@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { FeedbackService } from './feedback.service';
 import { FeedbackRepository } from './feedback.repository';
+import { CreateFeedbackDto } from './dto/create-feedback.dto';
 
 const mockRepo = {
   createFeedback: jest.fn(),
@@ -28,11 +29,11 @@ describe('FeedbackService', () => {
       mockRepo.createFeedback.mockResolvedValue(feedback);
       mockRepo.upsertPointsAndAwardBadges.mockResolvedValue({ points: 10, badges: [] });
 
-      const dto = { bookingId: 'b1', rating: 5, comment: 'Great session' };
-      const result = await service.submitFeedback('l1', dto as any);
+      const dto: CreateFeedbackDto = { bookingId: 'b1', rating: 5, comment: 'Great session' };
+      const result = await service.submitFeedback('l1', dto);
 
       expect(mockRepo.createFeedback).toHaveBeenCalledWith('l1', dto);
-      expect(mockRepo.upsertPointsAndAwardBadges).toHaveBeenCalledWith('l1', 'b1');
+      expect(mockRepo.upsertPointsAndAwardBadges).toHaveBeenCalledWith('l1');
       expect(result).toBe(feedback);
     });
 
@@ -41,7 +42,7 @@ describe('FeedbackService', () => {
       mockRepo.createFeedback.mockResolvedValue(feedback);
       mockRepo.upsertPointsAndAwardBadges.mockResolvedValue(null);
 
-      const result = await service.submitFeedback('l1', { bookingId: 'b2', rating: 4 } as any);
+      const result = await service.submitFeedback('l1', { bookingId: 'b2', rating: 4 });
 
       expect(result).toBe(feedback);
     });

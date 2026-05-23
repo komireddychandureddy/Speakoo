@@ -118,6 +118,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate code (build_runner)
+        run: dart run build_runner build --delete-conflicting-outputs
+
       - name: Analyze (must pass with zero warnings)
         run: flutter analyze --fatal-infos
 
@@ -143,7 +146,7 @@ jobs:
         run: docker build -t speakoo-api:ci ./apps/api
 
       - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.20.0
         with:
           image-ref: speakoo-api:ci
           format: table

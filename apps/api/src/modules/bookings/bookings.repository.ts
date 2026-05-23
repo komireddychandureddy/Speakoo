@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingStatus, SlotStatus } from '@prisma/client';
@@ -18,13 +18,18 @@ export class BookingsRepository {
         throw new ConflictException('Slot is no longer available');
       }
 
+      // Load the TutorProfile that owns this slot (slot.tutorId is TutorProfile.id)
+      const tutorProfile = await tx.tutorProfile.findUnique({ where: { id: slot.tutorId } });
+      if (!tutorProfile) throw new NotFoundException('Tutor profile not found');
+
+      // Validate the caller-provided tutorId matches the slot's actual tutor
+      if (tutorProfile.userId !== dto.tutorId) {
+        throw new BadRequestException('Slot does not belong to the specified tutor');
+      }
+
       await tx.availabilitySlot.update({
         where: { id: dto.slotId },
         data: { status: SlotStatus.booked },
-      });
-
-      const tutorProfile = await tx.tutorProfile.findUniqueOrThrow({
-        where: { userId: dto.tutorId },
       });
 
       const priceCents = tutorProfile.hourlyRateCents;
@@ -33,7 +38,7 @@ export class BookingsRepository {
       const booking = await tx.booking.create({
         data: {
           learnerId,
-          tutorId: dto.tutorId,
+          tutorId: tutorProfile.userId,
           slotId: dto.slotId,
           language: dto.language,
           priceCents,

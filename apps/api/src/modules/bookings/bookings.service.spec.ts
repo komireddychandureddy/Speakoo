@@ -3,15 +3,14 @@ import { BookingsService } from './bookings.service';
 import { BookingsRepository } from './bookings.repository';
 import { ConfigService } from '@nestjs/config';
 
+const refundsCreate = jest.fn();
+
 jest.mock('stripe', () => {
-  const refundsCreate = jest.fn();
   const MockStripe = jest.fn().mockImplementation(() => ({ refunds: { create: refundsCreate } }));
-  (MockStripe as any).__refundsCreate = refundsCreate;
   return { default: MockStripe };
 });
 
-import Stripe from 'stripe';
-const mockRefundsCreate = (Stripe as any).__refundsCreate as jest.Mock;
+const mockRefundsCreate = refundsCreate as jest.Mock;
 
 const mockRepo = {
   createBooking: jest.fn(),

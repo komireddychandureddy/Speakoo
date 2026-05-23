@@ -22,7 +22,8 @@ Dio dioClient(DioClientRef ref) {
         handler.next(options);
       },
       onError: (error, handler) async {
-        if (error.response?.statusCode == 401) {
+        if (error.response?.statusCode == 401 &&
+            error.requestOptions.extra['retryAttempted'] != true) {
           try {
             final refreshDio = Dio(BaseOptions(baseUrl: _baseUrl));
             final response = await refreshDio.post(
@@ -34,6 +35,7 @@ Dio dioClient(DioClientRef ref) {
             await storage.write(key: _accessTokenKey, value: newToken);
 
             error.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+            error.requestOptions.extra['retryAttempted'] = true;
             final retryResponse = await dio.fetch(error.requestOptions);
             handler.resolve(retryResponse);
             return;
