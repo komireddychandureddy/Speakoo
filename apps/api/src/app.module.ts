@@ -13,6 +13,9 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { AiAssessmentModule } from './modules/ai-assessment/ai-assessment.module';
+import { OnDemandModule } from './modules/on-demand/on-demand.module';
+import { GroupSessionsModule } from './modules/group-sessions/group-sessions.module';
 import { GlobalJwtAuthGuard } from './modules/auth/guards/global-jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -56,6 +59,9 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     NotificationsModule,
     FeedbackModule,
     AdminModule,
+    AiAssessmentModule,
+    OnDemandModule,
+    GroupSessionsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: GlobalJwtAuthGuard },
