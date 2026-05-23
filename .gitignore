@@ -1,6 +1,10 @@
-# Nestjs specific
-/dist
-/node_modules
+# Dependencies — all nested node_modules
+**/node_modules/
+node_modules/
+
+# Build outputs
+**/dist/
+dist/
 /build
 /tmp
 
@@ -13,9 +17,14 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# dotenv environment variable files
+# dotenv environment variable files — never commit real secrets
+# .env.example is the ONLY env file committed (no real values)
 .env
+.env.local
 .env.development
+.env.bil
+.env.qc
+.env.staging
 .env.test
 .env.production
 
