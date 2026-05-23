@@ -6,6 +6,7 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
@@ -49,13 +50,18 @@ export class AuthController {
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies?.[REFRESH_COOKIE] as string | undefined;
     if (!refreshToken) {
-      res.status(HttpStatus.UNAUTHORIZED).json({ message: 'No refresh token' });
-      return;
+      throw new UnauthorizedException('No refresh token');
     }
 
-    const payload = this.jwt.verify<{ sub: string }>(refreshToken, {
-      secret: this.config.getOrThrow('JWT_REFRESH_SECRET'),
-    });
+    let payload: { sub: string };
+    try {
+      payload = this.jwt.verify<{ sub: string }>(refreshToken, {
+        secret: this.config.getOrThrow('JWT_REFRESH_SECRET'),
+      });
+    } catch {
+      this.clearRefreshCookie(res);
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
 
     const tokens = await this.authService.refresh(payload.sub);
     this.setRefreshCookie(res, tokens.refreshToken);
@@ -65,7 +71,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie(REFRESH_COOKIE);
+    this.clearRefreshCookie(res);
   }
 
   private setRefreshCookie(res: Response, token: string) {
@@ -74,6 +80,15 @@ export class AuthController {
       secure: process.env['NODE_ENV'] === 'production',
       sameSite: 'strict',
       maxAge: COOKIE_MAX_AGE_MS,
+      path: '/api/v1/auth',
+    });
+  }
+
+  private clearRefreshCookie(res: Response) {
+    res.clearCookie(REFRESH_COOKIE, {
+      httpOnly: true,
+      secure: process.env['NODE_ENV'] === 'production',
+      sameSite: 'strict',
       path: '/api/v1/auth',
     });
   }

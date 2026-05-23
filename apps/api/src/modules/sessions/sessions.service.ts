@@ -41,7 +41,9 @@ export class SessionsService {
       canPublishData: true,
     });
 
-    return token.toJwt();
+    const jwt = await token.toJwt();
+    this.logger.log(`Token generated for user ${userId} in room ${booking.livekitRoom}`);
+    return jwt;
   }
 
   async startSession(bookingId: string, userId: string) {

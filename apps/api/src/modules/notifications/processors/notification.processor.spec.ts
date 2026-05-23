@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Job } from 'bull';
 import { NotificationProcessor } from './notification.processor';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationChannel, NotificationType } from '@prisma/client';
+import { NotificationJobData } from '../notifications.service';
 
 const mockResendEmailsSend = jest.fn();
 const mockTwilioMessagesCreate = jest.fn();
@@ -39,8 +41,8 @@ const mockConfig = {
   }),
 };
 
-function makeJob(data: object) {
-  return { data } as any;
+function makeJob(data: NotificationJobData) {
+  return { data } as unknown as Job<NotificationJobData>;
 }
 
 describe('NotificationProcessor', () => {

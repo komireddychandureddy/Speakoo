@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TutorsService } from './tutors.service';
 import { TutorsRepository } from './tutors.repository';
+import { CreateTutorProfileDto } from './dto/create-tutor-profile.dto';
+import { CreateAvailabilitySlotDto } from './dto/create-availability-slot.dto';
+import { SearchTutorsDto } from './dto/search-tutors.dto';
 
 const mockRepo = {
   upsertProfile: jest.fn(),
@@ -30,7 +33,7 @@ describe('TutorsService', () => {
     const profile = { userId: 'u1', bio: 'Hello' };
     mockRepo.upsertProfile.mockResolvedValue(profile);
 
-    const result = await service.upsertProfile('u1', { bio: 'Hello' } as any);
+    const result = await service.upsertProfile('u1', { bio: 'Hello' } as unknown as CreateTutorProfileDto);
 
     expect(mockRepo.upsertProfile).toHaveBeenCalledWith('u1', { bio: 'Hello' });
     expect(result).toBe(profile);
@@ -47,7 +50,7 @@ describe('TutorsService', () => {
     const slot = { id: 's1', tutorId: 'u1' };
     mockRepo.createSlot.mockResolvedValue(slot);
 
-    const result = await service.createSlot('u1', { startsAt: new Date() } as any);
+    const result = await service.createSlot('u1', { startsAt: new Date() } as unknown as CreateAvailabilitySlotDto);
 
     expect(mockRepo.createSlot).toHaveBeenCalledWith('u1', { startsAt: expect.any(Date) });
     expect(result).toBe(slot);
@@ -67,7 +70,7 @@ describe('TutorsService', () => {
     const tutors = [{ id: 'u1' }];
     mockRepo.searchTutors.mockResolvedValue(tutors);
 
-    const dto = { language: 'English', page: 1, limit: 10 } as any;
+    const dto = { language: 'English', page: 1, limit: 10 } as unknown as SearchTutorsDto;
     const result = await service.searchTutors(dto);
 
     expect(mockRepo.searchTutors).toHaveBeenCalledWith(dto);

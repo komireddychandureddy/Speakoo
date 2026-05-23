@@ -18,12 +18,6 @@ export class TutorsController {
     return this.tutorsService.searchTutors(dto);
   }
 
-  @Public()
-  @Get(':id')
-  getPublicProfile(@Param('id', ParseUUIDPipe) id: string) {
-    return this.tutorsService.getPublicTutorProfile(id);
-  }
-
   @Roles('tutor')
   @Post('profile')
   upsertProfile(@CurrentUser() user: User, @Body() dto: CreateTutorProfileDto) {
@@ -46,5 +40,11 @@ export class TutorsController {
   @Get('slots')
   getMySlots(@CurrentUser() user: User) {
     return this.tutorsService.getMySlots(user.id);
+  }
+
+  @Public()
+  @Get(':id')
+  getPublicProfile(@Param('id', ParseUUIDPipe) id: string) {
+    return this.tutorsService.getPublicTutorProfile(id);
   }
 }

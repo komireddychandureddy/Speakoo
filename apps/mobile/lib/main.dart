@@ -8,7 +8,10 @@ Future<void> main() async {
 
   await SentryFlutter.init(
     (options) {
-      options.dsn = const String.fromEnvironment('SENTRY_DSN');
+      final dsn = const String.fromEnvironment('SENTRY_DSN');
+      if (dsn.isNotEmpty) {
+        options.dsn = dsn;
+      }
       options.tracesSampleRate = 0.2;
     },
     appRunner: () => runApp(

@@ -6,7 +6,7 @@ services:
     container_name: speakoo-postgres
     environment:
       POSTGRES_USER: speakoo
-      POSTGRES_PASSWORD: devpassword
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
       POSTGRES_DB: speakoo_dev
     ports:
       - '5432:5432'
@@ -32,12 +32,12 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-03-15T01-07-19Z
     container_name: speakoo-minio
     command: server /data --console-address ':9001'
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
       - '9000:9000'
       - '9001:9001'
@@ -45,18 +45,18 @@ services:
       - minio_data:/data
 
   livekit:
-    image: livekit/livekit-server:latest
+    image: livekit/livekit-server:v1.7.2
     container_name: speakoo-livekit
     command: --dev
     environment:
-      LIVEKIT_KEYS: "devkey: devsecret"
+      LIVEKIT_KEYS: "${LIVEKIT_DEV_KEY:-devkey}: ${LIVEKIT_DEV_SECRET:-devsecret}"
     ports:
       - '7880:7880'
       - '7881:7881'
       - '7882:7882/udp'
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.51.0
     container_name: speakoo-prometheus
     ports:
       - '9090:9090'
@@ -65,12 +65,12 @@ services:
       - prometheus_data:/prometheus
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.4.0
     container_name: speakoo-grafana
     ports:
       - '3001:3000'
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
