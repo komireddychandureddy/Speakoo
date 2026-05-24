@@ -4,7 +4,7 @@ import { PaymentsService } from './payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ConfigService } from '@nestjs/config';
-import { PaymentStatus, BookingStatus } from '@prisma/client';
+import { PaymentStatus } from '@prisma/client';
 
 const mockPaymentIntentsCreate = jest.fn();
 const mockWebhooksConstructEvent = jest.fn();
