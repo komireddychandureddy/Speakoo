@@ -50,6 +50,33 @@ Required alongside Flutter:
 - **Xcode** (for iOS — macOS only): via App Store
 - **VS Code Flutter extension**: `ext install Dart-Code.flutter`
 
+#### Running the Flutter app in Chrome (web)
+
+```bash
+cd apps/mobile
+
+# 1. Enable web support (one-time setup)
+flutter config --enable-web
+
+# 2. Install dependencies and generate code
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+
+# 3. Launch in Chrome
+flutter run -d chrome
+
+# 4. Run widget tests on Chrome (headless)
+flutter test --platform chrome
+
+# 5. Build a production web bundle
+flutter build web --release
+# Output: apps/mobile/build/web/  (serve with any static host or nginx)
+```
+
+> **Note:** When running locally, the API defaults to `http://localhost:3000/api/v1`.
+> Make sure the backend is running (`docker compose up` or `pnpm run start:dev` inside `apps/api`).
+> To override: `flutter run -d chrome --dart-define=API_URL=http://your-api-host/api/v1`
+
 ---
 
 ### Git
@@ -147,7 +174,7 @@ docker run -d \
   -p 7880:7880 \
   -p 7881:7881 \
   -p 7882:7882/udp \
-  -e LIVEKIT_KEYS="devkey: devsecret" \
+  -e LIVEKIT_KEYS="devkey:devsecret" \
   livekit/livekit-server:latest \
   --dev
 
@@ -345,8 +372,12 @@ pnpm run start:dev
 cd ../mobile
 flutter pub get
 
-# 7. Run the app (with a connected device or emulator)
+# 7. Run the mobile app (with a connected device or emulator)
 flutter run
+
+# OR run in Chrome (web browser)
+flutter config --enable-web   # only needed once
+flutter run -d chrome
 ```
 
 ---
