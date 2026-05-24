@@ -1,4 +1,6 @@
+import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
+import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -10,7 +12,9 @@ const _accessTokenKey = 'access_token';
 @riverpod
 Dio dioClient(DioClientRef ref) {
   const storage = FlutterSecureStorage();
+  final cookieJar = CookieJar();
   final dio = Dio(BaseOptions(baseUrl: _baseUrl));
+  dio.interceptors.add(CookieManager(cookieJar));
 
   dio.interceptors.add(
     InterceptorsWrapper(
@@ -26,10 +30,8 @@ Dio dioClient(DioClientRef ref) {
             error.requestOptions.extra['retryAttempted'] != true) {
           try {
             final refreshDio = Dio(BaseOptions(baseUrl: _baseUrl));
-            final response = await refreshDio.post(
-              '/auth/refresh',
-              options: Options(extra: {'withCredentials': true}),
-            );
+            refreshDio.interceptors.add(CookieManager(cookieJar));
+            final response = await refreshDio.post('/auth/refresh');
 
             final newToken = response.data['accessToken'] as String;
             await storage.write(key: _accessTokenKey, value: newToken);

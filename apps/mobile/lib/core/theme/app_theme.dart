@@ -12,7 +12,6 @@ class AppTheme {
           seedColor: _primaryColor,
           secondary: _secondaryColor,
         ),
-        fontFamily: 'Inter',
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
         inputDecorationTheme: InputDecorationTheme(
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -33,7 +32,6 @@ class AppTheme {
           secondary: _secondaryColor,
           brightness: Brightness.dark,
         ),
-        fontFamily: 'Inter',
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
       );
 }

@@ -31,3 +31,7 @@ lerna-debug.log*
 # temp directory
 .temp
 .tmp
+
+# Compiled JavaScript artifacts in TypeScript source directories
+# (compiled output belongs in dist/, never committed alongside .ts source)
+apps/api/src/**/*.js
