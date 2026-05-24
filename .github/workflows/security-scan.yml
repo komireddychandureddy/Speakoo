@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      security-events: write
+
 
     steps:
       - name: Checkout code
@@ -20,6 +20,7 @@ jobs:
 
       - name: Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@v0.35.0
+
         with:
           scan-type: fs
           scan-ref: ./apps/api
@@ -38,6 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
 
     defaults:
       run:
