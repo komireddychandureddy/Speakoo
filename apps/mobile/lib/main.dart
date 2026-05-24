@@ -6,16 +6,18 @@ import 'app.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await SentryFlutter.init(
-    (options) {
-      final dsn = const String.fromEnvironment('SENTRY_DSN');
-      if (dsn.isNotEmpty) {
+  const dsn = String.fromEnvironment('SENTRY_DSN');
+  if (dsn.isNotEmpty) {
+    await SentryFlutter.init(
+      (options) {
         options.dsn = dsn;
-      }
-      options.tracesSampleRate = 0.2;
-    },
-    appRunner: () => runApp(
-      const ProviderScope(child: SpeakooApp()),
-    ),
-  );
+        options.tracesSampleRate = 0.2;
+      },
+      appRunner: () => runApp(
+        const ProviderScope(child: SpeakooApp()),
+      ),
+    );
+  } else {
+    runApp(const ProviderScope(child: SpeakooApp()));
+  }
 }
