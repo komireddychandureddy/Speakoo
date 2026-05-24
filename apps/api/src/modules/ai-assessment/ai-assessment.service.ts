@@ -13,7 +13,9 @@ export class AiAssessmentService {
     userId: string,
     dto: CreateAssessmentDto,
   ): Promise<{ userId: string; cefrLevel: string }> {
-    this.logger.log(`Assessing CEFR level for user ${userId} — AI integration pending`);
+    this.logger.log(
+      `Assessing CEFR level for user ${userId} with ${dto.answers?.length ?? 0} answers — AI integration pending`,
+    );
 
     // TODO: call AI provider with dto.answers and return evaluated CEFR level
     return { userId, cefrLevel: 'A1' };

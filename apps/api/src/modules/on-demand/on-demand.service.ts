@@ -13,7 +13,9 @@ export class OnDemandService {
     learnerId: string,
     dto: CreateOnDemandRequestDto,
   ): Promise<{ requestId: string; status: string }> {
-    this.logger.log(`On-demand tutor request from learner ${learnerId} — matching pending`);
+    this.logger.log(
+      `On-demand tutor request from learner ${learnerId} for ${dto.language} / ${dto.topic} — matching pending`,
+    );
 
     // TODO: find an available online tutor for dto.language/dto.topic and notify them
     const requestId = `odr_${Date.now()}`;
