@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+
+
 jobs:
   # ─── Backend (NestJS) ────────────────────────────────────────────
   api-lint-test:
@@ -146,7 +150,8 @@ jobs:
         run: docker build -t speakoo-api:ci ./apps/api
 
       - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@v0.20.0
+        uses: aquasecurity/trivy-action@v0.35.0
+
         with:
           image-ref: speakoo-api:ci
           format: table

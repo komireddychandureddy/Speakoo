@@ -135,7 +135,8 @@ describe('SessionsService', () => {
       mockPrisma.booking.findUniqueOrThrow.mockResolvedValue({
         id: 'b1',
         tutorId: 't1',
-        status: BookingStatus.booked,
+        status: BookingStatus.pending,
+
       });
 
       await expect(service.startSession('b1', 't1')).rejects.toThrow(ConflictException);

@@ -11,14 +11,16 @@ jobs:
     name: Trivy Container & FS Scan
     runs-on: ubuntu-latest
     permissions:
-      security-events: write
+      contents: read
+
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@v0.20.0
+        uses: aquasecurity/trivy-action@v0.35.0
+
         with:
           scan-type: fs
           scan-ref: ./apps/api
@@ -35,6 +37,9 @@ jobs:
   npm-audit:
     name: npm audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
 
     defaults:
       run:
