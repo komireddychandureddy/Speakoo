@@ -11,6 +11,7 @@ jobs:
     name: Trivy Container & FS Scan
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       security-events: write
 
     steps:
@@ -35,6 +36,8 @@ jobs:
   npm-audit:
     name: npm audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     defaults:
       run:
