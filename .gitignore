@@ -1,3 +1,6 @@
+# Playwright MCP snapshots
+.playwright-mcp/
+
 # Dependencies — all nested node_modules
 **/node_modules/
 node_modules/
