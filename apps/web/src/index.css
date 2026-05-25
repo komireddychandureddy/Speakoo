@@ -1,0 +1,76 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    font-family: 'Urbanist', sans-serif;
+  }
+
+  body {
+    @apply bg-[#F8FBF0] text-gray-900;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[#43A047] text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-[#2E7D32] transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-outline {
+    @apply border border-[#43A047] text-[#43A047] bg-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-[#E8F5E9] transition-colors;
+  }
+
+  .btn-light {
+    @apply bg-[#E8F5E9] text-[#2E7D32] px-5 py-2 rounded-full text-sm font-semibold hover:bg-[#C8E6C9] transition-colors;
+  }
+
+  .btn-gold {
+    @apply bg-[#FAC847] text-gray-900 px-5 py-2 rounded-lg text-sm font-semibold hover:bg-yellow-400 transition-colors;
+  }
+
+  .card {
+    @apply bg-white border border-[#E8F5E9] rounded-xl shadow-sm;
+  }
+
+  .filter-chip {
+    @apply px-4 py-1.5 rounded-full text-sm font-medium border border-gray-300 text-gray-700 cursor-pointer hover:border-[#43A047] hover:text-[#43A047] transition-colors whitespace-nowrap;
+  }
+
+  .filter-chip-active {
+    @apply px-4 py-1.5 rounded-full text-sm font-medium bg-[#43A047] text-white cursor-pointer whitespace-nowrap;
+  }
+
+  .tab-item {
+    @apply px-4 py-2 text-sm font-medium text-gray-500 cursor-pointer whitespace-nowrap border-b-2 border-transparent hover:text-[#43A047] transition-colors;
+  }
+
+  .tab-item-active {
+    @apply px-4 py-2 text-sm font-medium text-[#43A047] cursor-pointer whitespace-nowrap border-b-2 border-[#43A047];
+  }
+
+  .badge-green {
+    @apply bg-[#C8E6C9] text-[#2E7D32] text-xs font-semibold px-3 py-1 rounded-full;
+  }
+
+  .badge-light {
+    @apply bg-[#E8F5E9] text-[#388E3C] text-xs font-semibold px-3 py-1 rounded-full;
+  }
+
+  .badge-gold {
+    @apply bg-[#FAC847] text-gray-900 text-xs font-semibold px-3 py-1 rounded-full;
+  }
+}
