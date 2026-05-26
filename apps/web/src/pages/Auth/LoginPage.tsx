@@ -14,6 +14,10 @@ export default function LoginPage() {
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotMobile, setForgotMobile] = useState('');
   const [error, setError] = useState('');
+  const [role, setRole] = useState<'learner' | 'tutor'>('learner');
+
+  // Login name field
+  const [loginName, setLoginName] = useState('');
 
   // Signup fields
   const [name, setName] = useState('');
@@ -24,10 +28,11 @@ export default function LoginPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!loginName.trim()) return setError('Please enter your name.');
     if (!mobile) return setError('Please enter your mobile number.');
     if (!password) return setError('Please enter your password.');
     if (!/^\d{10}$/.test(mobile)) return setError('Enter a valid 10-digit mobile number.');
-    localStorage.setItem('speakoo_user', JSON.stringify({ mobile, name: 'Rahul' }));
+    localStorage.setItem('speakoo_user', JSON.stringify({ mobile, name: loginName.trim(), role }));
     navigate('/dashboard');
   };
 
@@ -35,7 +40,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     if (!name || !signupMobile || !signupPw) return setError('All fields are required.');
-    localStorage.setItem('speakoo_user', JSON.stringify({ mobile: signupMobile, name }));
+    localStorage.setItem('speakoo_user', JSON.stringify({ mobile: signupMobile, name, role }));
     navigate('/dashboard');
   };
 
@@ -52,7 +57,7 @@ export default function LoginPage() {
       facebook: 'Facebook User',
       apple: 'Apple User',
     };
-    localStorage.setItem('speakoo_user', JSON.stringify({ name: mockNames[provider], provider }));
+    localStorage.setItem('speakoo_user', JSON.stringify({ name: mockNames[provider], provider, role }));
     navigate('/dashboard');
   };
 
@@ -143,8 +148,37 @@ export default function LoginPage() {
                 <p className="text-red-500 text-sm mb-4 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
               )}
 
+              {/* Role Selector */}
+              <div className="flex gap-2 mb-4 p-1 bg-gray-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setRole('learner')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                    role === 'learner' ? 'bg-[#43A047] text-white shadow' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  🎓 Learner
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole('tutor')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                    role === 'tutor' ? 'bg-[#43A047] text-white shadow' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  👩‍🏫 Tutor
+                </button>
+              </div>
+
               {tab === 'login' ? (
                 <form onSubmit={handleLogin} className="space-y-4">
+                  <input
+                    type="text"
+                    placeholder="Your Name"
+                    value={loginName}
+                    onChange={(e) => setLoginName(e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
+                  />
                   <div className="flex gap-2">
                     <select
                       value={countryCode}

@@ -15,12 +15,20 @@ export default function DashboardPage() {
   const upcoming = SESSIONS.filter((s) => s.status === 'upcoming').slice(0, 2);
   const unread = NOTIFICATIONS.filter((n) => !n.isRead).length;
 
+  const storedUser = (() => {
+    try { return JSON.parse(localStorage.getItem('speakoo_user') ?? '{}'); } catch { return {}; }
+  })();
+  const userName: string = storedUser.name || 'there';
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Welcome Banner */}
       <div className="card px-6 py-5 bg-gradient-to-r from-[#43A047] to-[#43A047] text-white rounded-2xl">
-        <p className="text-purple-200 text-sm font-medium mb-1">Good morning 👋</p>
-        <h2 className="text-2xl font-extrabold">Hello, Rahul!</h2>
+        <p className="text-purple-200 text-sm font-medium mb-1">{greeting} 👋</p>
+        <h2 className="text-2xl font-extrabold">Hello, {userName}!</h2>
         <p className="text-purple-200 text-sm mt-1">Keep practising to improve your English skills!</p>
         <div className="flex items-center gap-6 mt-4">
           <div className="text-center">

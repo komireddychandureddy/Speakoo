@@ -26,10 +26,20 @@ const TUTOR_ITEMS = [
   { icon: '💸', label: 'Payouts', to: '/tutor-payout' },
 ];
 
+function getUser(): { name?: string; role?: string } {
+  try {
+    return JSON.parse(localStorage.getItem('speakoo_user') ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
 export default function Sidebar() {
   const navigate = useNavigate();
   const [showConfirm, setShowConfirm] = useState(false);
   const { t } = useI18n();
+  const user = getUser();
+  const isTutor = user.role === 'tutor';
 
   const handleLogout = () => {
     localStorage.removeItem('speakoo_user');
@@ -65,26 +75,30 @@ export default function Sidebar() {
           </NavLink>
         ))}
 
-        {/* Tutor Section */}
-        <div className="pt-3 mt-2 border-t border-white/10">
-          <span className="px-3 text-[10px] uppercase tracking-widest font-semibold text-gray-500">Tutor</span>
-        </div>
-        {TUTOR_ITEMS.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-[#141A16] text-white'
-                  : 'text-gray-300 hover:bg-white/10 hover:text-white'
-              }`
-            }
-          >
-            <span className="text-base leading-none">{item.icon}</span>
-            <span className="leading-tight">{item.label}</span>
-          </NavLink>
-        ))}
+        {/* Tutor Section — only shown for tutor role */}
+        {isTutor && (
+          <>
+            <div className="pt-3 mt-2 border-t border-white/10">
+              <span className="px-3 text-[10px] uppercase tracking-widest font-semibold text-gray-500">Tutor</span>
+            </div>
+            {TUTOR_ITEMS.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-[#141A16] text-white'
+                      : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                  }`
+                }
+              >
+                <span className="text-base leading-none">{item.icon}</span>
+                <span className="leading-tight">{item.label}</span>
+              </NavLink>
+            ))}
+          </>
+        )}
       </nav>
 
       {/* Logout */}
