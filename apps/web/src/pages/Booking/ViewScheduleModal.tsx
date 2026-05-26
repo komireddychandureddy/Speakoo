@@ -1,10 +1,13 @@
 ﻿import { useState } from 'react';
 import { X } from 'lucide-react';
 import { TIME_SLOTS } from '../../data/mockData';
+import { useLocale } from '../../core/locale/LocaleContext';
+import { slotToUserTime, tzAbbr } from '../../core/utils/timezone';
 
 interface Props {
   tutorName: string;
   selectedDate: string;
+  tutorTz?: string;
   onClose: () => void;
   onBook: (timeSlot: string) => void;
 }
@@ -12,8 +15,10 @@ interface Props {
 // Simulate some slots as reserved
 const RESERVED_SLOTS = ['8:00 AM', '9:00 AM', '11:00 AM', '2:00 PM', '4:00 PM', '6:00 PM'];
 
-export default function ViewScheduleModal({ tutorName, selectedDate, onClose, onBook }: Props) {
+export default function ViewScheduleModal({ tutorName, selectedDate, tutorTz, onClose, onBook }: Props) {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const { userTz } = useLocale();
+  const showTz = !!tutorTz && tutorTz !== userTz;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -28,6 +33,13 @@ export default function ViewScheduleModal({ tutorName, selectedDate, onClose, on
             <X size={18} />
           </button>
         </div>
+
+        {/* Timezone info banner */}
+        {showTz && (
+          <div className="px-6 py-2.5 bg-[#E8F5E9] border-b border-[#C8E6C9] text-xs text-[#2E7D32]">
+            🕒 Times in your timezone ({tzAbbr(userTz)}). Tutor is in ({tzAbbr(tutorTz!)}).
+          </div>
+        )}
 
         {/* Legend */}
         <div className="flex gap-4 px-6 py-3 border-b border-[#EEEEEE] text-xs">
@@ -51,12 +63,13 @@ export default function ViewScheduleModal({ tutorName, selectedDate, onClose, on
             {TIME_SLOTS.map((slot) => {
               const reserved = RESERVED_SLOTS.includes(slot);
               const selected = selectedSlot === slot;
+              const displayTime = showTz ? slotToUserTime(slot, tutorTz!, userTz) : slot;
               return (
                 <button
                   key={slot}
                   disabled={reserved}
                   onClick={() => setSelectedSlot(slot)}
-                  className={`py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
+                  className={`py-2.5 rounded-xl text-sm font-medium border-2 transition-all flex flex-col items-center ${
                     reserved
                       ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
                       : selected
@@ -64,7 +77,10 @@ export default function ViewScheduleModal({ tutorName, selectedDate, onClose, on
                       : 'bg-[#BBF7D0] border-[#14783D] text-[#14783D] hover:border-[#43A047]'
                   }`}
                 >
-                  {slot}
+                  <span>{displayTime}</span>
+                  {showTz && displayTime !== slot && (
+                    <span className="text-[10px] opacity-60">{slot}</span>
+                  )}
                 </button>
               );
             })}
@@ -77,7 +93,9 @@ export default function ViewScheduleModal({ tutorName, selectedDate, onClose, on
             onClick={() => selectedSlot && onBook(selectedSlot)}
             className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {selectedSlot ? `Book ${selectedSlot}` : 'Select a time slot'}
+            {selectedSlot
+              ? `Book ${showTz ? slotToUserTime(selectedSlot, tutorTz!, userTz) : selectedSlot}`
+              : 'Select a time slot'}
           </button>
         </div>
       </div>

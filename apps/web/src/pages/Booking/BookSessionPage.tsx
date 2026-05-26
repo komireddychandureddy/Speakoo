@@ -150,6 +150,7 @@ export default function BookSessionPage() {
         <ViewScheduleModal
           tutorName={scheduleModal.tutorName}
           selectedDate={weekDates[selectedDayIdx].full}
+          tutorTz={TUTORS.find((t) => t.id === scheduleModal.tutorId)?.timezone}
           onClose={() => setScheduleModal(null)}
           onBook={handleBook}
         />

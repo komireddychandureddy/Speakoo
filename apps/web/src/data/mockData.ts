@@ -13,6 +13,8 @@ export interface Tutor {
   experience: string;
   pricePerSession: number;
   isAvailable: boolean;
+  country: string;
+  timezone: string;
 }
 
 export interface Session {
@@ -78,6 +80,8 @@ export const TUTORS: Tutor[] = [
     experience: '8 years',
     pricePerSession: 499,
     isAvailable: true,
+    country: 'India',
+    timezone: 'Asia/Kolkata',
   },
   {
     id: '2',
@@ -94,6 +98,8 @@ export const TUTORS: Tutor[] = [
     experience: '6 years',
     pricePerSession: 449,
     isAvailable: true,
+    country: 'India',
+    timezone: 'Asia/Kolkata',
   },
   {
     id: '3',
@@ -105,10 +111,12 @@ export const TUTORS: Tutor[] = [
     isFavourite: false,
     bio: 'Passionate about making English accessible to everyone. Specialise in vocabulary building and grammar correction.',
     tutorSince: 2019,
-    language: 'English',
+    language: 'French',
     experience: '5 years',
     pricePerSession: 399,
     isAvailable: false,
+    country: 'United Kingdom',
+    timezone: 'Europe/London',
   },
   {
     id: '4',
@@ -124,6 +132,8 @@ export const TUTORS: Tutor[] = [
     experience: '9 years',
     pricePerSession: 549,
     isAvailable: true,
+    country: 'Canada',
+    timezone: 'America/Toronto',
   },
   {
     id: '5',
@@ -135,10 +145,12 @@ export const TUTORS: Tutor[] = [
     isFavourite: false,
     bio: 'Friendly and patient tutor who believes every learner has unique potential. Focus on building confidence.',
     tutorSince: 2020,
-    language: 'English',
+    language: 'Spanish',
     experience: '4 years',
     pricePerSession: 349,
     isAvailable: true,
+    country: 'Australia',
+    timezone: 'Australia/Sydney',
   },
   {
     id: '6',
@@ -154,6 +166,8 @@ export const TUTORS: Tutor[] = [
     experience: '7 years',
     pricePerSession: 499,
     isAvailable: false,
+    country: 'United States',
+    timezone: 'America/New_York',
   },
 ];
 
@@ -405,6 +419,81 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   { id: 'p3', sessions: 120, isRecommended: true },
 ];
 
+// ─── Practice ─────────────────────────────────────────────────────────────────
+
+export type CEFRLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+export type ExerciseType = 'speaking' | 'reading' | 'listening' | 'phonetics' | 'word-puzzle' | 'sentence';
+
+export interface PracticeSession {
+  id: string;
+  title: string;
+  language: string;
+  flag: string;
+  level: CEFRLevel;
+  scheduledAt: string;
+  durationMinutes: number;
+  hostName: string;
+  hostAvatar: string;
+  maxParticipants: number;
+  currentParticipants: number;
+  creditCost: number;
+  topic: string;
+  type: ExerciseType;
+}
+
+export const PRACTICE_SESSIONS: PracticeSession[] = [
+  { id: 'ps1', title: 'Morning English Conversation Circle', language: 'English', flag: '🇬🇧', level: 'B1', scheduledAt: '2026-06-15T06:00:00Z', durationMinutes: 30, hostName: 'Priya Sharma', hostAvatar: 'PS', maxParticipants: 6, currentParticipants: 4, creditCost: 5, topic: 'Daily Life & Routines', type: 'speaking' },
+  { id: 'ps2', title: 'French Pronunciation Bootcamp', language: 'French', flag: '🇫🇷', level: 'A2', scheduledAt: '2026-06-15T09:00:00Z', durationMinutes: 25, hostName: 'Anjali Gupta', hostAvatar: 'AG', maxParticipants: 4, currentParticipants: 2, creditCost: 5, topic: 'Nasal Vowels & Silent Letters', type: 'phonetics' },
+  { id: 'ps3', title: 'Spanish Storytelling Session', language: 'Spanish', flag: '🇪🇸', level: 'B2', scheduledAt: '2026-06-15T12:00:00Z', durationMinutes: 30, hostName: 'Rahul Verma', hostAvatar: 'RV', maxParticipants: 5, currentParticipants: 5, creditCost: 5, topic: 'Narrating Past Events', type: 'speaking' },
+  { id: 'ps4', title: 'German Reading Comprehension', language: 'German', flag: '🇩🇪', level: 'B1', scheduledAt: '2026-06-15T15:00:00Z', durationMinutes: 25, hostName: 'Vikram Singh', hostAvatar: 'VS', maxParticipants: 6, currentParticipants: 1, creditCost: 5, topic: 'News Articles & Opinions', type: 'reading' },
+  { id: 'ps5', title: 'Japanese Listening Challenge', language: 'Japanese', flag: '🇯🇵', level: 'A1', scheduledAt: '2026-06-16T04:00:00Z', durationMinutes: 20, hostName: 'Meena Patel', hostAvatar: 'MP', maxParticipants: 8, currentParticipants: 5, creditCost: 5, topic: 'Greetings & Basic Phrases', type: 'listening' },
+  { id: 'ps6', title: 'Arabic Script & Sounds', language: 'Arabic', flag: '🇸🇦', level: 'A1', scheduledAt: '2026-06-16T07:00:00Z', durationMinutes: 25, hostName: 'Arjun Nair', hostAvatar: 'AN', maxParticipants: 6, currentParticipants: 3, creditCost: 5, topic: 'Alphabet & Short Vowels', type: 'phonetics' },
+];
+
+// ─── Community ────────────────────────────────────────────────────────────────
+
+export interface CommunityThread {
+  id: string;
+  title: string;
+  body: string;
+  language: string;
+  flag: string;
+  category: 'question' | 'discussion' | 'tip' | 'resource';
+  authorName: string;
+  authorAvatar: string;
+  createdAt: string;
+  replies: number;
+  likes: number;
+  tags: string[];
+}
+
+export interface CommunityReply {
+  id: string;
+  threadId: string;
+  authorName: string;
+  authorAvatar: string;
+  body: string;
+  createdAt: string;
+  likes: number;
+}
+
+export const COMMUNITY_THREADS: CommunityThread[] = [
+  { id: 'ct1', title: "What's the best way to practice the French \"R\" sound?", body: "I've been struggling with the French guttural R for months. Any tips from native speakers or advanced learners?", language: 'French', flag: '🇫🇷', category: 'question', authorName: 'Rahul V.', authorAvatar: 'RV', createdAt: '2026-05-24T10:00:00Z', replies: 12, likes: 34, tags: ['pronunciation', 'phonetics', 'french'] },
+  { id: 'ct2', title: 'My 90-day Spanish journey — from A1 to B1', body: "I started learning Spanish in February with zero knowledge. Here's how I structured my daily practice routine and what actually worked...", language: 'Spanish', flag: '🇪🇸', category: 'discussion', authorName: 'Priya S.', authorAvatar: 'PS', createdAt: '2026-05-22T08:30:00Z', replies: 27, likes: 89, tags: ['journey', 'motivation', 'tips'] },
+  { id: 'ct3', title: '10 German words English speakers always get wrong', body: 'False friends and common pitfalls for English speakers learning German — gender, cases, and word order traps...', language: 'German', flag: '🇩🇪', category: 'tip', authorName: 'Vikram S.', authorAvatar: 'VS', createdAt: '2026-05-20T14:00:00Z', replies: 8, likes: 56, tags: ['vocabulary', 'common-mistakes', 'german'] },
+  { id: 'ct4', title: 'Curated playlist for improving English listening comprehension', body: 'YouTube channels, podcasts, and Netflix shows that helped me jump from B1 to C1 in listening comprehension over 6 months...', language: 'English', flag: '🇬🇧', category: 'resource', authorName: 'Anjali G.', authorAvatar: 'AG', createdAt: '2026-05-18T11:00:00Z', replies: 31, likes: 112, tags: ['listening', 'resources', 'english'] },
+  { id: 'ct5', title: 'How do you stay motivated during language learning plateaus?', body: "Hit a wall with my Japanese after 6 months. It feels like I'm not progressing anymore. How do you all handle this feeling?", language: 'Japanese', flag: '🇯🇵', category: 'question', authorName: 'Meena P.', authorAvatar: 'MP', createdAt: '2026-05-16T07:00:00Z', replies: 19, likes: 67, tags: ['motivation', 'plateau', 'mindset'] },
+  { id: 'ct6', title: 'Arabic script — is it really that hard for absolute beginners?', body: "Everyone told me Arabic script is impossible. I'm 3 weeks in and it's actually not that bad. Here's my approach and daily routine...", language: 'Arabic', flag: '🇸🇦', category: 'discussion', authorName: 'Arjun N.', authorAvatar: 'AN', createdAt: '2026-05-14T09:30:00Z', replies: 14, likes: 43, tags: ['arabic', 'script', 'writing'] },
+];
+
+export const COMMUNITY_REPLIES: CommunityReply[] = [
+  { id: 'cr1', threadId: 'ct1', authorName: 'Vikram S.', authorAvatar: 'VS', body: 'Try gargling water — it trains the exact muscle group used for the French R. Do it for 5 minutes a day for a week!', createdAt: '2026-05-24T11:30:00Z', likes: 18 },
+  { id: 'cr2', threadId: 'ct1', authorName: 'Anjali G.', authorAvatar: 'AG', body: 'The IPA symbol is /ʁ/. Listen to recordings on Forvo.com and slow down the playback to 50%. Mirror the mouth position.', createdAt: '2026-05-24T13:00:00Z', likes: 12 },
+  { id: 'cr3', threadId: 'ct1', authorName: 'Priya S.', authorAvatar: 'PS', body: "In Southern France, many people use a tapped R instead of the guttural one — it's totally acceptable! Don't stress about perfection.", createdAt: '2026-05-25T08:00:00Z', likes: 9 },
+  { id: 'cr4', threadId: 'ct2', authorName: 'Rahul V.', authorAvatar: 'RV', body: 'Amazing progress! What app did you use for daily vocabulary practice? Was it Anki or something else?', createdAt: '2026-05-22T10:00:00Z', likes: 7 },
+  { id: 'cr5', threadId: 'ct2', authorName: 'Meena P.', authorAvatar: 'MP', body: "That's inspiring! I've been stuck at A2 for 4 months. Do you have a specific resource list you can share?", createdAt: '2026-05-23T09:00:00Z', likes: 5 },
+];
+
 export const SUBSCRIPTION_PRICES: Record<string, Record<number, number>> = {
   '1 Month': { 72: 2999, 96: 3799, 120: 4599 },
   '2 Month': { 72: 5599, 96: 7199, 120: 8799 },
@@ -412,3 +501,86 @@ export const SUBSCRIPTION_PRICES: Record<string, Record<number, number>> = {
   '6 Month': { 72: 13999, 96: 17999, 120: 21999 },
   '12 Month': { 72: 24999, 96: 31999, 120: 38999 },
 };
+
+export interface Learner {
+  id: string;
+  name: string;
+  avatar: string;
+  email: string;
+  sessionsCompleted: number;
+  status: 'active' | 'suspended';
+  joinedDate: string;
+  language: string;
+  country: string;
+}
+
+export const LEARNERS: Learner[] = [
+  { id: 'u1', name: 'Aisha Patel', avatar: 'AP', email: 'aisha@example.com', sessionsCompleted: 24, status: 'active', joinedDate: '2025-01-15', language: 'English', country: 'India' },
+  { id: 'u2', name: 'Carlos Ruiz', avatar: 'CR', email: 'carlos@example.com', sessionsCompleted: 12, status: 'active', joinedDate: '2025-03-08', language: 'Spanish', country: 'Mexico' },
+  { id: 'u3', name: 'Yuki Tanaka', avatar: 'YT', email: 'yuki@example.com', sessionsCompleted: 36, status: 'active', joinedDate: '2024-11-20', language: 'English', country: 'Japan' },
+  { id: 'u4', name: 'Fatima Al-Rashid', avatar: 'FA', email: 'fatima@example.com', sessionsCompleted: 8, status: 'suspended', joinedDate: '2025-05-01', language: 'French', country: 'UAE' },
+  { id: 'u5', name: 'James Okonkwo', avatar: 'JO', email: 'james@example.com', sessionsCompleted: 19, status: 'active', joinedDate: '2025-02-14', language: 'English', country: 'Nigeria' },
+  { id: 'u6', name: 'Sofia Martinez', avatar: 'SM', email: 'sofia@example.com', sessionsCompleted: 45, status: 'active', joinedDate: '2024-09-10', language: 'German', country: 'Spain' },
+  { id: 'u7', name: 'Wei Chen', avatar: 'WC', email: 'wei@example.com', sessionsCompleted: 31, status: 'active', joinedDate: '2024-12-05', language: 'English', country: 'China' },
+  { id: 'u8', name: 'Liam Murphy', avatar: 'LM', email: 'liam@example.com', sessionsCompleted: 3, status: 'suspended', joinedDate: '2026-01-22', language: 'Spanish', country: 'Ireland' },
+];
+
+// ── Tutor Applications ──────────────────────────────────────────
+
+export type ApplicationStatus = 'pending' | 'approved' | 'amendment_requested' | 'rejected';
+
+export interface TutorApplication {
+  id: string;
+  refNumber: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  country: string;
+  city: string;
+  languages: string[];
+  proficiency: string;
+  certifications: string[];
+  yearsExp: string;
+  bio: string;
+  teachingStyle: string;
+  maxSessions: string;
+  availability: string[];
+  submittedAt: string;
+  status: ApplicationStatus;
+  adminFeedback?: string;
+  reviewedAt?: string;
+}
+
+export const TUTOR_APPLICATIONS: TutorApplication[] = [
+  { id: 'app1', refNumber: 'TUT-A3K9X', firstName: 'Aisha', lastName: 'Mahmood', email: 'aisha.m@example.com', phone: '+91 98765 43210', country: 'India', city: 'Mumbai', languages: ['English', 'Hindi'], proficiency: 'Native', certifications: ['CELTA'], yearsExp: '4', bio: 'Passionate English educator with 4 years teaching corporate professionals.', teachingStyle: 'Conversational and task-based approach', maxSessions: '20', availability: ['Monday', 'Wednesday', 'Friday'], submittedAt: '2026-05-20T09:15:00Z', status: 'pending' },
+  { id: 'app2', refNumber: 'TUT-B7M2P', firstName: 'Carlos', lastName: 'Fuentes', email: 'carlos.f@example.com', phone: '+52 55 1234 5678', country: 'Mexico', city: 'Mexico City', languages: ['Spanish', 'English'], proficiency: 'Native', certifications: ['TEFL', "Bachelor's in Education"], yearsExp: '7', bio: 'Experienced Spanish teacher with TEFL certification. Taught in schools across Latin America.', teachingStyle: 'Immersive and structured grammar-based', maxSessions: '30', availability: ['Tuesday', 'Thursday', 'Saturday'], submittedAt: '2026-05-18T14:30:00Z', status: 'approved', adminFeedback: 'Excellent profile. Strong certifications and solid experience.', reviewedAt: '2026-05-19T10:00:00Z' },
+  { id: 'app3', refNumber: 'TUT-C1Q4Z', firstName: 'Mei', lastName: 'Zhang', email: 'mei.zhang@example.com', phone: '+86 138 0000 1234', country: 'China', city: 'Shanghai', languages: ['Mandarin', 'English'], proficiency: 'Advanced', certifications: ["Master's Degree"], yearsExp: '3', bio: 'Mandarin tutor with a Masters in Linguistics. Specialise in business Mandarin for professionals.', teachingStyle: 'Structured with focus on tones and writing systems', maxSessions: '15', availability: ['Monday', 'Tuesday', 'Wednesday', 'Thursday'], submittedAt: '2026-05-22T08:00:00Z', status: 'amendment_requested', adminFeedback: 'Please upload your degree certificate and add an intro video link. Also clarify your availability timezone (CST or IST).', reviewedAt: '2026-05-23T11:30:00Z' },
+  { id: 'app4', refNumber: 'TUT-D5R8W', firstName: 'Olumide', lastName: 'Adeyemi', email: 'olumide@example.com', phone: '+234 80 1234 5678', country: 'Nigeria', city: 'Lagos', languages: ['English', 'Yoruba'], proficiency: 'Native', certifications: ['TESOL'], yearsExp: '2', bio: 'Enthusiastic new teacher eager to help learners build conversational English confidence.', teachingStyle: 'Relaxed conversational sessions with real-world examples', maxSessions: '10', availability: ['Saturday', 'Sunday'], submittedAt: '2026-05-24T17:45:00Z', status: 'pending' },
+  { id: 'app5', refNumber: 'TUT-E9T6L', firstName: 'Sophie', lastName: 'Dubois', email: 'sophie.d@example.com', phone: '+33 6 12 34 56 78', country: 'France', city: 'Paris', languages: ['French', 'English'], proficiency: 'Native', certifications: ['CELTA', 'PhD'], yearsExp: '12', bio: 'PhD in French Literature with 12 years teaching French as a foreign language at university level.', teachingStyle: 'Academic and immersive, literature-grounded', maxSessions: '25', availability: ['Monday', 'Wednesday', 'Friday', 'Saturday'], submittedAt: '2026-05-15T11:00:00Z', status: 'rejected', adminFeedback: 'We cannot onboard additional French tutors at this time due to supply. Please reapply in 3 months.', reviewedAt: '2026-05-16T09:00:00Z' },
+  { id: 'app6', refNumber: 'TUT-F2V0K', firstName: 'Yusuf', lastName: 'Al-Farsi', email: 'yusuf.af@example.com', phone: '+971 50 123 4567', country: 'UAE', city: 'Dubai', languages: ['Arabic', 'English'], proficiency: 'Native', certifications: ["Bachelor's in Education", 'TEFL'], yearsExp: '5', bio: 'Arabic language educator with 5 years in both online and classroom settings across the Gulf.', teachingStyle: 'Systematic grammar with cultural and dialectal context', maxSessions: '20', availability: ['Tuesday', 'Thursday', 'Friday', 'Sunday'], submittedAt: '2026-05-23T13:20:00Z', status: 'pending' },
+];
+
+// ── Credits & Pricing ────────────────────────────────────────────
+
+export const PLATFORM_FEE_PERCENT = 5;
+
+/** Base session prices in INR by duration (minutes) */
+export const BASE_SESSION_PRICES: Record<number, number> = { 30: 99, 45: 149, 60: 199, 90: 299 };
+
+export const MOCK_CREDIT_BALANCE = 350;
+
+export interface CreditPack {
+  id: string;
+  credits: number;
+  priceInr: number;
+  bonusCredits?: number;
+  label: string;
+}
+
+export const CREDIT_PACKS: CreditPack[] = [
+  { id: 'cp1', credits: 500, priceInr: 500, label: 'Starter' },
+  { id: 'cp2', credits: 1050, priceInr: 1000, bonusCredits: 50, label: 'Popular' },
+  { id: 'cp3', credits: 2750, priceInr: 2500, bonusCredits: 250, label: 'Pro' },
+  { id: 'cp4', credits: 5750, priceInr: 5000, bonusCredits: 750, label: 'Max' },
+];

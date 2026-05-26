@@ -1,23 +1,35 @@
 ﻿import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useI18n } from '../../core/i18n/I18nContext';
 
 const NAV_ITEMS = [
-  { icon: '🏠', label: 'Dashboard', to: '/dashboard' },
-  { icon: '📅', label: 'My Sessions', to: '/mySession' },
-  { icon: '📖', label: 'Book Session', to: '/myClass' },
-  { icon: '👩‍🏫', label: 'All Tutors', to: '/allTutors' },
-  { icon: '📚', label: 'EY Resource', to: '/ey-resource' },
-  { icon: '📋', label: 'Curriculum', to: '/Curriculum' },
-  { icon: '💳', label: 'Choose a Subscription', to: '/chooseSubscription' },
-  { icon: '👤', label: 'My Profile', to: '/myProfile' },
-  { icon: '🎁', label: 'Refer & Earn', to: '/reffer_earn' },
-  { icon: '🏆', label: 'My Level', to: '/Leaderboard' },
-  { icon: '❓', label: 'FAQs', to: '/faq' },
+  { icon: '🏠', key: 'nav_dashboard', to: '/dashboard' },
+  { icon: '📅', key: 'nav_sessions', to: '/mySession' },
+  { icon: '📖', key: 'nav_book', to: '/myClass' },
+  { icon: '👩‍🏫', key: 'nav_tutors', to: '/allTutors' },
+  { icon: '📚', key: 'nav_resources', to: '/ey-resource' },
+  { icon: '📋', key: 'nav_curriculum', to: '/Curriculum' },
+  { icon: '💎', key: 'nav_credits', to: '/my-credits' },
+  { icon: '👤', key: 'nav_profile', to: '/myProfile' },
+  { icon: '🎁', key: 'nav_refer', to: '/reffer_earn' },
+  { icon: '🏆', key: 'nav_leaderboard', to: '/Leaderboard' },
+  { icon: '❓', key: 'nav_faq', to: '/faq' },
+  { icon: '🎙️', key: 'nav_practice', to: '/practice' },
+  { icon: '🌐', key: 'nav_community', to: '/community' },
+] as const;
+
+const TUTOR_ITEMS = [
+  { icon: '📊', label: 'Tutor Dashboard', to: '/tutor-dashboard' },
+  { icon: '💰', label: 'Tutor Earnings', to: '/tutor-earnings' },
+  { icon: '🗓️', label: 'Schedule', to: '/tutor-schedule' },
+  { icon: '💲', label: 'My Pricing', to: '/tutor-pricing' },
+  { icon: '💸', label: 'Payouts', to: '/tutor-payout' },
 ];
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const [showConfirm, setShowConfirm] = useState(false);
+  const { t } = useI18n();
 
   const handleLogout = () => {
     localStorage.removeItem('speakoo_user');
@@ -31,12 +43,33 @@ export default function Sidebar() {
         <span className="text-white text-2xl font-extrabold tracking-tight">
           Speakoo
         </span>
-        <span className="block text-purple-300 text-xs font-medium mt-0.5">English Learning Platform</span>
+        <span className="block text-[#76D275] text-xs font-medium mt-0.5">Language Learning</span>
       </div>
 
-      {/* Nav Items */}
-      <nav className="flex-1 py-4 space-y-0.5 px-2">
+      {/* Learner Nav Items */}
+      <nav className="flex-1 py-4 space-y-0.5 px-2 overflow-y-auto">
         {NAV_ITEMS.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-[#141A16] text-white'
+                  : 'text-gray-300 hover:bg-white/10 hover:text-white'
+              }`
+            }
+          >
+            <span className="text-base leading-none">{item.icon}</span>
+            <span className="leading-tight">{t(item.key)}</span>
+          </NavLink>
+        ))}
+
+        {/* Tutor Section */}
+        <div className="pt-3 mt-2 border-t border-white/10">
+          <span className="px-3 text-[10px] uppercase tracking-widest font-semibold text-gray-500">Tutor</span>
+        </div>
+        {TUTOR_ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

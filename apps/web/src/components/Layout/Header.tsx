@@ -1,7 +1,9 @@
 ﻿import { useState } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, Gem } from 'lucide-react';
 import NotificationsPanel from '../Notifications/NotificationsPanel';
-import { NOTIFICATIONS } from '../../data/mockData';
+import { NOTIFICATIONS, MOCK_CREDIT_BALANCE } from '../../data/mockData';
+import { LanguageSwitcher } from '../../core/i18n/I18nContext';
+import { useLocale } from '../../core/locale/LocaleContext';
 
 interface HeaderProps {
   title: string;
@@ -11,6 +13,8 @@ interface HeaderProps {
 export default function Header({ title, onMenuToggle }: HeaderProps) {
   const [showNotifs, setShowNotifs] = useState(false);
   const unread = NOTIFICATIONS.filter((n) => !n.isRead).length;
+  const { fmtCredits } = useLocale();
+  const balance = Number(localStorage.getItem('speakoo_credits') ?? MOCK_CREDIT_BALANCE);
 
   return (
     <>
@@ -26,11 +30,13 @@ export default function Header({ title, onMenuToggle }: HeaderProps) {
 
         <h1 className="text-lg font-bold text-gray-900 flex-1">{title}</h1>
 
-        {/* Wallet */}
-        <div className="flex items-center gap-1.5 bg-[#FFFBE4] px-3 py-1.5 rounded-full">
-          <span className="text-sm">💰</span>
-          <span className="text-sm font-semibold text-gray-800">₹240</span>
+        {/* Credits */}
+        <div className="flex items-center gap-1.5 bg-[#E8F5E9] px-3 py-1.5 rounded-full">
+          <Gem size={14} className="text-[#2E7D32]" />
+          <span className="text-sm font-semibold text-[#2E7D32]">{balance} ≈ {fmtCredits(balance)}</span>
         </div>
+
+        <LanguageSwitcher />
 
         {/* Notification Bell */}
         <button

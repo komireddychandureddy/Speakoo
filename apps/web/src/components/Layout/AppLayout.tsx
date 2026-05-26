@@ -10,11 +10,13 @@ const PAGE_TITLES: Record<string, string> = {
   '/allTutors': 'All Tutors',
   '/ey-resource': 'EY Resource',
   '/Curriculum': 'Curriculum',
-  '/chooseSubscription': 'Choose a Subscription',
+  '/my-credits': 'My Credits',
   '/myProfile': 'My Profile',
   '/reffer_earn': 'Refer & Earn',
   '/Leaderboard': 'My Level',
   '/faq': 'FAQs',
+  '/tutor-pricing': 'My Pricing',
+  '/tutor-payout': 'Payout Settings',
 };
 
 export default function AppLayout() {

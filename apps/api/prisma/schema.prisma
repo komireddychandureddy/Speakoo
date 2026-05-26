@@ -80,6 +80,10 @@ model User {
   feedbackReceived    SessionFeedback[]    @relation("RevieweeFeedback")
   learnerPoints       LearnerPoints?
   learnerBadges       LearnerBadge[]
+  hostedSessions      PracticeSession[]     @relation("HostedSessions")
+  practiceJoins       PracticeParticipant[] @relation("PracticeJoins")
+  communityThreads    CommunityThread[]     @relation("ThreadAuthor")
+  communityReplies    CommunityReply[]      @relation("ReplyAuthor")
 
   @@map("users")
 }
@@ -278,4 +282,101 @@ model LearnerBadge {
 
   @@id([learnerId, badgeId])
   @@map("learner_badges")
+}
+
+// ─── Practice Sessions ────────────────────────────────────────────────────────
+
+enum PracticeSessionType {
+  speaking
+  reading
+  listening
+  phonetics
+  word_puzzle
+  sentence_arrange
+}
+
+enum PracticeSessionStatus {
+  scheduled
+  live
+  completed
+  cancelled
+}
+
+model PracticeSession {
+  id              String                @id @default(uuid()) @db.Uuid
+  hostId          String                @map("host_id") @db.Uuid
+  language        String
+  level           String
+  title           String
+  topic           String
+  type            PracticeSessionType
+  status          PracticeSessionStatus @default(scheduled)
+  scheduledAt     DateTime              @map("scheduled_at") @db.Timestamptz
+  durationMinutes Int                   @default(30) @map("duration_minutes")
+  maxParticipants Int                   @default(6) @map("max_participants")
+  creditCost      Int                   @default(5) @map("credit_cost")
+  livekitRoom     String?               @map("livekit_room")
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz
+
+  host         User                  @relation("HostedSessions", fields: [hostId], references: [id])
+  participants PracticeParticipant[]
+
+  @@map("practice_sessions")
+}
+
+model PracticeParticipant {
+  id            String   @id @default(uuid()) @db.Uuid
+  sessionId     String   @map("session_id") @db.Uuid
+  learnerId     String   @map("learner_id") @db.Uuid
+  joinedAt      DateTime @default(now()) @map("joined_at") @db.Timestamptz
+  creditCharged Int      @map("credit_charged")
+
+  session PracticeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  learner User            @relation("PracticeJoins", fields: [learnerId], references: [id])
+
+  @@unique([sessionId, learnerId])
+  @@map("practice_participants")
+}
+
+// ─── Community Forum ──────────────────────────────────────────────────────────
+
+enum ThreadCategory {
+  question
+  discussion
+  tip
+  resource
+}
+
+model CommunityThread {
+  id         String         @id @default(uuid()) @db.Uuid
+  authorId   String         @map("author_id") @db.Uuid
+  language   String
+  title      String
+  body       String         @db.Text
+  category   ThreadCategory
+  tags       String[]
+  likesCount Int            @default(0) @map("likes_count")
+  replyCount Int            @default(0) @map("reply_count")
+  isPinned   Boolean        @default(false) @map("is_pinned")
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  author  User             @relation("ThreadAuthor", fields: [authorId], references: [id])
+  replies CommunityReply[]
+
+  @@map("community_threads")
+}
+
+model CommunityReply {
+  id         String   @id @default(uuid()) @db.Uuid
+  threadId   String   @map("thread_id") @db.Uuid
+  authorId   String   @map("author_id") @db.Uuid
+  body       String   @db.Text
+  likesCount Int      @default(0) @map("likes_count")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  thread CommunityThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author User            @relation("ReplyAuthor", fields: [authorId], references: [id])
+
+  @@map("community_replies")
 }
