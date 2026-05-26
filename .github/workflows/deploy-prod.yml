@@ -1,0 +1,92 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/speakoo-api
+  IMAGE_TAG: sha-${{ github.sha }}
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/api
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Production Server
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment:
+      name: production
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -euo pipefail
+
+            export GHCR_OWNER="${{ github.repository_owner }}"
+            export IMAGE_TAG="${{ env.IMAGE_TAG }}"
+
+            # Pull latest code
+            cd /opt/speakoo
+            git pull origin main
+
+            # Pull latest API image
+            docker compose \
+              -f /opt/speakoo/infra/docker/docker-compose.yml \
+              -f /opt/speakoo/infra/docker/docker-compose.prod.yml \
+              --env-file /opt/speakoo/.env \
+              pull api
+
+            # Run pending Prisma migrations
+            docker compose \
+              -f /opt/speakoo/infra/docker/docker-compose.yml \
+              -f /opt/speakoo/infra/docker/docker-compose.prod.yml \
+              --env-file /opt/speakoo/.env \
+              run --rm --no-deps api \
+              npx prisma migrate deploy
+
+            # Rolling restart
+            docker compose \
+              -f /opt/speakoo/infra/docker/docker-compose.yml \
+              -f /opt/speakoo/infra/docker/docker-compose.prod.yml \
+              --env-file /opt/speakoo/.env \
+              up -d --remove-orphans
+
+            # Clean up dangling images
+            docker image prune -f
