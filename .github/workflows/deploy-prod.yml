@@ -70,9 +70,10 @@ jobs:
             # Authenticate to GHCR so docker compose pull works
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
 
-            # Pull latest code
+            # Pull latest code (force repo to match remote, discarding any local drift)
             cd /opt/speakoo
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             # Pull latest API image
             docker compose \
