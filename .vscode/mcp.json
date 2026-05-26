@@ -1,0 +1,185 @@
+{
+  "inputs": [
+    {
+      "id": "database_url",
+      "type": "promptString",
+      "description": "PostgreSQL connection string (from .env — DATABASE_URL)",
+      "password": true
+    },
+    {
+      "id": "redis_url",
+      "type": "promptString",
+      "description": "Redis connection URL (from .env — REDIS_URL)",
+      "password": false
+    },
+    {
+      "id": "stripe_secret_key",
+      "type": "promptString",
+      "description": "Stripe secret key (sk_test_... from Stripe dashboard)",
+      "password": true
+    },
+    {
+      "id": "stripe_restricted_key",
+      "type": "promptString",
+      "description": "Stripe restricted key for MCP (create at dashboard.stripe.com/apikeys)",
+      "password": true
+    },
+    {
+      "id": "github_token",
+      "type": "promptString",
+      "description": "GitHub Personal Access Token (repo + project scopes)",
+      "password": true
+    },
+    {
+      "id": "sentry_auth_token",
+      "type": "promptString",
+      "description": "Sentry Auth Token (Settings → Auth Tokens)",
+      "password": true
+    },
+    {
+      "id": "sentry_org",
+      "type": "promptString",
+      "description": "Sentry organisation slug (e.g. speakoo)",
+      "password": false
+    },
+    {
+      "id": "twilio_account_sid",
+      "type": "promptString",
+      "description": "Twilio Account SID (from console.twilio.com)",
+      "password": false
+    },
+    {
+      "id": "twilio_auth_token",
+      "type": "promptString",
+      "description": "Twilio Auth Token",
+      "password": true
+    }
+  ],
+
+  "servers": {
+
+    // ── PostgreSQL ──────────────────────────────────────────────────────────
+    // Query the Speakoo database directly from Copilot chat.
+    // Docs: https://github.com/modelcontextprotocol/servers/tree/main/src/postgres
+    "speakoo-postgres": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "${input:database_url}"]
+    },
+
+    // ── Redis ───────────────────────────────────────────────────────────────
+    // Inspect Bull queues, cached tokens, rate-limit counters.
+    // Docs: https://github.com/modelcontextprotocol/servers/tree/main/src/redis
+    "speakoo-redis": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-redis", "${input:redis_url}"]
+    },
+
+    // ── Stripe ──────────────────────────────────────────────────────────────
+    // Manage payments, customers, Connect accounts, and webhooks.
+    // Docs: https://github.com/stripe/agent-toolkit
+    "speakoo-stripe": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@stripe/agent-toolkit@latest", "--tools=all"],
+      "env": {
+        "STRIPE_SECRET_KEY": "${input:stripe_secret_key}"
+      }
+    },
+
+    // ── GitHub ──────────────────────────────────────────────────────────────
+    // Create issues, manage milestones, review PRs, trigger workflows.
+    // Uses GitHub's official MCP server with VS Code built-in auth (no PAT needed).
+    // Docs: https://github.com/github/github-mcp-server
+    "speakoo-github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@github/github-mcp-server@latest"],
+      "env": {
+        // Reads from system env var GITHUB_TOKEN if set, otherwise prompts securely.
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_TOKEN}"
+      }
+    },
+
+    // ── Prisma ──────────────────────────────────────────────────────────────
+    // Run migrations, generate client, introspect schema via chat.
+    // Requires Prisma CLI >= 5.14 installed locally.
+    // Docs: https://www.prisma.io/docs/orm/prisma-client/mcp
+    "speakoo-prisma": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["prisma", "mcp"],
+      "cwd": "${workspaceFolder}/apps/api",
+      "env": {
+        "DATABASE_URL": "${input:database_url}"
+      }
+    },
+
+    // ── Sentry ──────────────────────────────────────────────────────────────
+    // Query errors, releases, and performance data from Sentry.
+    // Requires Python + uv/uvx: https://docs.astral.sh/uv/
+    // Docs: https://github.com/getsentry/sentry-mcp
+    "speakoo-sentry": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-server-sentry",
+        "--auth-token", "${input:sentry_auth_token}",
+        "--org-slug", "${input:sentry_org}"
+      ]
+    },
+
+    // ── Docker ──────────────────────────────────────────────────────────────
+    // Start/stop containers, view logs, manage Speakoo infra stack.
+    // Requires Docker Desktop >= 4.40 with MCP support.
+    // Docs: https://docs.docker.com/desktop/features/mcp-catalog/
+    "speakoo-docker": {
+      "type": "stdio",
+      "command": "docker",
+      "args": ["mcp", "server"]
+    },
+
+    // ── Playwright ──────────────────────────────────────────────────────────
+    // Browser automation: navigate, click, fill forms, take screenshots.
+    // Useful for testing Speakoo UI flows and scraping session data.
+    // Docs: https://github.com/microsoft/playwright-mcp
+    "speakoo-playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+
+    // ── Twilio ──────────────────────────────────────────────────────────────
+    // Inspect WhatsApp message logs and sandbox configuration.
+    // Docs: https://github.com/twilio-labs/mcp-server-twilio
+    "speakoo-twilio": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-server-twilio"],
+      "env": {
+        "TWILIO_ACCOUNT_SID": "${input:twilio_account_sid}",
+        "TWILIO_AUTH_TOKEN": "${input:twilio_auth_token}"
+      }
+    },
+
+    // ── Next.js DevTools ────────────────────────────────────────────────────
+    // Inspect Next.js routes, components, and build output via MCP.
+    // Docs: https://github.com/next-devtools/next-devtools-mcp
+    "speakoo-next-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "next-devtools-mcp@latest"]
+    },
+
+    // ── Git (cyanheads) ─────────────────────────────────────────────────────
+    // Full Git operations: commit, branch, diff, log, stash, and more.
+    // Docs: https://github.com/cyanheads/git-mcp-server
+    "speakoo-git": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@cyanheads/git-mcp-server@latest"]
+    }
+
+  }
+}
