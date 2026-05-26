@@ -14,7 +14,7 @@ RUN npx prisma generate
 
 # Copy source and compile
 COPY . .
-RUN npm run build
+RUN NODE_OPTIONS="--max-old-space-size=1536" npm run build
 
 # ── Stage 2: Production image ────────────────────────────────────────────────
 FROM node:20-alpine AS runner
