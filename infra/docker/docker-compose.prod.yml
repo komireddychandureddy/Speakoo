@@ -20,9 +20,9 @@ services:
 
   minio:
     restart: unless-stopped
-    # Remove the console port from public exposure in production
+    # Bind to all interfaces — restrict access via Oracle Cloud security groups / iptables
     ports:
-      - '127.0.0.1:9000:9000'
+      - '9000:9000'
 
   # Override the local build with the pre-built GHCR image
   api:
@@ -30,9 +30,9 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-    # Only expose on loopback — nginx proxies requests
+    # Bind to all interfaces — Oracle Cloud security groups restrict external access
     ports:
-      - '127.0.0.1:3000:3000'
+      - '3000:3000'
     healthcheck:
       test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:3000/api/v1/health || exit 1']
       interval: 30s
@@ -49,13 +49,13 @@ services:
     profiles:
       - monitoring
     ports:
-      - '127.0.0.1:9090:9090'
+      - '9090:9090'
 
   grafana:
     profiles:
       - monitoring
     ports:
-      - '127.0.0.1:3001:3000'
+      - '3001:3000'
 
   nginx:
     image: nginx:1.27-alpine
