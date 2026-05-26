@@ -51,13 +51,13 @@ export class NotificationProcessor {
       const phoneNumber = user.profile?.phoneNumber;
       if (!phoneNumber) {
         this.logger.warn(`Skipping WhatsApp for user ${userId}: no phone number on profile`);
-      } else {
-        await this.twilio.messages.create({
-          from: this.config.getOrThrow('TWILIO_WHATSAPP_FROM'),
-          to: `whatsapp:${phoneNumber}`,
-          body: this.getBody(type, user.profile?.displayName ?? 'there'),
-        });
+        return;
       }
+      await this.twilio.messages.create({
+        from: this.config.getOrThrow('TWILIO_WHATSAPP_FROM'),
+        to: `whatsapp:${phoneNumber}`,
+        body: this.getBody(type, user.profile?.displayName ?? 'there'),
+      });
     }
 
     await this.prisma.notificationLog.create({

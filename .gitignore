@@ -24,6 +24,8 @@ lerna-debug.log*
 # .env.example is the ONLY env file committed (no real values)
 .env
 .env.local
+.env.dev
+.env.prod
 .env.development
 .env.bil
 .env.qc

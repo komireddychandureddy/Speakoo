@@ -24,4 +24,9 @@ export class AdminController {
   suspendUser(@Param('id', ParseUUIDPipe) id: string) {
     return this.adminService.suspendUser(id);
   }
+
+  @Patch('users/:id/unsuspend')
+  unsuspendUser(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.unsuspendUser(id);
+  }
 }

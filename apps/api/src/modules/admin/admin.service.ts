@@ -16,9 +16,17 @@ export class AdminService {
   async suspendUser(userId: string) {
     await this.prisma.user.update({
       where: { id: userId },
-      data: { isVerified: false },
+      data: { isSuspended: true },
     });
     return { suspended: true };
+  }
+
+  async unsuspendUser(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { isSuspended: false },
+    });
+    return { suspended: false };
   }
 
   async listUsers(page: number, limit: number) {
@@ -33,6 +41,7 @@ export class AdminService {
           email: true,
           role: true,
           isVerified: true,
+          isSuspended: true,
           createdAt: true,
           profile: { select: { displayName: true } },
         },

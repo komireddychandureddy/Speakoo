@@ -68,6 +68,7 @@ model User {
   passwordHash String   @map("password_hash")
   role         UserRole
   isVerified   Boolean  @default(false) @map("is_verified")
+  isSuspended  Boolean  @default(false) @map("is_suspended")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   profile             UserProfile?
