@@ -7,7 +7,7 @@
 #   - An Nginx reverse proxy (or cloud load balancer) terminates TLS externally
 #   - POSTGRES_DB set to speakoo_prod to avoid touching the dev database
 
-version: '3.9'
+
 
 services:
   postgres:
