@@ -1,12 +1,15 @@
 ﻿import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 
 const COUNTRY_CODES = ['+91 🇮🇳', '+1 🇺🇸', '+44 🇬🇧', '+61 🇦🇺', '+971 🇦🇪'];
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<'login' | 'signup'>('login');
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<'login' | 'signup'>(
+    searchParams.get('tab') === 'signup' ? 'signup' : 'login'
+  );
   const [countryCode, setCountryCode] = useState('+91 🇮🇳');
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
@@ -40,7 +43,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     if (!name || !signupMobile || !signupPw) return setError('All fields are required.');
-    localStorage.setItem('speakoo_user', JSON.stringify({ mobile: signupMobile, name, role }));
+    localStorage.setItem('speakoo_user', JSON.stringify({ mobile: signupMobile, name, role: 'learner' }));
     navigate('/dashboard');
   };
 
@@ -148,30 +151,29 @@ export default function LoginPage() {
                 <p className="text-red-500 text-sm mb-4 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
               )}
 
-              {/* Role Selector */}
-              <div className="flex gap-2 mb-4 p-1 bg-gray-100 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setRole('learner')}
-                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                    role === 'learner' ? 'bg-[#43A047] text-white shadow' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  🎓 Learner
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole('tutor')}
-                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                    role === 'tutor' ? 'bg-[#43A047] text-white shadow' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  👩‍🏫 Tutor
-                </button>
-              </div>
-
               {tab === 'login' ? (
                 <form onSubmit={handleLogin} className="space-y-4">
+                  {/* Role Selector — Login tab only */}
+                  <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setRole('learner')}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        role === 'learner' ? 'bg-[#43A047] text-white shadow' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      🎓 Learner
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRole('tutor')}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        role === 'tutor' ? 'bg-[#43A047] text-white shadow' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      👩‍🏫 Tutor
+                    </button>
+                  </div>
                   <input
                     type="text"
                     placeholder="Your Name"

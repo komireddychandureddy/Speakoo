@@ -16,6 +16,13 @@ export default function Header({ title, onMenuToggle }: HeaderProps) {
   const { fmtCredits } = useLocale();
   const balance = Number(localStorage.getItem('speakoo_credits') ?? MOCK_CREDIT_BALANCE);
 
+  const userInitial = (() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('speakoo_user') ?? '{}');
+      return (u.name as string | undefined)?.trim()[0]?.toUpperCase() ?? 'U';
+    } catch { return 'U'; }
+  })();
+
   return (
     <>
       <header className="h-14 bg-white border-b border-[#EEEEEE] flex items-center px-6 gap-4">
@@ -54,7 +61,7 @@ export default function Header({ title, onMenuToggle }: HeaderProps) {
 
         {/* Avatar */}
         <div className="w-8 h-8 rounded-full bg-[#43A047] flex items-center justify-center text-white text-xs font-bold">
-          R
+          {userInitial}
         </div>
       </header>
 

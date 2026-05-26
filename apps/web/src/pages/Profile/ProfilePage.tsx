@@ -13,9 +13,13 @@ const COUNTRIES = [
 ];
 
 export default function ProfilePage() {
-  const [name, setName] = useState('Rahul Mehta');
-  const [email, setEmail] = useState('rahul.mehta@email.com');
-  const [mobile] = useState('9876543210');
+  const storedUser = (() => {
+    try { return JSON.parse(localStorage.getItem('speakoo_user') ?? '{}'); } catch { return {}; }
+  })();
+
+  const [name, setName] = useState(storedUser.name ?? '');
+  const [email, setEmail] = useState(storedUser.email ?? '');
+  const [mobile] = useState(storedUser.mobile ?? '');
   const [bio, setBio] = useState('');
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('India');
@@ -53,7 +57,7 @@ export default function ProfilePage() {
 
   const initials = name
     .split(' ')
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join('')
     .toUpperCase()
     .slice(0, 2);

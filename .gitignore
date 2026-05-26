@@ -40,3 +40,5 @@ lerna-debug.log*
 # Compiled JavaScript artifacts in TypeScript source directories
 # (compiled output belongs in dist/, never committed alongside .ts source)
 apps/api/src/**/*.js
+
+/PlaywrightTests

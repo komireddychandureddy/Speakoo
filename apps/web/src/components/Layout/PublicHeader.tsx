@@ -48,7 +48,7 @@ export default function PublicHeader() {
             Log in
           </button>
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/login?tab=signup')}
             className="btn-primary text-sm px-4 py-2"
           >
             Register
@@ -85,7 +85,7 @@ export default function PublicHeader() {
               Log in
             </button>
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/login?tab=signup')}
               className="flex-1 btn-primary text-sm py-2"
             >
               Register

@@ -44,7 +44,7 @@ export default function WelcomePage() {
             One-on-one video sessions, interactive whiteboards, and flexible scheduling — all on one platform.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button onClick={() => navigate('/login')} className="bg-white text-[#2E7D32] font-semibold px-8 py-3 rounded-lg hover:bg-green-50 transition-colors flex items-center gap-2">
+            <button onClick={() => navigate('/login?tab=signup')} className="bg-white text-[#2E7D32] font-semibold px-8 py-3 rounded-lg hover:bg-green-50 transition-colors flex items-center gap-2">
               Start Learning Free <ArrowRight size={16} />
             </button>
             <button onClick={() => navigate('/become-a-tutor')} className="border border-white/60 text-white px-8 py-3 rounded-lg hover:bg-white/10 transition-colors">
