@@ -49,7 +49,7 @@ services:
     container_name: speakoo-livekit
     command: --dev
     environment:
-      LIVEKIT_KEYS: "${LIVEKIT_DEV_KEY}: ${LIVEKIT_DEV_SECRET}"
+      LIVEKIT_KEYS: "${LIVEKIT_DEV_KEY}:${LIVEKIT_DEV_SECRET}"
     ports:
       - '7880:7880'
       - '7881:7881'

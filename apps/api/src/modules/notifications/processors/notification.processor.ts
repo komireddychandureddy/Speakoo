@@ -40,7 +40,7 @@ export class NotificationProcessor {
 
     if (channel === NotificationChannel.email) {
       await this.resend.emails.send({
-        from: 'Speakoo <noreply@speakoo.com>',
+        from: this.config.getOrThrow('RESEND_FROM_EMAIL'),
         to: user.email,
         subject: this.getSubject(type),
         text: this.getBody(type, user.profile?.displayName ?? 'Learner'),

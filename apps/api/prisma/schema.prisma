@@ -8,6 +8,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -84,6 +85,7 @@ model User {
   practiceJoins       PracticeParticipant[] @relation("PracticeJoins")
   communityThreads    CommunityThread[]     @relation("ThreadAuthor")
   communityReplies    CommunityReply[]      @relation("ReplyAuthor")
+  otpCodes            OtpCode[]
 
   @@map("users")
 }
@@ -379,4 +381,25 @@ model CommunityReply {
   author User            @relation("ReplyAuthor", fields: [authorId], references: [id])
 
   @@map("community_replies")
+}
+
+// ─── OTP / Verification ───────────────────────────────────────────────────────
+
+enum OtpPurpose {
+  email_verification
+  password_reset
+}
+
+model OtpCode {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @map("user_id") @db.Uuid
+  codeHash  String     @map("code_hash")
+  purpose   OtpPurpose
+  expiresAt DateTime   @map("expires_at") @db.Timestamptz
+  used      Boolean    @default(false)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("otp_codes")
 }

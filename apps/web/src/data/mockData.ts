@@ -584,3 +584,65 @@ export const CREDIT_PACKS: CreditPack[] = [
   { id: 'cp3', credits: 2750, priceInr: 2500, bonusCredits: 250, label: 'Pro' },
   { id: 'cp4', credits: 5750, priceInr: 5000, bonusCredits: 750, label: 'Max' },
 ];
+
+// ─── Levelled Reading Passages (Lingua.com-inspired) ─────────────────────────
+
+export interface LeveledReading {
+  level: CEFRLevel;
+  title: string;
+  passage: string;
+  questions: { q: string; opts: string[]; ans: number }[];
+}
+
+export const LEVELED_READINGS: LeveledReading[] = [
+  {
+    level: 'A1',
+    title: 'My Family',
+    passage: 'I have a small family. I have a mother, a father, and one sister. My mother is a teacher. My father is a doctor. My sister is seven years old. We live in a house with a garden. We have a cat. Her name is Luna.',
+    questions: [
+      { q: 'How many people are in the family?', opts: ['Two', 'Three', 'Four'], ans: 2 },
+      { q: "What is the father's job?", opts: ['Teacher', 'Doctor', 'Engineer'], ans: 1 },
+      { q: "What is the cat's name?", opts: ['Luna', 'Sunny', 'Bella'], ans: 0 },
+    ],
+  },
+  {
+    level: 'A2',
+    title: 'A Day at School',
+    passage: "Lucas goes to school every day. He wakes up at seven o'clock. He eats breakfast with his family. Then he takes the bus to school. His favourite subject is mathematics. He has lunch with his friends. After school, he does his homework.",
+    questions: [
+      { q: 'What time does Lucas wake up?', opts: ["Six o'clock", "Seven o'clock", "Eight o'clock"], ans: 1 },
+      { q: 'How does Lucas get to school?', opts: ['By car', 'By bus', 'On foot'], ans: 1 },
+      { q: "What is Lucas's favourite subject?", opts: ['Science', 'English', 'Mathematics'], ans: 2 },
+    ],
+  },
+  {
+    level: 'B1',
+    title: 'Working from Home',
+    passage: 'Remote work has transformed the modern workplace. Since 2020, millions of professionals found that working from home can be as productive as office work — sometimes more so. Companies are rethinking space requirements while employees save on commuting costs and gain back personal time.',
+    questions: [
+      { q: 'What has transformed the modern workplace?', opts: ['Social media', 'Remote work', 'Automation'], ans: 1 },
+      { q: 'Since when did this shift accelerate?', opts: ['2015', '2020', '2023'], ans: 1 },
+      { q: 'What benefit do employees enjoy?', opts: ['Higher salaries', 'Saved commuting time', 'Bigger offices'], ans: 1 },
+    ],
+  },
+  {
+    level: 'B2',
+    title: 'The Golden Gate Bridge',
+    passage: "The Golden Gate Bridge is one of the most recognisable structures in the world. Completed in 1937, it spans the strait connecting San Francisco Bay to the Pacific Ocean. At the time of its opening, it was the longest suspension bridge in the world. Its distinctive International Orange colour was chosen to make it visible through San Francisco's famous fog.",
+    questions: [
+      { q: 'When was the Golden Gate Bridge completed?', opts: ['1927', '1937', '1947'], ans: 1 },
+      { q: 'What does the bridge span?', opts: ['Two cities', 'San Francisco Bay to the Pacific', 'California to Nevada'], ans: 1 },
+      { q: 'Why was International Orange chosen?', opts: ['It was cheapest', 'Visibility in fog', 'Government requirement'], ans: 1 },
+    ],
+  },
+  {
+    level: 'C1',
+    title: 'Climate Change',
+    passage: 'Climate change represents one of the most complex and pressing challenges of our era. Rising global temperatures, driven predominantly by the combustion of fossil fuels and deforestation, are altering ecosystems at an unprecedented rate. Policymakers, scientists, and civil society must collaborate to implement ambitious mitigation strategies before irreversible tipping points are reached.',
+    questions: [
+      { q: 'What primarily drives rising temperatures?', opts: ['Ocean currents', 'Fossil fuels and deforestation', 'Solar activity'], ans: 1 },
+      { q: 'What is being altered at an unprecedented rate?', opts: ['Economies', 'Ecosystems', 'Political systems'], ans: 1 },
+      { q: 'What must happen before tipping points are reached?', opts: ['Economic growth', 'Ambitious mitigation strategies', 'Technology investment'], ans: 1 },
+    ],
+  },
+];

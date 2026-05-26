@@ -19,8 +19,6 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/profile_setup_screen.dart';
 import '../../features/profile/presentation/screens/wallet_screen.dart';
 import '../../features/tutors/presentation/screens/tutor_profile_screen.dart';
-import '../../features/tutor_dashboard/presentation/screens/tutor_home_screen.dart';
-import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/notifications/presentation/screens/notification_center_screen.dart';
 
 part 'app_router.g.dart';
@@ -51,14 +49,7 @@ GoRouter appRouter(AppRouterRef ref) {
 
       // Authenticated — send away from auth screens
       if (isAuth || isOnboarding || isSplash) {
-        switch (authState.user?.role) {
-          case UserRole.tutor:
-            return '/tutor-home';
-          case UserRole.admin:
-            return '/admin';
-          default:
-            return '/home';
-        }
+        return '/home';
       }
       return null;
     },
@@ -113,12 +104,6 @@ GoRouter appRouter(AppRouterRef ref) {
       GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
       GoRoute(path: '/wallet', builder: (_, __) => const WalletScreen()),
       GoRoute(path: '/notifications', builder: (_, __) => const NotificationCenterScreen()),
-
-      // Tutor routes
-      GoRoute(path: '/tutor-home', builder: (_, __) => const TutorHomeScreen()),
-
-      // Admin routes
-      GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardScreen()),
     ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(child: Text('Page not found: ${state.uri}')),

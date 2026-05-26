@@ -1,17 +1,20 @@
 import { useNavigate } from 'react-router-dom';
 import {
   Mic, BookOpen, Headphones, Volume2, Puzzle, AlignLeft,
-  Users, Clock, Gem, CheckCircle, Video,
+  Users, Clock, Gem, CheckCircle, Video, Library, GraduationCap, Mic2,
 } from 'lucide-react';
 import { PRACTICE_SESSIONS, type CEFRLevel } from '../../data/mockData';
 
 const EXERCISE_TYPES = [
-  { type: 'speaking',     icon: Mic,        label: 'Speaking',        desc: 'Live group calls',            color: '#43A047', bg: '#E8F5E9' },
-  { type: 'reading',      icon: BookOpen,   label: 'Reading',         desc: 'Passages + comprehension',    color: '#1565C0', bg: '#E3F2FD' },
-  { type: 'listening',    icon: Headphones, label: 'Listening',       desc: 'Audio drills & exercises',    color: '#7B1FA2', bg: '#F3E5F5' },
-  { type: 'phonetics',    icon: Volume2,    label: 'Phonetics',       desc: 'IPA sounds & pronunciation',  color: '#E65100', bg: '#FFF3E0' },
-  { type: 'word-puzzle',  icon: Puzzle,     label: 'Word Puzzles',    desc: 'Vocabulary building games',   color: '#00838F', bg: '#E0F7FA' },
-  { type: 'sentence',     icon: AlignLeft,  label: 'Sentence Build',  desc: 'Fill in the blanks',          color: '#AD1457', bg: '#FCE4EC' },
+  { type: 'speaking',    icon: Mic,           label: 'Speaking',        desc: 'Live group calls',            color: '#43A047', bg: '#E8F5E9' },
+  { type: 'reading',     icon: BookOpen,      label: 'Reading',         desc: 'Levelled texts A1–C1',        color: '#1565C0', bg: '#E3F2FD' },
+  { type: 'listening',   icon: Headphones,    label: 'Listening',       desc: 'Audio drills & exercises',    color: '#7B1FA2', bg: '#F3E5F5' },
+  { type: 'phonetics',   icon: Volume2,       label: 'Phonetics',       desc: 'IPA sounds & pronunciation',  color: '#E65100', bg: '#FFF3E0' },
+  { type: 'word-puzzle', icon: Puzzle,        label: 'Word Puzzles',    desc: 'Sentence ordering games',     color: '#00838F', bg: '#E0F7FA' },
+  { type: 'sentence',    icon: AlignLeft,     label: 'Sentence Build',  desc: 'Fill in the blanks',          color: '#AD1457', bg: '#FCE4EC' },
+  { type: 'vocabulary',  icon: Library,       label: 'Vocabulary',      desc: 'Flashcard trainer',           color: '#0277BD', bg: '#E1F5FE' },
+  { type: 'grammar',     icon: GraduationCap, label: 'Grammar Drills',  desc: 'Tenses, prepositions & more', color: '#6A1B9A', bg: '#EDE7F6' },
+  { type: 'dictation',   icon: Mic2,          label: 'Dictation',       desc: 'Listen & type what you hear', color: '#B71C1C', bg: '#FFEBEE' },
 ] as const;
 
 const LEVEL_COLOR: Record<CEFRLevel, string> = {

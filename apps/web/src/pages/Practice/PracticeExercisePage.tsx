@@ -1,15 +1,10 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Volume2, CheckCircle, RefreshCw } from 'lucide-react';
-
-const READING_DATA = {
-  passage: 'Remote work has transformed the modern workplace. Since 2020, millions of professionals found that working from home can be as productive as office work — sometimes more so. Companies are rethinking space requirements while employees save on commuting costs and gain back personal time.',
-  questions: [
-    { q: 'What has transformed the modern workplace?', opts: ['Social media', 'Remote work', 'Automation'], ans: 1 },
-    { q: 'Since when did this shift accelerate?', opts: ['2015', '2020', '2023'], ans: 1 },
-    { q: 'What benefit do employees enjoy?', opts: ['Higher salaries', 'Saved commuting time', 'Bigger offices'], ans: 1 },
-  ],
-};
+import { LEVELED_READINGS, type CEFRLevel } from '../../data/mockData';
+import VocabularyTrainerExercise from './VocabularyTrainerExercise';
+import GrammarDrillExercise from './GrammarDrillExercise';
+import DictationExercise from './DictationExercise';
 
 const PHONETICS = [
   { ipa: '/iː/', word: 'see', eg: 'tree, feel' },    { ipa: '/ɪ/', word: 'sit', eg: 'big, hit' },
@@ -36,15 +31,32 @@ function speak(text: string) {
   }
 }
 
+const CEFR_LEVELS: CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1'];
+
 function ReadingExercise() {
+  const [level, setLevel] = useState<CEFRLevel>('B1');
   const [answers, setAnswers] = useState<number[]>([]);
   const [submitted, setSubmitted] = useState(false);
-  const score = answers.filter((a, i) => a === READING_DATA.questions[i].ans).length;
+
+  const data = LEVELED_READINGS.find((r) => r.level === level) ?? LEVELED_READINGS[2];
+  const score = answers.filter((a, i) => a === data.questions[i].ans).length;
+
+  const changeLevel = (l: CEFRLevel) => { setLevel(l); setAnswers([]); setSubmitted(false); };
+
   return (
     <div className="space-y-4">
-      <div className="bg-[#F8FBF0] border border-[#C8E6C9] rounded-xl p-4 text-sm text-[#212121] leading-relaxed">{READING_DATA.passage}</div>
-      {READING_DATA.questions.map((q, qi) => (
-        <div key={qi} className="card p-4">
+      <div className="flex flex-wrap gap-2">
+        {CEFR_LEVELS.map((l) => (
+          <button key={l} onClick={() => changeLevel(l)}
+            className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${level === l ? 'bg-[#43A047] text-white border-[#43A047]' : 'border-gray-300 text-[#616161] hover:border-[#43A047]'}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs font-semibold text-[#616161]">{data.title}</p>
+      <div className="bg-[#F8FBF0] border border-[#C8E6C9] rounded-xl p-4 text-sm text-[#212121] leading-relaxed">{data.passage}</div>
+      {data.questions.map((q, qi) => (
+        <div key={`${level}-${qi}`} className="card p-4">
           <p className="font-semibold text-sm mb-3">{qi + 1}. {q.q}</p>
           <div className="grid gap-2">
             {q.opts.map((o, oi) => {
@@ -62,11 +74,11 @@ function ReadingExercise() {
         </div>
       ))}
       {!submitted ? (
-        <button disabled={answers.length < READING_DATA.questions.length} onClick={() => setSubmitted(true)} className="btn-primary w-full py-2.5 disabled:opacity-40">Submit Answers</button>
+        <button disabled={answers.length < data.questions.length} onClick={() => setSubmitted(true)} className="btn-primary w-full py-2.5 disabled:opacity-40">Submit Answers</button>
       ) : (
         <div className="card p-4 text-center bg-[#E8F5E9]">
           <CheckCircle size={24} className="text-[#43A047] mx-auto mb-1" />
-          <p className="font-bold text-lg text-[#2E7D32]">{score}/{READING_DATA.questions.length} Correct!</p>
+          <p className="font-bold text-lg text-[#2E7D32]">{score}/{data.questions.length} Correct!</p>
           <p className="text-sm text-[#616161]">You earned {score * 10} XP</p>
         </div>
       )}
@@ -200,11 +212,14 @@ function FillBlank() {
 }
 
 const MODE_MAP: Record<string, { label: string; el: JSX.Element }> = {
-  reading:      { label: 'Reading Comprehension', el: <ReadingExercise /> },
-  listening:    { label: 'Listening Exercise',    el: <ListeningExercise /> },
-  phonetics:    { label: 'Phonetics Drill',        el: <PhoneticsDrill /> },
-  'word-puzzle':{ label: 'Word Puzzle',            el: <WordPuzzle /> },
-  sentence:     { label: 'Fill in the Blank',      el: <FillBlank /> },
+  reading:    { label: 'Reading Comprehension', el: <ReadingExercise /> },
+  listening:  { label: 'Listening Exercise',    el: <ListeningExercise /> },
+  phonetics:  { label: 'Phonetics Drill',       el: <PhoneticsDrill /> },
+  'word-puzzle': { label: 'Word Puzzle',        el: <WordPuzzle /> },
+  sentence:   { label: 'Fill in the Blank',     el: <FillBlank /> },
+  vocabulary: { label: 'Vocabulary Trainer',    el: <VocabularyTrainerExercise /> },
+  grammar:    { label: 'Grammar Drills',        el: <GrammarDrillExercise /> },
+  dictation:  { label: 'Dictation',             el: <DictationExercise /> },
 };
 
 export default function PracticeExercisePage() {
