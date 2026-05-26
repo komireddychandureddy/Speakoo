@@ -15,4 +15,3 @@ test
 **/*.e2e-spec.ts
 .eslintrc*
 .prettierrc*
-tsconfig*.json
