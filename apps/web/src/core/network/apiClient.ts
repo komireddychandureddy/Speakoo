@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
+import axios, { isAxiosError, type AxiosInstance, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 
 let accessToken: string | null = null;
 
@@ -34,8 +34,9 @@ function processQueue(newToken: string): void {
 }
 
 apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
+  (response: AxiosResponse) => response,
+  async (error: unknown) => {
+    if (!isAxiosError(error)) return Promise.reject(error);
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retried?: boolean };
 
     if (error.response?.status === 401 && !originalRequest._retried) {
