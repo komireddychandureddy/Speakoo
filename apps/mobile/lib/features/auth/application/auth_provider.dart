@@ -197,7 +197,7 @@ class AuthNotifier extends Notifier<AuthState> {
       state = AuthState(
         status: AuthStatus.needsEmailOtp,
         pendingEmail: email,
-        pendingRole: role,
+        pendingRole: 'learner',
         pendingPhone: hasPhoneInput ? phone : null,
       );
     } on DioException catch (e) {
