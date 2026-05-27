@@ -43,7 +43,7 @@ export async function apiRegister(
   password: string,
   captchaToken?: string,
 ): Promise<AuthUser> {
-  const { data } = await apiClient.post<AuthResponse>('/auth/register', {
+  const { data } = await apiClient.post<AuthResponse>('auth/register', {
     displayName,
     email,
     password,
@@ -51,7 +51,7 @@ export async function apiRegister(
   });
   setAccessToken(data.accessToken);
 
-  const me = await apiClient.get<MeResponse>('/users/me');
+  const me = await apiClient.get<MeResponse>('users/me');
   const user: AuthUser = {
     id: me.data.id,
     name: me.data.profile?.displayName ?? displayName,
@@ -71,14 +71,14 @@ export async function apiLogin(
   password: string,
   captchaToken?: string,
 ): Promise<AuthUser> {
-  const { data } = await apiClient.post<AuthResponse>('/auth/login', {
+  const { data } = await apiClient.post<AuthResponse>('auth/login', {
     email,
     password,
     captchaToken,
   });
   setAccessToken(data.accessToken);
 
-  const me = await apiClient.get<MeResponse>('/users/me');
+  const me = await apiClient.get<MeResponse>('users/me');
   const user: AuthUser = {
     id: me.data.id,
     name: me.data.profile?.displayName ?? email.split('@')[0],
@@ -94,7 +94,7 @@ export async function apiLogin(
  */
 export async function apiLogout(): Promise<void> {
   try {
-    await apiClient.post('/auth/logout');
+    await apiClient.post('auth/logout');
   } catch {
     // Best-effort — always clear local state
   }
@@ -118,7 +118,7 @@ export function bootstrapAuth(): void {
  * Verifies the email OTP code sent after registration.
  */
 export async function apiVerifyEmailOtp(code: string): Promise<void> {
-  await apiClient.post('/auth/verify-email', { code });
+  await apiClient.post('auth/verify-email', { code });
 }
 
 /**
@@ -129,17 +129,17 @@ export async function apiRegisterPhone(
   fullName: string,
   role?: string,
 ): Promise<void> {
-  await apiClient.post('/auth/register-phone', { phone, fullName, role });
+  await apiClient.post('auth/register-phone', { phone, fullName, role });
 }
 
 /**
  * Verifies the phone OTP and returns the authenticated user.
  */
 export async function apiVerifyPhoneOtp(phone: string, otp: string): Promise<AuthUser> {
-  const { data } = await apiClient.post<AuthResponse>('/auth/verify-phone', { phone, otp });
+  const { data } = await apiClient.post<AuthResponse>('auth/verify-phone', { phone, otp });
   setAccessToken(data.accessToken);
 
-  const me = await apiClient.get<MeResponse>('/users/me');
+  const me = await apiClient.get<MeResponse>('users/me');
   const user: AuthUser = {
     id: me.data.id,
     name: me.data.profile?.displayName ?? phone,

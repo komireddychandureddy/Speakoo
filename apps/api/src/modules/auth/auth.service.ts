@@ -36,6 +36,7 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto, role: UserRole = UserRole.learner) {
+    await this.verifyCaptcha(dto.captchaToken);
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email already registered');
 
@@ -58,6 +59,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    await this.verifyCaptcha(dto.captchaToken);
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
@@ -294,5 +296,41 @@ export class AuthService {
     throw new BadRequestException(
       `Social login via ${normalizedProvider} is not yet implemented. Please sign up with email and password.`,
     );
+  }
+
+  // ─── hCaptcha verification ────────────────────────────────────────────────
+
+  /**
+   * Verifies a hCaptcha token with the hCaptcha siteverify API.
+   * No-ops when HCAPTCHA_ENABLED is not 'true'.
+   * Per coding standards rule 30: credentials are lazy-loaded inside the method, not the constructor.
+   */
+  private async verifyCaptcha(captchaToken?: string): Promise<void> {
+    const enabled = this.config.get<string>('HCAPTCHA_ENABLED');
+    if (enabled !== 'true') return;
+
+    if (!captchaToken) {
+      throw new BadRequestException('Captcha verification is required');
+    }
+
+    const secret = this.config.getOrThrow<string>('HCAPTCHA_SECRET');
+    const body = new URLSearchParams({ secret, response: captchaToken });
+
+    let json: { success: boolean };
+    try {
+      const res = await fetch('https://api.hcaptcha.com/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      json = (await res.json()) as { success: boolean };
+    } catch (err) {
+      this.logger.error('hCaptcha siteverify request failed', err);
+      throw new BadRequestException('Captcha verification failed — please try again');
+    }
+
+    if (!json.success) {
+      throw new BadRequestException('Captcha verification failed — please complete the challenge');
+    }
   }
 }
