@@ -438,3 +438,321 @@ targets: ['host.docker.internal:3000']
 ```
 
 Also ensure the `api` service is defined in the same Compose network as Prometheus.
+
+---
+
+## 26. Node.js Built-in Modules — Always Use Named Imports
+
+**Rule:** Import only the specific functions you need from Node.js built-ins. `import * as crypto` pollutes the namespace; named imports are explicit and tree-shakeable.
+
+```typescript
+// ✅ CORRECT
+import { randomUUID } from 'crypto';
+const id = randomUUID();
+
+// ❌ WRONG — namespace import for a single function
+import * as crypto from 'crypto';
+const id = crypto.randomUUID();
+```
+
+---
+
+## 27. Prisma Query Fields Must Exactly Match the Schema
+
+**Rule:** Never guess field names in `orderBy`, `where`, or `select`. Always verify against `prisma/schema.prisma`. TypeScript only catches missing fields if `strict` mode is on; runtime Prisma errors still occur.
+
+```typescript
+// ✅ CORRECT — field name taken from schema
+await this.prisma.notificationLog.findMany({ orderBy: { sentAt: 'desc' } });
+
+// ❌ WRONG — NotificationLog has no createdAt; fails at runtime
+await this.prisma.notificationLog.findMany({ orderBy: { createdAt: 'desc' } });
+```
+
+---
+
+## 28. Env Example Files — Naming Convention and Correct `NODE_ENV`
+
+**Rule:** `ConfigModule` loads `.env.${NODE_ENV}` at runtime. Example/template files must be named `.env.${ENV}.example` (e.g. `.env.development.example`, `.env.production.example`) so they are never accidentally loaded. Each example file must have the correct `NODE_ENV` for its environment.
+
+```
+# ✅ CORRECT
+.env.development.example  ← NODE_ENV=development
+.env.production.example   ← NODE_ENV=production
+
+# ❌ WRONG — .env.dev/.env.prod are never loaded by ConfigModule; name is misleading
+.env.dev   (NODE_ENV=development)
+.env.prod  (NODE_ENV=development)  ← wrong NODE_ENV makes prod behave as dev
+```
+
+---
+
+## 29. All Env Vars Consumed by Guards/Services Must Appear in `.env.example`
+
+**Rule:** Any environment variable read by a NestJS guard, service, or strategy must be present in **every** relevant `.env.example` / `.env.*.example` file. Silent fallbacks in guards (e.g. captcha disabled when `HCAPTCHA_SECRET` is absent) are especially dangerous because the missing var quietly disables security.
+
+```
+# ✅ CORRECT — all three example files document HCAPTCHA vars
+apps/api/.env.example:
+  HCAPTCHA_ENABLED=false
+  HCAPTCHA_SECRET=REPLACE_ME
+
+.env.development.example:
+  HCAPTCHA_ENABLED=false
+  HCAPTCHA_SECRET=REPLACE_ME
+
+.env.production.example:
+  HCAPTCHA_ENABLED=true
+  HCAPTCHA_SECRET=REPLACE_ME
+```
+
+---
+
+## 30. Lazy-Initialize Third-Party Clients With Production-Only Credentials
+
+**Rule:** Never call `config.getOrThrow(...)` for production-only credentials (Twilio, Stripe webhooks, etc.) inside the class constructor. The constructor runs at module bootstrap in **all** environments, causing dev/CI/test startup to fail when credentials are absent. Instantiate the client lazily inside the method that needs it, guarded by the production check.
+
+```typescript
+// ✅ CORRECT — only instantiated when the method actually runs in prod
+async sendSmsOtp(phone: string, otp: string): Promise<void> {
+  if (this.config.get('NODE_ENV') !== 'production') return;
+  const twilio = new Twilio(
+    this.config.getOrThrow('TWILIO_ACCOUNT_SID'),
+    this.config.getOrThrow('TWILIO_AUTH_TOKEN'),
+  );
+  await twilio.messages.create({ ... });
+}
+
+// ❌ WRONG — getOrThrow in constructor crashes dev/CI startup
+constructor(private readonly config: ConfigService) {
+  this.twilio = new Twilio(
+    config.getOrThrow('TWILIO_ACCOUNT_SID'), // throws if not set
+    config.getOrThrow('TWILIO_AUTH_TOKEN'),
+  );
+}
+```
+
+---
+
+## 31. Always Use a DTO Class for `@Body()` — Never Inline Types
+
+**Rule:** An inline type (`@Body() body: { token: string }`) bypasses `class-validator` entirely — clients can omit the field or pass any value. Every request body must use a DTO class decorated with `class-validator` decorators.
+
+```typescript
+// ✅ CORRECT — class-validator runs automatically via ValidationPipe
+export class SocialLoginDto {
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+}
+
+@Post('social')
+socialLogin(@Body() dto: SocialLoginDto) { ... }
+
+// ❌ WRONG — no validation, token can be undefined or any type
+@Post('social')
+socialLogin(@Body() body: { token: string }) { ... }
+```
+
+---
+
+## 32. Don't Add `@UseGuards(JwtAuthGuard)` When `GlobalJwtAuthGuard` Is Registered
+
+**Rule:** `GlobalJwtAuthGuard` is registered as a global guard in `AppModule`. Adding `@UseGuards(JwtAuthGuard)` on individual controllers or methods is redundant and misleading. Use `@Public()` to opt out; everything else is already protected.
+
+```typescript
+// ✅ CORRECT — global guard already protects this; use @Public() to opt out
+@Controller('notifications')
+export class NotificationsController { ... }
+
+// ❌ WRONG — redundant, implies the controller would be unprotected without it
+@UseGuards(JwtAuthGuard)
+@Controller('notifications')
+export class NotificationsController { ... }
+```
+
+---
+
+## 33. Flutter — Await Async Provider Calls; Never Fire-and-Forget
+
+**Rule:** Calling an `async` provider method without `await` means the call runs in the background. Any error it throws is silently lost, and state read immediately after will reflect the pre-call value. Always `await` the call, then check `mounted` before using `BuildContext`.
+
+```dart
+// ✅ CORRECT
+Future<void> _socialLogin() async {
+  await ref.read(authProvider.notifier).socialLogin(token);
+  if (!mounted) return;
+  final state = ref.read(authProvider);
+  if (state.hasError) {
+    ScaffoldMessenger.of(context).showSnackBar(...);
+  }
+}
+
+// ❌ WRONG — fire-and-forget: errors are lost, state check is premature
+void _socialLogin() {
+  ref.read(authProvider.notifier).socialLogin(token); // no await
+  final state = ref.read(authProvider); // reads stale state
+}
+```
+
+---
+
+## 34. GitHub Actions Workflows Must Live in `.github/workflows/` at Repo Root
+
+**Rule:** GitHub only discovers workflow files under the **repository root** `.github/workflows/` directory. A workflow file nested anywhere else (e.g. `PlaywrightTests/.github/workflows/playwright.yml`) is silently ignored and never runs.
+
+```
+# ✅ CORRECT
+.github/workflows/playwright.yml   ← discovered and runs
+
+# ❌ WRONG — never discovered by GitHub Actions
+PlaywrightTests/.github/workflows/playwright.yml
+```
+
+When the test project is in a subdirectory, set `working-directory` on the run steps:
+```yaml
+- run: npm ci
+  working-directory: PlaywrightTests
+- run: npx playwright test
+  working-directory: PlaywrightTests
+```
+
+---
+
+## 35. E2E / Playwright Tests Must Not Target Auth-Protected Routes
+
+**Rule:** E2E tests that navigate to a protected route without valid session cookies will silently redirect to `/login` and assert against the wrong page (e.g. the login title instead of the dashboard title). Always target a **public** route, or set up an authenticated session fixture before navigating to a private route.
+
+```typescript
+// ✅ CORRECT — public marketing/welcome page
+await page.goto('https://speakoo.duckdns.org/');
+await expect(page).toHaveTitle(/Speakoo/);
+
+// ❌ WRONG — /dashboard redirects unauthenticated users to /login
+await page.goto('https://speakoo.duckdns.org/dashboard');
+await expect(page).toHaveTitle(/Dashboard/); // asserts against login page title
+```
+
+---
+
+## 36. Never Ship Placeholder or Hardcoded IDs in Production Code
+
+**Rule:** Hard-coded placeholder values (e.g. `'placeholder-slot-id'`) must never reach a production code path. They bypass validation and cause guaranteed runtime failures. Add a guard that prevents the action and shows a user-facing message instead.
+
+```dart
+// ✅ CORRECT — guard prevents calling API with placeholder
+if (slotId == 'placeholder-slot-id') {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Please select a time slot first.')),
+  );
+  return;
+}
+
+// ❌ WRONG — placeholder reaches the API, always fails validation
+await bookingRepo.createBooking(slotId: 'placeholder-slot-id', ...);
+```
+
+---
+
+## 37. Client Payloads and API Routes Must Exactly Match the Backend Contract
+
+**Rule:** Client code (Flutter/web) must send exactly what the backend DTO requires — no extra fields, no missing required fields, and the correct HTTP method + path (including all path segments). Verify against the backend DTO and controller source before writing client code.
+
+```dart
+// ✅ CORRECT — matches CreateBookingDto exactly (slotId, tutorId, language)
+await _dio.post('/bookings', data: {
+  'slotId': slotId,
+  'tutorId': tutorId,
+  'language': language,
+});
+
+// ✅ CORRECT — matches DELETE /bookings/:id/cancel
+await _dio.delete('/bookings/$bookingId/cancel');
+
+// ❌ WRONG — priceCents not in DTO; tutorId missing; API rejects request
+await _dio.post('/bookings', data: { 'slotId': slotId, 'priceCents': 5000 });
+
+// ❌ WRONG — missing /cancel suffix; matches wrong route or returns 404
+await _dio.delete('/bookings/$bookingId');
+```
+
+Also verify the response shape: if the backend returns `{ items, total, page, limit }`, read `data['items']`, not `data['tutors']`.
+
+---
+
+## 38. Client-Side Persisted Auth State Must Only Include Backend-Returned Fields
+
+**Rule:** When persisting user data to `localStorage` / `SharedPreferences`, only include fields that the backend actually returns. Reading a field that was never persisted (e.g. `storedUser.mobile` when `/auth/login` never returns `mobile`) always yields `null` or `undefined` silently.
+
+```typescript
+// ✅ CORRECT — only persist what /auth/login returns
+const user = { id, name, email, role }; // no 'mobile' — backend doesn't return it
+localStorage.setItem('speakoo_user', JSON.stringify(user));
+
+// ❌ WRONG — reading a field that was never stored
+const storedUser = JSON.parse(localStorage.getItem('speakoo_user'));
+const [mobile] = useState(storedUser.mobile ?? ''); // always ''
+```
+
+---
+
+## 39. Speakoo Verification Flags — Never Conflate Email and Phone Verification
+
+**Rule:** `isVerified` tracks **email** verification. `isPhoneVerified` tracks **phone** verification. Setting `isVerified: true` during phone OTP verification causes `resendEmailOtp` to silently no-op for phone-registered users who later add an email.
+
+```typescript
+// ✅ CORRECT — only flip the relevant flag
+await this.prisma.user.update({
+  where: { id: userId },
+  data: { isPhoneVerified: true },
+});
+
+// ❌ WRONG — isVerified=true on phone OTP blocks subsequent email verification flows
+await this.prisma.user.update({
+  where: { id: userId },
+  data: { isPhoneVerified: true, isVerified: true },
+});
+```
+
+---
+
+## 40. Remove Function Parameters That Have No Effect on the Backend
+
+**Rule:** If a parameter is accepted by a client-side function but is never forwarded to the API (because the backend ignores or rejects it), remove the parameter from the function signature. Keeping it implies to callers that it has an effect, causing silent bugs.
+
+```dart
+// ✅ CORRECT — role is not sent; backend always assigns 'learner' at email register
+Future<void> register({
+  required String email,
+  required String password,
+  required String fullName,
+}) async {
+  await _api.post('/auth/register', data: {
+    'email': email,
+    'password': password,
+    'displayName': fullName,
+  });
+}
+
+// ❌ WRONG — role parameter accepted but never sent; callers believe tutor role works
+Future<void> register({
+  required String email,
+  required String password,
+  required String fullName,
+  required String role, // silently ignored — backend always creates 'learner'
+}) async { ... }
+```
+
+---
+
+## 41. Use Correct Unicode Characters in String Literals
+
+**Rule:** Copy-pasted or auto-corrected text may contain replacement characters (`\uFFFD` / `?`) instead of the intended Unicode codepoint. Always use the proper character — e.g. `…` (U+2026 HORIZONTAL ELLIPSIS) not `\uFFFD`.
+
+```dart
+// ✅ CORRECT
+hint: 'Search tutors, languages…',
+
+// ❌ WRONG — corrupted replacement character renders as a glyph box in the UI
+hint: 'Search tutors, languages\uFFFD',
+```
