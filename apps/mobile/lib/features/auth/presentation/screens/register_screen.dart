@@ -59,7 +59,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             email: _emailCtrl.text.trim(),
             password: _passwordCtrl.text,
             fullName: _nameCtrl.text.trim(),
-            role: _role,
           );
     } else {
       await ref.read(authProvider.notifier).registerWithPhone(
@@ -79,10 +78,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     }
   }
 
-  void _socialLogin(String provider) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$provider sign-up — SDK integration required')),
+  Future<void> _socialLogin(String provider) async {
+    // Call the auth provider to attempt social login
+    // The provider will return the backend error message
+    await ref.read(authProvider.notifier).socialLogin(
+      provider: provider,
+      token: 'temp_token_pending_oauth_sdk',
     );
+    final state = ref.read(authProvider);
+    if (state.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(state.errorMessage!)),
+      );
+    }
   }
 
   @override

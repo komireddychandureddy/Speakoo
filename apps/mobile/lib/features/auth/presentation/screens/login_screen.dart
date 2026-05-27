@@ -54,6 +54,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _socialLogin(String provider) async {
+    // TODO: Integrate proper OAuth SDKs (google_sign_in, sign_in_with_apple, flutter_facebook_sdk)
+    // For now, show the backend error message
+    await ref.read(authProvider.notifier).socialLogin(
+      provider: provider,
+      token: 'temp_token_pending_oauth_sdk',
+    );
+    if (!mounted) return;
+    final state = ref.read(authProvider);
+    if (state.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(state.errorMessage!)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
@@ -154,9 +170,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 fontWeight: FontWeight.w700,
                                 fontSize: 16,
                                 color: AppColors.error)),
-                        onPressed: () => ScaffoldMessenger.of(context)
-                            .showSnackBar(const SnackBar(
-                                content: Text('Google sign-in coming soon'))),
+                        onPressed: () => _socialLogin('google'),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -165,9 +179,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         label: 'Apple',
                         icon: const Icon(Icons.apple, size: 18,
                             color: AppColors.textPrimary),
-                        onPressed: () => ScaffoldMessenger.of(context)
-                            .showSnackBar(const SnackBar(
-                                content: Text('Apple sign-in coming soon'))),
+                        onPressed: () => _socialLogin('apple'),
                       ),
                     ),
                   ],
@@ -218,27 +230,6 @@ class _OrDivider extends StatelessWidget {
           ),
         ),
         const Expanded(child: Divider(color: AppColors.divider)),
-      ],
-    );
-  }
-}
-
-class _OrDivider extends StatelessWidget {
-  const _OrDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        Expanded(child: Divider(color: AppColors.divider)),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'or',
-            style: TextStyle(fontSize: 13, color: AppColors.textHint),
-          ),
-        ),
-        Expanded(child: Divider(color: AppColors.divider)),
       ],
     );
   }

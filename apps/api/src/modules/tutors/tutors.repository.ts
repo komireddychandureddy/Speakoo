@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTutorProfileDto } from './dto/create-tutor-profile.dto';
 import { CreateAvailabilitySlotDto } from './dto/create-availability-slot.dto';
@@ -30,6 +30,18 @@ export class TutorsRepository {
 
     const tutorProfile = await this.prisma.tutorProfile.findUnique({ where: { userId } });
     if (!tutorProfile) throw new NotFoundException('Tutor profile not found');
+
+    const overlap = await this.prisma.availabilitySlot.findFirst({
+      where: {
+        tutorId: tutorProfile.id,
+        status: { not: 'blocked' },
+        startTime: { lt: end },
+        endTime: { gt: start },
+      },
+    });
+    if (overlap) {
+      throw new ConflictException('Slot overlaps with an existing availability slot');
+    }
 
     return this.prisma.availabilitySlot.create({
       data: { tutorId: tutorProfile.id, startTime: start, endTime: end },

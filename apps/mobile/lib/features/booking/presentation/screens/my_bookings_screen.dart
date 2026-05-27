@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/session_card.dart';
+import '../../application/booking_provider.dart';
+import '../../data/models/booking_model.dart';
 
-class MyBookingsScreen extends StatefulWidget {
+class MyBookingsScreen extends ConsumerStatefulWidget {
   const MyBookingsScreen({super.key});
 
   @override
-  State<MyBookingsScreen> createState() => _MyBookingsScreenState();
+  ConsumerState<MyBookingsScreen> createState() => _MyBookingsScreenState();
 }
 
-class _MyBookingsScreenState extends State<MyBookingsScreen>
+class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
@@ -26,58 +30,26 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     super.dispose();
   }
 
-  static final _upcoming = [
-    SessionCard(
-      tutorName: 'Sofia Martinez',
-      tutorAvatar: '',
-      language: 'Spanish',
-      dateTime: DateTime.now().add(const Duration(hours: 2)),
-      durationMinutes: 60,
-      status: SessionStatus.upcoming,
-      onJoin: () {},
-    ),
-    SessionCard(
-      tutorName: 'Liang Wei',
-      tutorAvatar: '',
-      language: 'Mandarin',
-      dateTime: DateTime.now().add(const Duration(days: 1, hours: 3)),
-      durationMinutes: 60,
-      status: SessionStatus.upcoming,
-      onJoin: () {},
-    ),
-  ];
+  SessionStatus _toStatus(String status) {
+    switch (status) {
+      case 'in_session':
+        return SessionStatus.inSession;
+      case 'completed':
+        return SessionStatus.completed;
+      case 'cancelled':
+        return SessionStatus.cancelled;
+      default:
+        return SessionStatus.upcoming;
+    }
+  }
 
-  static final _past = [
-    SessionCard(
-      tutorName: 'Amélie Dubois',
-      tutorAvatar: '',
-      language: 'French',
-      dateTime: DateTime.now().subtract(const Duration(days: 3)),
-      durationMinutes: 60,
-      status: SessionStatus.completed,
-      onReview: () {},
-    ),
-    SessionCard(
-      tutorName: 'Sofia Martinez',
-      tutorAvatar: '',
-      language: 'Spanish',
-      dateTime: DateTime.now().subtract(const Duration(days: 7)),
-      durationMinutes: 60,
-      status: SessionStatus.completed,
-      onReview: () {},
-    ),
-    SessionCard(
-      tutorName: 'Hiroshi Tanaka',
-      tutorAvatar: '',
-      language: 'Japanese',
-      dateTime: DateTime.now().subtract(const Duration(days: 14)),
-      durationMinutes: 45,
-      status: SessionStatus.cancelled,
-    ),
-  ];
+  bool _isUpcoming(BookingModel b) =>
+      b.status == 'confirmed' || b.status == 'in_session';
 
   @override
   Widget build(BuildContext context) {
+    final bookingsAsync = ref.watch(myBookingsProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -95,26 +67,71 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _BookingList(sessions: _upcoming, emptyLabel: 'No upcoming sessions'),
-          _BookingList(sessions: _past, emptyLabel: 'No past sessions'),
-        ],
+      body: bookingsAsync.when(
+        loading: () =>
+            const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline,
+                  size: 48, color: AppColors.error),
+              const SizedBox(height: 12),
+              Text('Failed to load bookings',
+                  style: const TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => ref.invalidate(myBookingsProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (bookings) {
+          final upcoming =
+              bookings.where(_isUpcoming).toList();
+          final past =
+              bookings.where((b) => !_isUpcoming(b)).toList();
+
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _BookingList(
+                bookings: upcoming,
+                emptyLabel: 'No upcoming sessions',
+                toStatus: _toStatus,
+                onJoin: (b) =>
+                    context.push('/sessions/${b.id}'),
+              ),
+              _BookingList(
+                bookings: past,
+                emptyLabel: 'No past sessions',
+                toStatus: _toStatus,
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
 class _BookingList extends StatelessWidget {
-  final List<SessionCard> sessions;
+  final List<BookingModel> bookings;
   final String emptyLabel;
+  final SessionStatus Function(String) toStatus;
+  final void Function(BookingModel)? onJoin;
 
-  const _BookingList({required this.sessions, required this.emptyLabel});
+  const _BookingList({
+    required this.bookings,
+    required this.emptyLabel,
+    required this.toStatus,
+    this.onJoin,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (sessions.isEmpty) {
+    if (bookings.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -131,9 +148,19 @@ class _BookingList extends StatelessWidget {
     }
     return ListView.builder(
       padding: const EdgeInsets.all(20),
-      itemCount: sessions.length,
-      itemBuilder: (context, i) =>
-          sessions[i].animate().fadeIn(delay: (50 * i).ms).slideY(begin: 0.1),
+      itemCount: bookings.length,
+      itemBuilder: (context, i) {
+        final b = bookings[i];
+        return SessionCard(
+          tutorName: b.tutorDisplayName ?? 'Tutor',
+          tutorAvatar: b.tutorAvatarUrl ?? '',
+          language: b.language,
+          dateTime: b.scheduledAt,
+          durationMinutes: b.durationMinutes,
+          status: toStatus(b.status),
+          onJoin: onJoin != null ? () => onJoin!(b) : null,
+        ).animate().fadeIn(delay: (50 * i).ms).slideY(begin: 0.1);
+      },
     );
   }
 }

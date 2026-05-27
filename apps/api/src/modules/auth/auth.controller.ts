@@ -7,6 +7,8 @@ import {
   HttpCode,
   HttpStatus,
   UnauthorizedException,
+  UseGuards,
+  Param,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
@@ -15,7 +17,13 @@ import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { RegisterPhoneDto } from './dto/register-phone.dto';
+import { VerifyPhoneDto } from './dto/verify-phone.dto';
+import { ResendEmailOtpDto } from './dto/resend-email-otp.dto';
+import { ResendPhoneOtpDto } from './dto/resend-phone-otp.dto';
+import { SocialLoginDto } from './dto/social-login.dto';
 import { Public } from './decorators/public.decorator';
+import { CaptchaGuard } from './guards/captcha.guard';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
@@ -31,6 +39,7 @@ export class AuthController {
   ) {}
 
   @Public()
+  @UseGuards(CaptchaGuard)
   @Post('register')
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const tokens = await this.authService.register(dto);
@@ -39,6 +48,7 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(CaptchaGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
@@ -104,6 +114,56 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async resetPassword(@Body() dto: ResetPasswordDto) {
     await this.authService.resetPassword(dto.email, dto.code, dto.newPassword);
+  }
+
+  // ─── Phone OTP routes ──────────────────────────────────────────────────────
+
+  @Public()
+  @Post('register-phone')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async registerPhone(@Body() dto: RegisterPhoneDto) {
+    await this.authService.registerPhone(dto);
+  }
+
+  @Public()
+  @Post('verify-phone')
+  @HttpCode(HttpStatus.OK)
+  async verifyPhone(
+    @Body() dto: VerifyPhoneDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const tokens = await this.authService.verifyPhoneOtp(dto.phone, dto.otp);
+    this.setRefreshCookie(res, tokens.refreshToken);
+    return { accessToken: tokens.accessToken };
+  }
+
+  @Public()
+  @Post('resend-email-otp')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resendEmailOtp(@Body() dto: ResendEmailOtpDto) {
+    await this.authService.resendEmailOtp(dto.email);
+  }
+
+  @Public()
+  @Post('resend-phone-otp')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resendPhoneOtp(@Body() dto: ResendPhoneOtpDto) {
+    await this.authService.resendPhoneOtp(dto.phone);
+  }
+
+  // ─── Social login (OAuth stub) ─────────────────────────────────────────────
+
+  @Public()
+  @Post('social/:provider')
+  @HttpCode(HttpStatus.OK)
+  async socialLogin(
+    @Param('provider') provider: string,
+    @Body() dto: SocialLoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const tokens = await this.authService.socialLogin(provider, dto.token);
+    this.setRefreshCookie(res, tokens.refreshToken);
+    return { accessToken: tokens.accessToken };
   }
 
   private setRefreshCookie(res: Response, token: string) {

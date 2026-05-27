@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../auth/application/auth_provider.dart';
+import '../../application/profile_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -10,10 +11,14 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
-    final user = authState.user;
-    final initials = user != null
-        ? user.fullName.trim().split(' ').map((w) => w[0]).take(2).join()
-        : 'U';
+    final profileAsync = ref.watch(profileProvider);
+
+    // Derive display values — prefer profileProvider data, fall back to authState
+    final profile = profileAsync.valueOrNull;
+    final displayName = profile?.displayNameOrEmail ?? authState.user?.fullName ?? 'Guest';
+    final email = profile?.email ?? authState.user?.email ?? '';
+    final avatarUrl = profile?.avatarUrl ?? authState.user?.avatarUrl;
+    final initials = displayName.trim().split(' ').map((w) => w[0]).take(2).join().toUpperCase();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -39,10 +44,10 @@ class ProfileScreen extends ConsumerWidget {
                         CircleAvatar(
                           radius: 44,
                           backgroundColor: Colors.white.withValues(alpha: 0.25),
-                          backgroundImage: user?.avatarUrl != null
-                              ? NetworkImage(user!.avatarUrl!)
+                          backgroundImage: avatarUrl != null
+                              ? NetworkImage(avatarUrl)
                               : null,
-                          child: user?.avatarUrl == null
+                          child: avatarUrl == null
                               ? Text(initials,
                                   style: const TextStyle(
                                       fontSize: 28,
@@ -65,14 +70,14 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      user?.fullName ?? 'Guest',
+                      displayName,
                       style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           fontSize: 18),
                     ),
                     Text(
-                      user?.email ?? '',
+                      email,
                       style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.8),
                           fontSize: 13),

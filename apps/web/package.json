@@ -10,11 +10,12 @@
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@hcaptcha/react-hcaptcha": "^2.0.2",
     "axios": "^1.6.7",
+    "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.0",
-    "lucide-react": "^0.344.0"
+    "react-router-dom": "^6.22.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.55",

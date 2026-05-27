@@ -185,3 +185,20 @@ PLATFORM_FEE_PERCENT=5
 - ❌ Skipping DTO validation decorators
 - ❌ `console.log` in production code (use NestJS Logger)
 - ❌ Blocking the main thread in Flutter (use `compute()` for heavy work)
+- ❌ Inline `@Body()` object types — always use a DTO class with `class-validator` decorators
+- ❌ `@UseGuards(JwtAuthGuard)` on individual controllers when `GlobalJwtAuthGuard` is registered globally
+- ❌ `import * as crypto` — use named imports: `import { randomUUID } from 'crypto'`
+- ❌ Hardcoded or guessed Prisma field names — always verify against `prisma/schema.prisma`
+- ❌ Naming env example files `.env.dev` / `.env.prod` — use `.env.development.example` / `.env.production.example`
+- ❌ `config.getOrThrow()` for production-only credentials (Twilio, Stripe) in class constructors — lazy-init inside the method, guarded by `NODE_ENV` check
+- ❌ Fire-and-forget async provider calls in Flutter — always `await` and check `mounted` before using `BuildContext`
+- ❌ GitHub Actions workflow files outside `.github/workflows/` at repo root — nested workflows are silently ignored
+- ❌ E2E / Playwright tests targeting authenticated routes without an auth fixture — silently redirects to login
+- ❌ Placeholder or hardcoded IDs in production code paths (e.g. `'placeholder-slot-id'`)
+- ❌ Client payloads with extra fields or missing required fields vs. the backend DTO
+- ❌ Client API paths that don't exactly match backend routes (including all path segments like `/cancel`)
+- ❌ Reading response keys that don't match backend shape (e.g. `data['tutors']` when backend returns `data['items']`)
+- ❌ Persisting auth state fields that the backend never returns
+- ❌ Setting `isVerified: true` during phone OTP verification — `isVerified` is email-only; use `isPhoneVerified`
+- ❌ Function parameters on client-side methods that are never forwarded to the API
+- ❌ Corrupted Unicode replacement characters (`\uFFFD`) in string literals — use the correct codepoint (e.g. `…` U+2026)
