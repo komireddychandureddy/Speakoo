@@ -1,8 +1,10 @@
 ﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { I18nProvider } from './core/i18n/I18nContext';
 import { LocaleProvider } from './core/locale/LocaleContext';
+import { bootstrapAuth } from './core/network/authApi';
 import AppLayout from './components/Layout/AppLayout';
 import LoginPage from './pages/Auth/LoginPage';
+import OtpVerifyPage from './pages/Auth/OtpVerifyPage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
 import MySessionsPage from './pages/Sessions/MySessionsPage';
 import BookSessionPage from './pages/Booking/BookSessionPage';
@@ -39,6 +41,9 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return user ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
+// Restore the access token from localStorage on app start
+bootstrapAuth();
+
 export default function App() {
   return (
     <I18nProvider>
@@ -47,6 +52,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<WelcomePage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/verify-email" element={<OtpVerifyPage />} />
         <Route path="/become-a-tutor" element={<BecomeTutorPage />} />
         <Route path="/tutor-apply" element={<TutorApplyPage />} />
         <Route

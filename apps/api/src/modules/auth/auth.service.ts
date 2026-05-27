@@ -8,19 +8,25 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
+import { Twilio } from 'twilio';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { RegisterPhoneDto } from './dto/register-phone.dto';
 import { OtpPurpose, UserRole } from '@prisma/client';
 
 const BCRYPT_ROUNDS = 12;
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const IS_PROD = process.env['NODE_ENV'] === 'production';
+const STATIC_OTP = '123456'; // used in all non-production environments
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly resend: Resend;
+
+  private readonly twilio: Twilio;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -28,6 +34,10 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {
     this.resend = new Resend(this.config.getOrThrow('RESEND_API_KEY'));
+    this.twilio = new Twilio(
+      this.config.getOrThrow('TWILIO_ACCOUNT_SID'),
+      this.config.getOrThrow('TWILIO_AUTH_TOKEN'),
+    );
   }
 
   async register(dto: RegisterDto, role: UserRole = UserRole.learner) {
@@ -85,8 +95,27 @@ export class AuthService {
 
   // ─── OTP helpers ──────────────────────────────────────────────────────────
 
+  /**
+   * In production: random 6-digit OTP.
+   * In all other environments: static '123456' so tests/staging never need real codes.
+   */
   private generateOtp(): string {
+    if (!IS_PROD) return STATIC_OTP;
     return String(Math.floor(100000 + Math.random() * 900000));
+  }
+
+  private async sendSmsOtp(phone: string, code: string): Promise<void> {
+    if (!IS_PROD) {
+      this.logger.debug(`[DEV] SMS OTP for ${phone}: ${code}`);
+      return;
+    }
+    const from = this.config.getOrThrow<string>('TWILIO_WHATSAPP_FROM');
+    await this.twilio.messages.create({
+      body: `Your Speakoo verification code is: ${code}. It expires in 10 minutes.`,
+      from,
+      to: phone,
+    });
+    this.logger.log(`SMS OTP sent to ${phone}`);
   }
 
   private async createOtp(userId: string, purpose: OtpPurpose): Promise<string> {
@@ -175,5 +204,96 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+  }
+
+  // ─── Phone registration / verification ───────────────────────────────────────
+
+  async registerPhone(dto: RegisterPhoneDto): Promise<void> {
+    const existing = await this.prisma.user.findUnique({ where: { phoneNumber: dto.phone } });
+    if (existing) throw new ConflictException('Phone number already registered');
+
+    // Random placeholder password hash — user will authenticate via OTP only
+    const passwordHash = await bcrypt.hash(crypto.randomUUID(), BCRYPT_ROUNDS);
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: `phone_${dto.phone.replace('+', '')}@speakoo.internal`,
+        passwordHash,
+        phoneNumber: dto.phone,
+        role: dto.role ?? UserRole.learner,
+        profile: {
+          create: {
+            displayName: dto.fullName,
+            phoneNumber: dto.phone,
+          },
+        },
+      },
+    });
+
+    const code = await this.createOtp(user.id, OtpPurpose.phone_verification);
+    await this.sendSmsOtp(dto.phone, code);
+    this.logger.log(`Phone registration OTP sent to ${dto.phone}`);
+  }
+
+  async verifyPhoneOtp(phone: string, otp: string) {
+    const user = await this.prisma.user.findUnique({ where: { phoneNumber: phone } });
+    if (!user) throw new BadRequestException('Invalid or expired code');
+
+    await this.consumeOtp(user.id, OtpPurpose.phone_verification, otp);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { isPhoneVerified: true, isVerified: true },
+    });
+
+    this.logger.log(`Phone verified for user ${user.id}`);
+    return this.issueTokens(user.id, user.email, user.role);
+  }
+
+  async resendEmailOtp(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || user.isVerified) return; // silent — prevents email enumeration
+
+    const code = await this.createOtp(user.id, OtpPurpose.email_verification);
+    const from = this.config.getOrThrow<string>('RESEND_FROM_EMAIL');
+    const appName = this.config.get<string>('APP_NAME', 'Speakoo');
+
+    await this.resend.emails.send({
+      from,
+      to: user.email,
+      subject: `${appName} — Verify your email`,
+      html: `<p>Your email verification code is: <strong>${code}</strong></p><p>It expires in 10 minutes.</p>`,
+    });
+
+    this.logger.log(`Verification email resent to ${user.email}`);
+  }
+
+  async resendPhoneOtp(phone: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { phoneNumber: phone } });
+    if (!user) return; // silent — prevents phone enumeration
+    const code = await this.createOtp(user.id, OtpPurpose.phone_verification);
+    await this.sendSmsOtp(phone, code);
+  }
+
+  // ─── Social login (OAuth stub) ─────────────────────────────────────────────
+
+  /**
+   * Social login handler.
+   * In production, this would validate OAuth tokens with Google, Facebook, or Apple.
+   * For now, returns "not implemented" error to guide clients.
+   */
+  async socialLogin(provider: string, token: string): Promise<{ accessToken: string; refreshToken: string }> {
+    const supportedProviders = ['google', 'facebook', 'apple'];
+    const normalizedProvider = provider.toLowerCase().trim();
+
+    if (!supportedProviders.includes(normalizedProvider)) {
+      throw new BadRequestException(`Unsupported provider: ${provider}`);
+    }
+
+    // TODO: Implement OAuth token validation for each provider
+    // For now, return error to prevent misuse
+    throw new BadRequestException(
+      `Social login via ${normalizedProvider} is not yet implemented. Please sign up with email and password.`,
+    );
   }
 }

@@ -6,9 +6,11 @@ import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
-import '../../features/auth/presentation/screens/otp_verification_screen.dart';
+import '../../features/auth/presentation/screens/otp_verify_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/reset_password_screen.dart';
+import '../../features/tutor_dashboard/presentation/screens/tutor_home_screen.dart';
+import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/home/presentation/screens/learner_home_screen.dart';
 import '../../features/booking/presentation/screens/tutor_search_screen.dart';
 import '../../features/booking/presentation/screens/booking_confirm_screen.dart';
@@ -47,8 +49,11 @@ GoRouter appRouter(AppRouterRef ref) {
         return '/onboarding';
       }
 
-      // Authenticated — send away from auth screens
+      // Authenticated — send away from auth screens to role-appropriate home
       if (isAuth || isOnboarding || isSplash) {
+        final role = authState.user?.role;
+        if (role == UserRole.tutor) return '/tutor-home';
+        if (role == UserRole.admin) return '/admin';
         return '/home';
       }
       return null;
@@ -60,7 +65,7 @@ GoRouter appRouter(AppRouterRef ref) {
       GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
       GoRoute(
         path: '/verify-otp',
-        builder: (_, state) => OtpVerificationScreen(
+        builder: (_, state) => OtpVerifyScreen(
           email: state.uri.queryParameters['email'],
         ),
       ),
@@ -104,6 +109,12 @@ GoRouter appRouter(AppRouterRef ref) {
       GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
       GoRoute(path: '/wallet', builder: (_, __) => const WalletScreen()),
       GoRoute(path: '/notifications', builder: (_, __) => const NotificationCenterScreen()),
+
+      // Tutor routes
+      GoRoute(path: '/tutor-home', builder: (_, __) => const TutorHomeScreen()),
+
+      // Admin routes
+      GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardScreen()),
     ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(child: Text('Page not found: ${state.uri}')),

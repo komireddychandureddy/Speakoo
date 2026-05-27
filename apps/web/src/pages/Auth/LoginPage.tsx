@@ -1,67 +1,112 @@
-﻿import { useState } from 'react';
+﻿import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
+import HCaptcha from '@hcaptcha/react-hcaptcha';
+import { apiLogin, apiRegister, parseAuthError } from '../../core/network/authApi';
+import apiClient from '../../core/network/apiClient';
 
-const COUNTRY_CODES = ['+91 🇮🇳', '+1 🇺🇸', '+44 🇬🇧', '+61 🇦🇺', '+971 🇦🇪'];
+const HCAPTCHA_SITE_KEY = import.meta.env['VITE_HCAPTCHA_SITE_KEY'] as string;
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<'login' | 'signup'>(
-    searchParams.get('tab') === 'signup' ? 'signup' : 'login'
+    searchParams.get('tab') === 'signup' ? 'signup' : 'login',
   );
-  const [countryCode, setCountryCode] = useState('+91 🇮🇳');
-  const [mobile, setMobile] = useState('');
-  const [password, setPassword] = useState('');
+
+  // Shared state
   const [showPw, setShowPw] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
-  const [forgotMobile, setForgotMobile] = useState('');
   const [error, setError] = useState('');
-  const [role, setRole] = useState<'learner' | 'tutor'>('learner');
+  const [loading, setLoading] = useState(false);
 
-  // Login name field
-  const [loginName, setLoginName] = useState('');
+  // Login fields
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginCaptchaToken, setLoginCaptchaToken] = useState('');
+  const loginCaptchaRef = useRef<HCaptcha>(null);
 
-  // Signup fields
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [signupMobile, setSignupMobile] = useState('');
+  // Sign Up fields
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
   const [signupPw, setSignupPw] = useState('');
+  const [signupCaptchaToken, setSignupCaptchaToken] = useState('');
+  const signupCaptchaRef = useRef<HCaptcha>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Forgot password fields
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!loginName.trim()) return setError('Please enter your name.');
-    if (!mobile) return setError('Please enter your mobile number.');
-    if (!password) return setError('Please enter your password.');
-    if (!/^\d{10}$/.test(mobile)) return setError('Enter a valid 10-digit mobile number.');
-    localStorage.setItem('speakoo_user', JSON.stringify({ mobile, name: loginName.trim(), role }));
-    navigate('/dashboard');
+    if (!loginEmail.trim()) return setError('Please enter your email address.');
+    if (!loginPassword) return setError('Please enter your password.');
+    setLoading(true);
+    try {
+      await apiLogin(loginEmail.trim().toLowerCase(), loginPassword, loginCaptchaToken || undefined);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(parseAuthError(err));
+      loginCaptchaRef.current?.resetCaptcha();
+      setLoginCaptchaToken('');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!name || !signupMobile || !signupPw) return setError('All fields are required.');
-    localStorage.setItem('speakoo_user', JSON.stringify({ mobile: signupMobile, name, role: 'learner' }));
-    navigate('/dashboard');
+    if (!signupName.trim()) return setError('Please enter your full name.');
+    if (!signupEmail.trim()) return setError('Please enter your email address.');
+    if (signupPw.length < 8) return setError('Password must be at least 8 characters.');
+    setLoading(true);
+    try {
+      await apiRegister(
+        signupName.trim(),
+        signupEmail.trim().toLowerCase(),
+        signupPw,
+        signupCaptchaToken || undefined,
+      );
+      navigate(`/verify-email?email=${encodeURIComponent(signupEmail.trim().toLowerCase())}`);
+    } catch (err) {
+      setError(parseAuthError(err));
+      signupCaptchaRef.current?.resetCaptcha();
+      setSignupCaptchaToken('');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleForgot = (e: React.FormEvent) => {
+  const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotMobile) return setError('Please enter your mobile number.');
-    alert('OTP sent to ' + countryCode + ' ' + forgotMobile);
-    setForgotMode(false);
+    setError('');
+    if (!forgotEmail.trim()) return setError('Please enter your email address.');
+    setLoading(true);
+    try {
+      await apiClient.post('/auth/forgot-password', { email: forgotEmail.trim().toLowerCase() });
+      setForgotSent(true);
+    } catch (err) {
+      setError(parseAuthError(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSocialLogin = (provider: 'google' | 'facebook' | 'apple') => {
-    const mockNames: Record<string, string> = {
-      google: 'Google User',
-      facebook: 'Facebook User',
-      apple: 'Apple User',
-    };
-    localStorage.setItem('speakoo_user', JSON.stringify({ name: mockNames[provider], provider, role }));
-    navigate('/dashboard');
+  const handleSocialLogin = async (provider: 'google' | 'facebook' | 'apple') => {
+    setError('');
+    setLoading(true);
+    try {
+      // TODO: Integrate real OAuth SDKs (Google OAuth, Facebook SDK, Apple Sign In)
+      // For now, show the backend error that guides users to email/password login
+      await apiClient.post(`/auth/social/${provider}`, { token: 'temp_token_pending_oauth_sdk' });
+      navigate('/dashboard');
+    } catch (err) {
+      setError(parseAuthError(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -77,43 +122,44 @@ export default function LoginPage() {
           {forgotMode ? (
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">Forgot Password</h2>
-              <p className="text-sm text-gray-500 mb-6">We'll send an OTP to your mobile</p>
+              <p className="text-sm text-gray-500 mb-6">
+                {forgotSent
+                  ? "Check your email for a reset link."
+                  : "We'll send a password reset link to your email."}
+              </p>
               {error && (
                 <p className="text-red-500 text-sm mb-4 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
               )}
-              <form onSubmit={handleForgot} className="space-y-4">
-                <div className="flex gap-2">
-                  <select
-                    value={countryCode}
-                    onChange={(e) => setCountryCode(e.target.value)}
-                    className="border border-gray-300 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047] w-32"
-                  >
-                    {COUNTRY_CODES.map((c) => (
-                      <option key={c}>{c}</option>
-                    ))}
-                  </select>
+              {!forgotSent && (
+                <form onSubmit={handleForgot} className="space-y-4">
                   <input
-                    type="tel"
-                    placeholder="Mobile number"
-                    value={forgotMobile}
-                    onChange={(e) => setForgotMobile(e.target.value.replace(/\D/, '').slice(0, 10))}
-                    className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
+                    type="email"
+                    placeholder="Email address"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
+                    autoComplete="email"
                   />
-                </div>
-                <button type="submit" className="btn-primary w-full py-3 text-base">
-                  Send OTP
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotMode(false);
-                    setError('');
-                  }}
-                  className="w-full text-sm text-[#43A047] hover:underline text-center"
-                >
-                  Back to Login
-                </button>
-              </form>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn-primary w-full py-3 text-base disabled:opacity-60"
+                  >
+                    {loading ? 'Sending…' : 'Send Reset Link'}
+                  </button>
+                </form>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotMode(false);
+                  setForgotSent(false);
+                  setError('');
+                }}
+                className="w-full text-sm text-[#43A047] hover:underline text-center mt-4"
+              >
+                Back to Login
+              </button>
             </>
           ) : (
             <>
@@ -153,59 +199,22 @@ export default function LoginPage() {
 
               {tab === 'login' ? (
                 <form onSubmit={handleLogin} className="space-y-4">
-                  {/* Role Selector — Login tab only */}
-                  <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
-                    <button
-                      type="button"
-                      onClick={() => setRole('learner')}
-                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                        role === 'learner' ? 'bg-[#43A047] text-white shadow' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      🎓 Learner
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRole('tutor')}
-                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                        role === 'tutor' ? 'bg-[#43A047] text-white shadow' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      👩‍🏫 Tutor
-                    </button>
-                  </div>
                   <input
-                    type="text"
-                    placeholder="Your Name"
-                    value={loginName}
-                    onChange={(e) => setLoginName(e.target.value)}
+                    type="email"
+                    placeholder="Email address"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
                     className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
+                    autoComplete="email"
                   />
-                  <div className="flex gap-2">
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      className="border border-gray-300 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047] w-32"
-                    >
-                      {COUNTRY_CODES.map((c) => (
-                        <option key={c}>{c}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="tel"
-                      placeholder="Mobile number"
-                      value={mobile}
-                      onChange={(e) => setMobile(e.target.value.replace(/\D/, '').slice(0, 10))}
-                      className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
-                    />
-                  </div>
                   <div className="relative">
                     <input
                       type={showPw ? 'text' : 'password'}
                       placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
                       className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm pr-12 focus:outline-none focus:ring-2 focus:ring-[#43A047]"
+                      autoComplete="current-password"
                     />
                     <button
                       type="button"
@@ -227,8 +236,18 @@ export default function LoginPage() {
                       Forgot Password?
                     </button>
                   </div>
-                  <button type="submit" className="btn-primary w-full py-3 text-base">
-                    Login
+                  <HCaptcha
+                    sitekey={HCAPTCHA_SITE_KEY}
+                    onVerify={setLoginCaptchaToken}
+                    ref={loginCaptchaRef}
+                    theme="light"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn-primary w-full py-3 text-base disabled:opacity-60"
+                  >
+                    {loading ? 'Logging in…' : 'Login'}
                   </button>
                 </form>
               ) : (
@@ -236,44 +255,27 @@ export default function LoginPage() {
                   <input
                     type="text"
                     placeholder="Full Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={signupName}
+                    onChange={(e) => setSignupName(e.target.value)}
                     className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
+                    autoComplete="name"
                   />
                   <input
                     type="email"
-                    placeholder="Email address (optional)"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email address"
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
                     className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
+                    autoComplete="email"
                   />
-                  <div className="flex gap-2">
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      className="border border-gray-300 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047] w-32"
-                    >
-                      {COUNTRY_CODES.map((c) => (
-                        <option key={c}>{c}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="tel"
-                      placeholder="Mobile number"
-                      value={signupMobile}
-                      onChange={(e) =>
-                        setSignupMobile(e.target.value.replace(/\D/, '').slice(0, 10))
-                      }
-                      className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
-                    />
-                  </div>
                   <div className="relative">
                     <input
                       type={showPw ? 'text' : 'password'}
-                      placeholder="Create Password"
+                      placeholder="Create Password (min 8 characters)"
                       value={signupPw}
                       onChange={(e) => setSignupPw(e.target.value)}
                       className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm pr-12 focus:outline-none focus:ring-2 focus:ring-[#43A047]"
+                      autoComplete="new-password"
                     />
                     <button
                       type="button"
@@ -283,8 +285,18 @@ export default function LoginPage() {
                       {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
-                  <button type="submit" className="btn-primary w-full py-3 text-base">
-                    Create Account
+                  <HCaptcha
+                    sitekey={HCAPTCHA_SITE_KEY}
+                    onVerify={setSignupCaptchaToken}
+                    ref={signupCaptchaRef}
+                    theme="light"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn-primary w-full py-3 text-base disabled:opacity-60"
+                  >
+                    {loading ? 'Creating account…' : 'Create Account'}
                   </button>
                 </form>
               )}

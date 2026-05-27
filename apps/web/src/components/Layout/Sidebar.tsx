@@ -1,6 +1,7 @@
 ﻿import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useI18n } from '../../core/i18n/I18nContext';
+import { apiLogout } from '../../core/network/authApi';
 
 const NAV_ITEMS = [
   { icon: '🏠', key: 'nav_dashboard', to: '/dashboard' },
@@ -42,8 +43,7 @@ export default function Sidebar() {
   const isTutor = user.role === 'tutor';
 
   const handleLogout = () => {
-    localStorage.removeItem('speakoo_user');
-    navigate('/');
+    void apiLogout().finally(() => navigate('/'));
   };
 
   return (

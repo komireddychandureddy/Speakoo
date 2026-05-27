@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: speakoo_dev
     ports:
-      - '5434:5432'
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -47,7 +47,7 @@ services:
     container_name: speakoo-livekit
     command: --dev
     environment:
-      LIVEKIT_KEYS: "${LIVEKIT_DEV_KEY}:${LIVEKIT_DEV_SECRET}"
+      LIVEKIT_KEYS: "${LIVEKIT_DEV_KEY}: ${LIVEKIT_DEV_SECRET}"
     ports:
       - '7880:7880'
       - '7881:7881'

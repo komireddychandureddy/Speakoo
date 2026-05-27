@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/primary_button.dart';
+import '../../../tutors/application/tutors_provider.dart';
+import '../../application/booking_provider.dart';
 
 enum _PayMethod { wallet, card }
 
@@ -21,78 +23,62 @@ class BookingConfirmScreen extends ConsumerStatefulWidget {
 class _BookingConfirmScreenState extends ConsumerState<BookingConfirmScreen> {
   _PayMethod _method = _PayMethod.wallet;
   _Duration _duration = _Duration.min25;
-  // TODO: fetch from user profile/API — true if no prior sessions with this tutor
-  bool _isFreeTrial = true;
   bool _loading = false;
 
-  String get _tutorName {
-    switch (widget.tutorId) {
-      case '1':
-        return 'Sofia Martinez';
-      case '2':
-        return 'Liang Wei';
-      case '3':
-        return 'Amélie Dubois';
-      default:
-        return 'Sofia Martinez';
-    }
-  }
-
-  String get _language {
-    switch (widget.tutorId) {
-      case '1':
-        return 'Spanish';
-      case '2':
-        return 'Mandarin';
-      case '3':
-        return 'French';
-      default:
-        return 'Spanish';
-    }
-  }
-
-  double get _hourlyRate {
-    switch (widget.tutorId) {
-      case '1':
-        return 28;
-      case '2':
-        return 24;
-      case '3':
-        return 32;
-      default:
-        return 28;
-    }
-  }
-
-  /// Prorated rate based on selected duration (25 min = 42%, 50 min = 83%).
-  double get _sessionFee {
-    if (_isFreeTrial) return 0;
+  double _sessionFee(double hourlyRate) {
     final fraction = _duration == _Duration.min25 ? 25.0 / 60 : 50.0 / 60;
-    return _hourlyRate * fraction;
+    return hourlyRate * fraction;
   }
 
-  double get _platformFee => _sessionFee * 0.05;
-  double get _total => _sessionFee + _platformFee;
+  double _platformFee(double hourlyRate) => _sessionFee(hourlyRate) * 0.05;
+  double _total(double hourlyRate) =>
+      _sessionFee(hourlyRate) + _platformFee(hourlyRate);
+
   String get _durationLabel =>
       _duration == _Duration.min25 ? '25 min' : '50 min';
-  String get _initials => _tutorName.split(' ').take(2).map((s) => s[0]).join();
 
-  Future<void> _confirmPay() async {
+  Future<void> _confirmPay(String tutorUserId, double hourlyRate) async {
     setState(() => _loading = true);
-    await Future.delayed(const Duration(seconds: 1));
+    final totalCents = (_total(hourlyRate) * 100).round();
+    final creation = ref.read(bookingCreationProvider.notifier);
+    // NOTE: slotId must come from a slot selection screen; placeholder UUID used here.
+    // TODO: add slot selection step before booking confirm.
+    final booking = await creation.createBooking(
+      slotId: 'placeholder-slot-id',
+      language: 'English',
+      priceCents: totalCents,
+    );
     if (!mounted) return;
     setState(() => _loading = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Booking confirmed! Check your email.'),
-        backgroundColor: AppColors.primaryGreen,
-      ),
-    );
-    context.go('/my-bookings');
+    if (booking != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Booking confirmed! Check your email.'),
+          backgroundColor: AppColors.primaryGreen,
+        ),
+      );
+      context.go('/my-bookings');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Booking failed. Please try again.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.tutorId == null) {
+      return const Scaffold(
+        body: Center(child: Text('No tutor selected')),
+      );
+    }
+
+    final tutorAsync =
+        ref.watch(tutorPublicProfileProvider(widget.tutorId!));
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -100,42 +86,49 @@ class _BookingConfirmScreenState extends ConsumerState<BookingConfirmScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_isFreeTrial)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.primaryGreen),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.star_rounded, color: AppColors.primaryGreen, size: 18),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Free Trial — First session with this tutor is free!',
-                        style: TextStyle(
-                            color: AppColors.primaryGreen,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(delay: 30.ms),
+      body: tutorAsync.when(
+        loading: () =>
+            const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline,
+                  size: 48, color: AppColors.error),
+              const SizedBox(height: 12),
+              Text('Failed to load tutor: $e',
+                  style:
+                      const TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => ref.invalidate(
+                    tutorPublicProfileProvider(widget.tutorId!)),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (tutor) {
+          final hourlyRate = tutor.hourlyRateCents / 100;
+          final initials = tutor.displayName
+              .split(' ')
+              .take(2)
+              .map((s) => s[0])
+              .join();
+          final language = tutor.languagesTaught.isNotEmpty
+              ? tutor.languagesTaught.first
+              : 'English';
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             _SummaryCard(
-              initials: _initials,
-              name: _tutorName,
-              language: _language,
-              slot: 'Mon, 26 May 2025 • 09:00 – 10:00',
+              initials: initials,
+              name: tutor.displayName,
+              language: language,
+              slot: 'Select a slot',
               duration: _durationLabel,
             ).animate().fadeIn(delay: 50.ms),
             const SizedBox(height: 16),
@@ -153,33 +146,32 @@ class _BookingConfirmScreenState extends ConsumerState<BookingConfirmScreen> {
                 Expanded(
                   child: _DurationChip(
                     label: '25 min',
-                    price: _isFreeTrial
-                        ? 'Free'
-                        : '\$${(_hourlyRate * 25 / 60).toStringAsFixed(2)}',
+                    price:
+                        '\$${(hourlyRate * 25 / 60).toStringAsFixed(2)}',
                     selected: _duration == _Duration.min25,
-                    onTap: () => setState(() => _duration = _Duration.min25),
+                    onTap: () =>
+                        setState(() => _duration = _Duration.min25),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _DurationChip(
                     label: '50 min',
-                    price: _isFreeTrial
-                        ? 'Free'
-                        : '\$${(_hourlyRate * 50 / 60).toStringAsFixed(2)}',
+                    price:
+                        '\$${(hourlyRate * 50 / 60).toStringAsFixed(2)}',
                     selected: _duration == _Duration.min50,
-                    onTap: () => setState(() => _duration = _Duration.min50),
+                    onTap: () =>
+                        setState(() => _duration = _Duration.min50),
                   ),
                 ),
               ],
             ).animate().fadeIn(delay: 120.ms),
             const SizedBox(height: 20),
             _PriceCard(
-              sessionFee: _sessionFee,
-              platformFee: _platformFee,
-              total: _total,
+              sessionFee: _sessionFee(hourlyRate),
+              platformFee: _platformFee(hourlyRate),
+              total: _total(hourlyRate),
               durationLabel: _durationLabel,
-              isFreeTrial: _isFreeTrial,
             ).animate().fadeIn(delay: 150.ms),
             const SizedBox(height: 20),
             const Text(
@@ -197,7 +189,8 @@ class _BookingConfirmScreenState extends ConsumerState<BookingConfirmScreen> {
                     icon: Icons.account_balance_wallet_outlined,
                     label: 'Wallet',
                     selected: _method == _PayMethod.wallet,
-                    onTap: () => setState(() => _method = _PayMethod.wallet),
+                    onTap: () =>
+                        setState(() => _method = _PayMethod.wallet),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -206,29 +199,33 @@ class _BookingConfirmScreenState extends ConsumerState<BookingConfirmScreen> {
                     icon: Icons.credit_card_outlined,
                     label: 'Credit Card',
                     selected: _method == _PayMethod.card,
-                    onTap: () => setState(() => _method = _PayMethod.card),
+                    onTap: () =>
+                        setState(() => _method = _PayMethod.card),
                   ),
                 ),
               ],
             ).animate().fadeIn(delay: 250.ms),
             const SizedBox(height: 32),
             PrimaryButton(
-              label: _isFreeTrial
-                  ? 'Confirm Free Trial'
-                  : 'Confirm & Pay  \$${_total.toStringAsFixed(2)}',
+              label:
+                  'Confirm & Pay  \$${_total(hourlyRate).toStringAsFixed(2)}',
               loading: _loading,
-              onPressed: _confirmPay,
+              onPressed: () =>
+                  _confirmPay(tutor.userId, hourlyRate),
             ).animate().fadeIn(delay: 300.ms),
             const SizedBox(height: 12),
             const Center(
               child: Text(
                 'By confirming you agree to our cancellation policy.',
-                style: TextStyle(fontSize: 12, color: AppColors.textHint),
+                style:
+                    TextStyle(fontSize: 12, color: AppColors.textHint),
                 textAlign: TextAlign.center,
               ),
             ),
           ],
         ),
+        );
+        },
       ),
     );
   }
@@ -374,14 +371,12 @@ class _PriceCard extends StatelessWidget {
   final double platformFee;
   final double total;
   final String durationLabel;
-  final bool isFreeTrial;
 
   const _PriceCard({
     required this.sessionFee,
     required this.platformFee,
     required this.total,
     required this.durationLabel,
-    required this.isFreeTrial,
   });
 
   @override
@@ -402,14 +397,8 @@ class _PriceCard extends StatelessWidget {
                   color: AppColors.textPrimary,
                   fontSize: 15)),
           const SizedBox(height: 12),
-          _PriceRow(
-              label: 'Session Fee ($durationLabel)',
-              amount: sessionFee,
-              isFree: isFreeTrial),
-          _PriceRow(
-              label: 'Platform Fee (5%)',
-              amount: platformFee,
-              isFree: isFreeTrial),
+          _PriceRow(label: 'Session Fee ($durationLabel)', amount: sessionFee),
+          _PriceRow(label: 'Platform Fee (5%)', amount: platformFee),
           const Divider(color: AppColors.divider, height: 20),
           _PriceRow(label: 'Total', amount: total, bold: true),
         ],
@@ -422,13 +411,11 @@ class _PriceRow extends StatelessWidget {
   final String label;
   final double amount;
   final bool bold;
-  final bool isFree;
 
   const _PriceRow({
     required this.label,
     required this.amount,
     this.bold = false,
-    this.isFree = false,
   });
 
   @override
@@ -444,11 +431,9 @@ class _PriceRow extends StatelessWidget {
                   fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
                   fontSize: bold ? 15 : 14)),
           Text(
-              isFree ? 'Free' : '\$${amount.toStringAsFixed(2)}',
+              '\$${amount.toStringAsFixed(2)}',
               style: TextStyle(
-                  color: isFree
-                      ? AppColors.primaryGreen
-                      : bold
+                  color: bold
                           ? AppColors.primaryGreen
                           : AppColors.textPrimary,
                   fontWeight: bold ? FontWeight.w700 : FontWeight.w500,

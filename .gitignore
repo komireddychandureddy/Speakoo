@@ -24,8 +24,6 @@ lerna-debug.log*
 # .env.example is the ONLY env file committed (no real values)
 .env
 .env.local
-.env.dev
-.env.prod
 .env.development
 .env.bil
 .env.qc
@@ -40,5 +38,4 @@ lerna-debug.log*
 # Compiled JavaScript artifacts in TypeScript source directories
 # (compiled output belongs in dist/, never committed alongside .ts source)
 apps/api/src/**/*.js
-
-/PlaywrightTests
+apps/api/src/**/*.js.map
