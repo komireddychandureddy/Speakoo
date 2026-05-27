@@ -38,15 +38,24 @@ class _BookingConfirmScreenState extends ConsumerState<BookingConfirmScreen> {
       _duration == _Duration.min25 ? '25 min' : '50 min';
 
   Future<void> _confirmPay(String tutorUserId, double hourlyRate) async {
-    setState(() => _loading = true);
-    final totalCents = (_total(hourlyRate) * 100).round();
     final creation = ref.read(bookingCreationProvider.notifier);
-    // NOTE: slotId must come from a slot selection screen; placeholder UUID used here.
+    // NOTE: slotId must come from a slot selection screen.
     // TODO: add slot selection step before booking confirm.
+    const slotId = 'placeholder-slot-id';
+    if (slotId == 'placeholder-slot-id') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a time slot first.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    setState(() => _loading = true);
     final booking = await creation.createBooking(
-      slotId: 'placeholder-slot-id',
+      slotId: slotId,
+      tutorId: tutorUserId,
       language: 'English',
-      priceCents: totalCents,
     );
     if (!mounted) return;
     setState(() => _loading = false);

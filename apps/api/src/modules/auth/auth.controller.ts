@@ -21,6 +21,7 @@ import { RegisterPhoneDto } from './dto/register-phone.dto';
 import { VerifyPhoneDto } from './dto/verify-phone.dto';
 import { ResendEmailOtpDto } from './dto/resend-email-otp.dto';
 import { ResendPhoneOtpDto } from './dto/resend-phone-otp.dto';
+import { SocialLoginDto } from './dto/social-login.dto';
 import { Public } from './decorators/public.decorator';
 import { CaptchaGuard } from './guards/captcha.guard';
 import { JwtService } from '@nestjs/jwt';
@@ -157,10 +158,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async socialLogin(
     @Param('provider') provider: string,
-    @Body() body: { token: string },
+    @Body() dto: SocialLoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const tokens = await this.authService.socialLogin(provider, body.token);
+    const tokens = await this.authService.socialLogin(provider, dto.token);
     this.setRefreshCookie(res, tokens.refreshToken);
     return { accessToken: tokens.accessToken };
   }

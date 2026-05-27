@@ -88,7 +88,7 @@ class _TutorSearchScreenState extends ConsumerState<TutorSearchScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: SpeakooTextField(
               label: '',
-              hint: 'Search tutors, languages�',
+              hint: 'Search tutors, languages…',
               controller: _searchCtrl,
               prefixIcon: Icons.search,
               onChanged: (_) => setState(() {}),
@@ -141,7 +141,7 @@ class _TutorSearchScreenState extends ConsumerState<TutorSearchScreen> {
               ),
             ),
             data: (data) {
-              final rawList = (data['tutors'] as List<dynamic>?) ?? [];
+              final rawList = (data['items'] as List<dynamic>?) ?? [];
               final profiles = rawList
                   .cast<Map<String, dynamic>>()
                   .map(TutorPublicProfile.fromJson)

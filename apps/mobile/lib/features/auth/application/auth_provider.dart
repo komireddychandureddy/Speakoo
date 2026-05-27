@@ -177,7 +177,6 @@ class AuthNotifier extends Notifier<AuthState> {
     required String email,
     required String password,
     required String fullName,
-    required String role,
     String? phone,
   }) async {
     final hasPhoneInput = phone != null && phone.isNotEmpty;

@@ -35,16 +35,16 @@ class BookingCreationNotifier
 
   Future<BookingModel?> createBooking({
     required String slotId,
+    required String tutorId,
     required String language,
-    required int priceCents,
   }) async {
     state = const AsyncLoading();
     final repo = ref.read(bookingRepositoryProvider);
     state = await AsyncValue.guard(
       () => repo.createBooking(
         slotId: slotId,
+        tutorId: tutorId,
         language: language,
-        priceCents: priceCents,
       ),
     );
     // Invalidate list so MyBookingsScreen refreshes

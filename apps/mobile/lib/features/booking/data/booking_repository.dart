@@ -21,22 +21,22 @@ class BookingRepository {
   }
 
   /// Creates a booking for a given slot.
-  /// [priceCents] and [language] are sent to the backend.
+  /// [tutorId] and [language] are sent to the backend.
   Future<BookingModel> createBooking({
     required String slotId,
+    required String tutorId,
     required String language,
-    required int priceCents,
   }) async {
     final response = await _dio.post('/bookings', data: {
       'slotId': slotId,
+      'tutorId': tutorId,
       'language': language,
-      'priceCents': priceCents,
     });
     return BookingModel.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Cancels a booking by ID.
   Future<void> cancelBooking(String bookingId) async {
-    await _dio.delete('/bookings/$bookingId');
+    await _dio.delete('/bookings/$bookingId/cancel');
   }
 }

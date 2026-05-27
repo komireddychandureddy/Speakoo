@@ -33,7 +33,7 @@ class BookingModel {
   factory BookingModel.fromJson(Map<String, dynamic> json) {
     final slot = json['slot'] as Map<String, dynamic>?;
     final tutor = json['tutor'] as Map<String, dynamic>?;
-    final tutorProfile = tutor?['user']?['profile'] as Map<String, dynamic>?;
+    final tutorProfile = tutor?['profile'] as Map<String, dynamic>?;
 
     return BookingModel(
       id: json['id'] as String,

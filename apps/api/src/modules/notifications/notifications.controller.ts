@@ -1,12 +1,10 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Controller, Get, Query } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationQueryDto } from './dto/notification-query.dto';
 import { User } from '@prisma/client';
 
 @Controller('notifications')
-@UseGuards(JwtAuthGuard)
 export class NotificationsController {
   constructor(private readonly prisma: PrismaService) {}
 
@@ -19,7 +17,7 @@ export class NotificationsController {
     const limit = query.limit ?? 20;
     return this.prisma.notificationLog.findMany({
       where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { sentAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
     });

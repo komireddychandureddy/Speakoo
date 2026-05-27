@@ -8,6 +8,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
+import { randomUUID } from 'crypto';
 import { Twilio } from 'twilio';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
@@ -26,18 +27,12 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly resend: Resend;
 
-  private readonly twilio: Twilio;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
   ) {
     this.resend = new Resend(this.config.getOrThrow('RESEND_API_KEY'));
-    this.twilio = new Twilio(
-      this.config.getOrThrow('TWILIO_ACCOUNT_SID'),
-      this.config.getOrThrow('TWILIO_AUTH_TOKEN'),
-    );
   }
 
   async register(dto: RegisterDto, role: UserRole = UserRole.learner) {
@@ -109,8 +104,12 @@ export class AuthService {
       this.logger.debug(`[DEV] SMS OTP for ${phone}: ${code}`);
       return;
     }
+    const twilio = new Twilio(
+      this.config.getOrThrow<string>('TWILIO_ACCOUNT_SID'),
+      this.config.getOrThrow<string>('TWILIO_AUTH_TOKEN'),
+    );
     const from = this.config.getOrThrow<string>('TWILIO_WHATSAPP_FROM');
-    await this.twilio.messages.create({
+    await twilio.messages.create({
       body: `Your Speakoo verification code is: ${code}. It expires in 10 minutes.`,
       from,
       to: phone,
@@ -213,7 +212,7 @@ export class AuthService {
     if (existing) throw new ConflictException('Phone number already registered');
 
     // Random placeholder password hash — user will authenticate via OTP only
-    const passwordHash = await bcrypt.hash(crypto.randomUUID(), BCRYPT_ROUNDS);
+    const passwordHash = await bcrypt.hash(randomUUID(), BCRYPT_ROUNDS);
 
     const user = await this.prisma.user.create({
       data: {
@@ -243,7 +242,7 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { isPhoneVerified: true, isVerified: true },
+      data: { isPhoneVerified: true },
     });
 
     this.logger.log(`Phone verified for user ${user.id}`);

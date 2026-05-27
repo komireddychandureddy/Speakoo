@@ -4,7 +4,7 @@ import '../data/models/user_profile_model.dart';
 import '../data/profile_repository.dart';
 
 final profileRepositoryProvider = Provider<ProfileRepository>(
-  (ref) => ProfileRepository(ref.watch(dioProvider)),
+  (ref) => ProfileRepository(ref.watch(dioClientProvider)),
 );
 
 /// Fetches the current user's full profile from GET /users/me.
