@@ -75,6 +75,13 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
+            # Build web app (uses Docker Node image — no Node.js install needed on host)
+            docker run --rm \
+              -v /opt/speakoo/apps/web:/app \
+              -w /app \
+              node:20-alpine \
+              sh -c "npm ci && npm run build"
+
             # Pull latest API image
             docker compose \
               -f /opt/speakoo/infra/docker/docker-compose.yml \
