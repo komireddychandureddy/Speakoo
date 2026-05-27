@@ -140,16 +140,6 @@ export default function ProfilePage() {
         </div>
 
         <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Mobile Number</label>
-          <input
-            type="tel"
-            value={mobile}
-            readOnly
-            className="mt-1 w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
-          />
-        </div>
-
-        <div>
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bio</label>
           <textarea
             value={bio}
