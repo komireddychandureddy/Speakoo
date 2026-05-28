@@ -53,6 +53,8 @@ export class AuthService {
       include: { profile: true },
     });
 
+    await this.sendVerificationEmail(user.id);
+
     this.logger.log(`User registered: ${user.id}`);
     return this.issueTokens(user.id, user.email, user.role);
   }
@@ -117,6 +119,25 @@ export class AuthService {
     this.logger.log(`SMS OTP sent to ${phone}`);
   }
 
+  private async sendEmailOtp(
+    to: string,
+    subject: string,
+    html: string,
+    failureLogPrefix: string,
+    failureMessage: string,
+  ): Promise<void> {
+    const { error } = await this.resend.emails.send({
+      from: this.config.getOrThrow('RESEND_FROM_EMAIL'),
+      to,
+      subject,
+      html,
+    });
+    if (error) {
+      this.logger.error(`${failureLogPrefix}: ${error.message}`);
+      throw new BadRequestException(failureMessage);
+    }
+  }
+
   private async createOtp(userId: string, purpose: OtpPurpose): Promise<string> {
     const code = this.generateOtp();
     const codeHash = await bcrypt.hash(code, 10);
@@ -156,15 +177,15 @@ export class AuthService {
     if (user.isVerified) return;
 
     const code = await this.createOtp(userId, OtpPurpose.email_verification);
-    const from = this.config.getOrThrow<string>('RESEND_FROM_EMAIL');
     const appName = this.config.get<string>('APP_NAME', 'Speakoo');
 
-    await this.resend.emails.send({
-      from,
-      to: user.email,
-      subject: `${appName} — Verify your email`,
-      html: `<p>Your email verification code is: <strong>${code}</strong></p><p>It expires in 10 minutes.</p>`,
-    });
+    await this.sendEmailOtp(
+      user.email,
+      `${appName} — Verify your email`,
+      `<p>Your email verification code is: <strong>${code}</strong></p><p>It expires in 10 minutes.</p>`,
+      `Failed to send verification email to ${user.email}`,
+      'Failed to send verification email — please try again later',
+    );
 
     this.logger.log(`Verification email sent to ${user.email}`);
   }
@@ -182,15 +203,15 @@ export class AuthService {
     if (!user) return;
 
     const code = await this.createOtp(user.id, OtpPurpose.password_reset);
-    const from = this.config.getOrThrow<string>('RESEND_FROM_EMAIL');
     const appName = this.config.get<string>('APP_NAME', 'Speakoo');
 
-    await this.resend.emails.send({
-      from,
-      to: user.email,
-      subject: `${appName} — Reset your password`,
-      html: `<p>Your password reset code is: <strong>${code}</strong></p><p>It expires in 10 minutes.</p>`,
-    });
+    await this.sendEmailOtp(
+      user.email,
+      `${appName} — Reset your password`,
+      `<p>Your password reset code is: <strong>${code}</strong></p><p>It expires in 10 minutes.</p>`,
+      `Failed to send password reset email to ${user.email}`,
+      'Failed to send password reset email — please try again later',
+    );
 
     this.logger.log(`Password reset email sent to ${user.email}`);
   }
@@ -254,15 +275,15 @@ export class AuthService {
     if (!user || user.isVerified) return; // silent — prevents email enumeration
 
     const code = await this.createOtp(user.id, OtpPurpose.email_verification);
-    const from = this.config.getOrThrow<string>('RESEND_FROM_EMAIL');
     const appName = this.config.get<string>('APP_NAME', 'Speakoo');
 
-    await this.resend.emails.send({
-      from,
-      to: user.email,
-      subject: `${appName} — Verify your email`,
-      html: `<p>Your email verification code is: <strong>${code}</strong></p><p>It expires in 10 minutes.</p>`,
-    });
+    await this.sendEmailOtp(
+      user.email,
+      `${appName} — Verify your email`,
+      `<p>Your email verification code is: <strong>${code}</strong></p><p>It expires in 10 minutes.</p>`,
+      `Failed to resend verification email to ${user.email}`,
+      'Failed to resend verification email — please try again later',
+    );
 
     this.logger.log(`Verification email resent to ${user.email}`);
   }
@@ -281,7 +302,10 @@ export class AuthService {
    * In production, this would validate OAuth tokens with Google, Facebook, or Apple.
    * For now, returns "not implemented" error to guide clients.
    */
-  async socialLogin(provider: string, token: string): Promise<{ accessToken: string; refreshToken: string }> {
+  async socialLogin(
+    provider: string,
+    token: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const supportedProviders = ['google', 'facebook', 'apple'];
     const normalizedProvider = provider.toLowerCase().trim();
 
