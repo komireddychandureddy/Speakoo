@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
-import FacebookLogin from 'react-facebook-login';
+import FacebookLogin from '@greatsumini/react-facebook-login';
 import AppleLogin from 'react-apple-login';
 import {
   apiLogin,
