@@ -461,11 +461,11 @@ export default function LoginPage() {
                   <FacebookLogin
                     appId={FACEBOOK_APP_ID}
                     onSuccess={handleFacebookLogin}
-                    onFail={(error) => {
+                    onFail={(error: unknown) => {
                       console.error('Facebook login error:', error);
                       setError('Facebook login failed. Please try again or use email/password login.');
                     }}
-                    render={({ onClick }) => (
+                    render={({ onClick }: { onClick?: () => void; logout?: (callback: (res: unknown) => void) => void }) => (
                       <button
                         type="button"
                         onClick={onClick}
