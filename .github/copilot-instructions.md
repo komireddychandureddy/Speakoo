@@ -202,3 +202,10 @@ PLATFORM_FEE_PERCENT=5
 - ❌ Setting `isVerified: true` during phone OTP verification — `isVerified` is email-only; use `isPhoneVerified`
 - ❌ Function parameters on client-side methods that are never forwarded to the API
 - ❌ Corrupted Unicode replacement characters (`\uFFFD`) in string literals — use the correct codepoint (e.g. `…` U+2026)
+- ❌ OAuth client packages installed in `apps/api` instead of `apps/web` — React/browser packages belong in the frontend app
+- ❌ OAuth email-only lookup during login — always query by `(provider, providerId)` first to prevent account takeover
+- ❌ Trusting OAuth provider emails without checking `email_verified` claim
+- ❌ Setting `isVerified: true` for Apple Private Relay emails — user cannot change to a real email later
+- ❌ Social login endpoints without `@Public()`, `@UseGuards(CaptchaGuard)`, and `@Throttle({ auth: { ttl: 15 * 60_000, limit: 5 } })`
+- ❌ Running `npx prisma migrate deploy` before `docker compose up` — database must be running before migrations
+- ❌ Running `npm run build` in deployment scripts when `docker-compose.prod.yml` uses pre-built GHCR images

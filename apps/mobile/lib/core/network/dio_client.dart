@@ -1,12 +1,16 @@
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'dio_client.g.dart';
 
-const _baseUrl = String.fromEnvironment('API_URL', defaultValue: 'http://10.0.2.2:3000/api/v1');
+// API URL: use production URL for web, localhost for mobile development
+final _baseUrl = kIsWeb 
+    ? const String.fromEnvironment('API_URL', defaultValue: 'https://speakoo.duckdns.org/api/v1')
+    : const String.fromEnvironment('API_URL', defaultValue: 'http://10.0.2.2:3000/api/v1');
 const _accessTokenKey = 'access_token';
 
 @riverpod

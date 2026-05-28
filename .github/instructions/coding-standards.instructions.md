@@ -756,3 +756,300 @@ hint: 'Search tutors, languages…',
 // ❌ WRONG — corrupted replacement character renders as a glyph box in the UI
 hint: 'Search tutors, languages\uFFFD',
 ```
+
+---
+
+## 42. Monorepo Package Placement — Frontend Packages Go in Frontend App
+
+**Rule:** In a monorepo with separate `apps/api` (backend) and `apps/web` (frontend) directories, OAuth client packages must be installed in the **frontend** app where they will be used. Never add React/browser packages to the backend.
+
+```bash
+# ✅ CORRECT — OAuth packages in apps/web
+cd apps/web
+npm install @react-oauth/google react-facebook-login react-apple-login --legacy-peer-deps
+
+# ❌ WRONG — React packages in backend
+cd apps/api
+npm install @react-oauth/google react-facebook-login
+```
+
+Also check `package.json` carefully during code review — browser packages (React, DOM APIs) in backend signal misplaced dependencies.
+
+---
+
+## 43. Google OAuth — Use ID Token Flow, Not Authorization Code Exchange
+
+**Rule:** For Google OAuth in a web client, use the **ID token credential flow** (`@react-oauth/google` with `GoogleLogin` component). The authorization code flow requires a `client_secret`, which must never be exposed to the browser.
+
+```tsx
+// ✅ CORRECT — ID token credential flow (no client_secret needed)
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
+
+<GoogleLogin
+  onSuccess={(credentialResponse: CredentialResponse) => {
+    axios.post('/auth/social/google', { token: credentialResponse.credential });
+  }}
+  onError={() => console.error('Login failed')}
+/>
+
+// ❌ WRONG — auth code flow requires client_secret (unsafe in browser)
+const authCode = await googleOAuth.getAuthCode();
+axios.post('/auth/social/google', { code: authCode }); // backend needs client_secret to exchange
+```
+
+Backend verifies the ID token with `google-auth-library.OAuth2Client.verifyIdToken()`.
+
+---
+
+## 44. Auth localStorage Keys — Always Match the Expected Key Name
+
+**Rule:** Use the exact `localStorage` key names expected by the auth context/guards. For Speakoo: `speakoo_access_token` and `speakoo_user`. Never shorten or invent new key names.
+
+```typescript
+// ✅ CORRECT — matches auth context and guards
+localStorage.setItem('speakoo_access_token', accessToken);
+localStorage.setItem('speakoo_user', JSON.stringify(user));
+
+// ❌ WRONG — 'speakoo_token' is not recognized; auth guards will fail
+localStorage.setItem('speakoo_token', accessToken);
+```
+
+Also fetch and persist user data immediately after receiving the token so the UI can display user info.
+
+---
+
+## 45. Database Migrations Must Run After Database Starts
+
+**Rule:** In deployment/update scripts, `npx prisma migrate deploy` must run **after** `docker compose up` (which starts the database), never before or after `docker compose down` (which stops the database).
+
+```bash
+# ✅ CORRECT — migrate after DB starts
+docker compose up -d
+sleep 10  # wait for DB to be ready
+npx prisma migrate deploy
+
+# ❌ WRONG — migrate runs when DB is stopped
+docker compose down
+npx prisma migrate deploy  # will fail — DB not running
+docker compose up -d
+```
+
+---
+
+## 46. Monorepo Root Directory Checks — Validate Structure, Not package.json
+
+**Rule:** When validating the working directory in a monorepo script, check for the existence of **subdirectories** (`apps/api`, `apps/web`, `infra/docker`), not `package.json` in the repo root. Monorepos often have no root `package.json`.
+
+```bash
+# ✅ CORRECT — check for monorepo structure
+if [ ! -d "apps/api" ] || [ ! -d "infra/docker" ]; then
+    echo "Error: Must run from repository root (apps/api and infra/docker must exist)"
+    exit 1
+fi
+
+# ❌ WRONG — monorepos may not have root package.json
+if [ ! -f "package.json" ]; then
+    echo "Error: Must run from repository root (where package.json exists)"
+    exit 1
+fi
+```
+
+---
+
+## 47. Deployment Scripts — Don't Build Locally When Using Pre-Built Remote Images
+
+**Rule:** If `docker-compose.prod.yml` uses a pre-built image from a container registry (`ghcr.io/...`), the deployment script must **not** run local build steps (`npm run build`, `docker build`). Local builds are dead work when the container already has the built code.
+
+```bash
+# ✅ CORRECT — no local build when using GHCR image
+npm ci                       # for Prisma CLI only
+npx prisma generate          # for migration tooling
+docker compose up -d         # pulls ghcr.io/owner/speakoo-api:tag
+npx prisma migrate deploy    # after DB starts
+
+# ❌ WRONG — local build is never used
+npm ci
+npm run build                # builds locally but container uses GHCR image
+docker compose up -d         # ignores local build, pulls remote image
+```
+
+Keep `npm ci` + `npx prisma generate` only if migrations must run from the host. Otherwise, run migrations inside the container.
+
+---
+
+## 48. Social Login Endpoints Must Use CaptchaGuard and Throttling
+
+**Rule:** All social OAuth endpoints (`/auth/social/:provider`) must be decorated with `@Public()` (to bypass JWT auth), `@UseGuards(CaptchaGuard)` (to prevent bots), and `@Throttle({ auth: { ttl: 15 * 60_000, limit: 5 } })` (stricter than default rate limit).
+
+```typescript
+// ✅ CORRECT — captcha + throttling + public
+import { Throttle } from '@nestjs/throttler';
+
+@Post('social/:provider')
+@Public()
+@UseGuards(CaptchaGuard)
+@Throttle({ auth: { ttl: 15 * 60_000, limit: 5 } })
+async socialLogin(
+  @Param('provider') provider: string,
+  @Body() dto: SocialLoginDto,
+) { ... }
+
+// ❌ WRONG — no captcha, no throttling
+@Post('social/:provider')
+@Public()
+async socialLogin(@Param('provider') provider: string, @Body() dto: SocialLoginDto) { ... }
+```
+
+The `SocialLoginDto` must include `captchaToken?: string` for hCaptcha verification.
+
+---
+
+## 49. OAuth Email Verification — Check `email_verified` Claim and Handle Apple Private Relay
+
+**Rule:** When creating a user from an OAuth provider:
+1. Check the `email_verified` claim from Google/Apple ID tokens (reject if `false`)
+2. For Apple Private Relay emails (`@privaterelay.appleid.com`), set `isVerified: false` (prevents user from changing to a real email later)
+
+```typescript
+// ✅ CORRECT — checks email_verified, handles Apple Private Relay
+const payload = await verifyGoogleIdToken(idToken);
+if (payload.email_verified === false) {
+  throw new BadRequestException('Email not verified');
+}
+const isPrivateRelay = payload.email.endsWith('privaterelay.appleid.com');
+await prisma.user.create({
+  data: {
+    email: payload.email,
+    isVerified: payload.email_verified && !isPrivateRelay,
+    ...
+  },
+});
+
+// ❌ WRONG — no email_verified check, all Apple users marked verified
+await prisma.user.create({
+  data: { email: payload.email, isVerified: true, ... },
+});
+```
+
+---
+
+## 50. OAuth Account Takeover Prevention — Store and Lookup by Provider User ID
+
+**Rule:** Never look up users solely by email during social login. Store the **provider user ID** (`sub` claim from ID token, or `id` from Facebook Graph API) in a `SocialAccount` linking table with a unique constraint on `(provider, providerId)`. Always query by provider ID first to prevent account takeover via email changes.
+
+**Attack scenario:** Alice uses Google (`alice@example.com`). Alice changes Google email to `alice.new@example.com`. Bob creates Google account with `alice@example.com`. If the backend looks up by email, Bob gets Alice's Speakoo account.
+
+```typescript
+// ✅ CORRECT — query by provider + provider user ID first
+let socialAccount = await prisma.socialAccount.findUnique({
+  where: { provider_providerId: { provider: 'google', providerId: payload.sub } },
+  include: { user: true },
+});
+if (socialAccount) return issueTokens(socialAccount.user);
+
+// If no social account exists, check if email exists to link accounts
+let user = await prisma.user.findUnique({ where: { email: payload.email } });
+if (user) {
+  await prisma.socialAccount.create({
+    data: { userId: user.id, provider: 'google', providerId: payload.sub },
+  });
+} else {
+  user = await prisma.user.create({
+    data: {
+      email: payload.email,
+      ...
+      socialAccounts: { create: { provider: 'google', providerId: payload.sub } },
+    },
+  });
+}
+
+// ❌ WRONG — email-only lookup allows account takeover
+let user = await prisma.user.findUnique({ where: { email: payload.email } });
+if (!user) user = await prisma.user.create({ data: { email: payload.email, ... } });
+return issueTokens(user);
+```
+
+Prisma schema:
+```prisma
+enum SocialProvider { google facebook apple }
+
+model SocialAccount {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  provider   SocialProvider
+  providerId String   @map("provider_id")  // OAuth sub claim or Graph API id
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId], map: "social_accounts_provider_provider_id_key")
+  @@map("social_accounts")
+}
+```
+
+---
+
+## 51. OAuth Env Variables Must Exist in All Environment Example Files
+
+**Rule:** Any environment variable consumed by the backend (especially OAuth credentials) must be documented in **all** environment template files: `apps/api/.env.example`, `.env.development.example`, and `.env.production.example`.
+
+```bash
+# ✅ CORRECT — all three files have OAuth section
+# apps/api/.env.example:
+GOOGLE_CLIENT_ID=REPLACE_ME.apps.googleusercontent.com
+FACEBOOK_APP_ID=REPLACE_ME
+FACEBOOK_APP_SECRET=REPLACE_ME
+APPLE_CLIENT_ID=REPLACE_ME
+
+# .env.development.example: (same vars)
+# .env.production.example: (same vars)
+
+# ❌ WRONG — vars in apps/api/.env.example but missing from root env files
+```
+
+Root env files are used by Docker Compose and CI/CD. Missing vars cause silent failures or misconfigurations.
+
+---
+
+## 52. Social Auth Must Persist User Data After Token Reception
+
+**Rule:** After receiving an access token from the backend, immediately fetch `/users/me` and persist both the token and the user object to `localStorage` so the UI can display user info (name, role, email).
+
+```typescript
+// ✅ CORRECT — fetch user and persist both
+async function persistSocialAuth(accessToken: string) {
+  setAccessToken(accessToken);
+  localStorage.setItem('speakoo_access_token', accessToken);
+  
+  const { data: user } = await api.get('/users/me');
+  localStorage.setItem('speakoo_user', JSON.stringify(user));
+}
+
+handleGoogleLogin(credentialResponse: CredentialResponse) {
+  const { data } = await axios.post('/auth/social/google', { token: credentialResponse.credential });
+  await persistSocialAuth(data.accessToken);
+}
+
+// ❌ WRONG — only token persisted, no user data
+localStorage.setItem('speakoo_access_token', accessToken);
+// UI shows "undefined" for user name/email
+```
+
+---
+
+## 53. Deployment Script Migration Timing — After Services Start
+
+**Rule:** Deployment scripts must start Docker services **before** running database migrations. Migrations require a running database connection.
+
+```bash
+# ✅ CORRECT — services up, wait, then migrate
+docker compose up -d
+sleep 10  # wait for DB to be healthy
+npx prisma migrate deploy
+
+# ❌ WRONG — migrate before services start
+npx prisma migrate deploy  # fails — DB not running yet
+docker compose up -d
+```
+
+This is a variant of rule 45 but applies specifically to deployment (not update) scripts where the database may not exist yet.

@@ -2,10 +2,21 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
-import { apiLogin, apiRegister, parseAuthError } from '../../core/network/authApi';
-import apiClient from '../../core/network/apiClient';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
+import FacebookLogin from 'react-facebook-login';
+import AppleLogin from 'react-apple-login';
+import {
+  apiLogin,
+  apiRegister,
+  parseAuthError,
+  type AuthUser,
+} from '../../core/network/authApi';
+import apiClient, { setAccessToken } from '../../core/network/apiClient';
 
 const HCAPTCHA_SITE_KEY = import.meta.env['VITE_HCAPTCHA_SITE_KEY'] as string;
+const GOOGLE_CLIENT_ID = import.meta.env['VITE_GOOGLE_CLIENT_ID'] as string;
+const FACEBOOK_APP_ID = import.meta.env['VITE_FACEBOOK_APP_ID'] as string;
+const APPLE_CLIENT_ID = import.meta.env['VITE_APPLE_CLIENT_ID'] as string;
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -21,7 +32,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   // Login fields
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginCaptchaToken, setLoginCaptchaToken] = useState('');
   const loginCaptchaRef = useRef<HCaptcha>(null);
@@ -29,6 +40,7 @@ export default function LoginPage() {
   // Sign Up fields
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
+  const [signupPhone, setSignupPhone] = useState('');
   const [signupPw, setSignupPw] = useState('');
   const [signupCaptchaToken, setSignupCaptchaToken] = useState('');
   const signupCaptchaRef = useRef<HCaptcha>(null);
@@ -40,11 +52,24 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!loginEmail.trim()) return setError('Please enter your email address.');
+    if (!loginIdentifier.trim()) return setError('Please enter your email address or phone number.');
     if (!loginPassword) return setError('Please enter your password.');
+    
+    // Basic client-side validation for phone format (if it starts with +)
+    if (loginIdentifier.trim().startsWith('+')) {
+      const phonePattern = /^\+[1-9]\d{7,14}$/;
+      if (!phonePattern.test(loginIdentifier.trim())) {
+        return setError('Invalid phone number format. Use E.164 format (e.g., +1234567890).');
+      }
+    }
+    
     setLoading(true);
     try {
-      await apiLogin(loginEmail.trim().toLowerCase(), loginPassword, loginCaptchaToken || undefined);
+      await apiLogin(
+        loginIdentifier.trim(),
+        loginPassword,
+        loginCaptchaToken && loginCaptchaToken.trim() ? loginCaptchaToken.trim() : undefined,
+      );
       navigate('/dashboard');
     } catch (err) {
       setError(parseAuthError(err));
@@ -61,13 +86,23 @@ export default function LoginPage() {
     if (!signupName.trim()) return setError('Please enter your full name.');
     if (!signupEmail.trim()) return setError('Please enter your email address.');
     if (signupPw.length < 8) return setError('Password must be at least 8 characters.');
+    
+    // Validate phone if provided
+    if (signupPhone.trim()) {
+      const phonePattern = /^\+[1-9]\d{7,14}$/;
+      if (!phonePattern.test(signupPhone.trim())) {
+        return setError('Invalid phone number format. Use E.164 format (e.g., +1234567890).');
+      }
+    }
+    
     setLoading(true);
     try {
       await apiRegister(
         signupName.trim(),
         signupEmail.trim().toLowerCase(),
         signupPw,
-        signupCaptchaToken || undefined,
+        signupCaptchaToken && signupCaptchaToken.trim() ? signupCaptchaToken.trim() : undefined,
+        signupPhone.trim() || undefined,
       );
       navigate(`/verify-email?email=${encodeURIComponent(signupEmail.trim().toLowerCase())}`);
     } catch (err) {
@@ -94,15 +129,99 @@ export default function LoginPage() {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'facebook' | 'apple') => {
+  // Helper to persist social login auth state consistently
+  const persistSocialAuth = async (accessToken: string): Promise<void> => {
+    setAccessToken(accessToken);
+
+    const meResponse = await apiClient.get<{
+      id: string;
+      email: string;
+      role: 'learner' | 'tutor' | 'admin';
+      profile: { displayName: string | null } | null;
+    }>('users/me');
+
+    const user: AuthUser = {
+      id: meResponse.data.id,
+      name: meResponse.data.profile?.displayName ?? meResponse.data.email.split('@')[0],
+      email: meResponse.data.email,
+      role: meResponse.data.role,
+    };
+
+    localStorage.setItem('speakoo_access_token', accessToken);
+    localStorage.setItem('speakoo_user', JSON.stringify(user));
+  };
+
+  // Google OAuth login handler (credential flow gives us ID token directly)
+  const handleGoogleLogin = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
+      setError('Google login failed. Please try again or use email/password login.');
+      return;
+    }
+
     setError('');
     setLoading(true);
     try {
-      // TODO: Integrate real OAuth SDKs (Google OAuth, Facebook SDK, Apple Sign In)
-      // For now, show the backend error that guides users to email/password login
-      await apiClient.post(`auth/social/${provider}`, { token: 'temp_token_pending_oauth_sdk' });
+      // Send the ID token to our backend
+      const response = await apiClient.post<{ accessToken: string }>('auth/social/google', {
+        token: credentialResponse.credential,
+      });
+
+      await persistSocialAuth(response.data.accessToken);
       navigate('/dashboard');
     } catch (err) {
+      console.error('Google login error:', err);
+      setError(parseAuthError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Facebook OAuth login handler
+  const handleFacebookLogin = async (response: { accessToken?: string }) => {
+    if (!response.accessToken) {
+      setError('Facebook login failed. Please try again or use email/password login.');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+    try {
+      // Send the access token to our backend
+      const backendResponse = await apiClient.post<{ accessToken: string }>(
+        'auth/social/facebook',
+        { token: response.accessToken },
+      );
+
+      await persistSocialAuth(backendResponse.data.accessToken);
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Facebook login error:', err);
+      setError(parseAuthError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Apple Sign In handler
+  const handleAppleLogin = async (response: { authorization?: { id_token?: string } }) => {
+    if (!response.authorization?.id_token) {
+      setError('Apple login failed. Please try again or use email/password login.');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+    try {
+      // Send the ID token to our backend
+      const backendResponse = await apiClient.post<{ accessToken: string }>(
+        'auth/social/apple',
+        { token: response.authorization.id_token },
+      );
+
+      await persistSocialAuth(backendResponse.data.accessToken);
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Apple login error:', err);
       setError(parseAuthError(err));
     } finally {
       setLoading(false);
@@ -199,14 +318,19 @@ export default function LoginPage() {
 
               {tab === 'login' ? (
                 <form onSubmit={handleLogin} className="space-y-4">
-                  <input
-                    type="email"
-                    placeholder="Email address"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
-                    autoComplete="email"
-                  />
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Email or Phone Number"
+                      value={loginIdentifier}
+                      onChange={(e) => setLoginIdentifier(e.target.value)}
+                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
+                      autoComplete="username"
+                    />
+                    <p className="text-xs text-gray-500 mt-1 ml-1">
+                      For phone, use E.164 format (e.g., +1234567890)
+                    </p>
+                  </div>
                   <div className="relative">
                     <input
                       type={showPw ? 'text' : 'password'}
@@ -268,6 +392,19 @@ export default function LoginPage() {
                     className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
                     autoComplete="email"
                   />
+                  <div>
+                    <input
+                      type="tel"
+                      placeholder="Phone Number (optional)"
+                      value={signupPhone}
+                      onChange={(e) => setSignupPhone(e.target.value)}
+                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
+                      autoComplete="tel"
+                    />
+                    <p className="text-xs text-gray-500 mt-1 ml-1">
+                      Use E.164 format (e.g., +1234567890)
+                    </p>
+                  </div>
                   <div className="relative">
                     <input
                       type={showPw ? 'text' : 'password'}
@@ -310,53 +447,67 @@ export default function LoginPage() {
 
               {/* Social login buttons */}
               <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => handleSocialLogin('google')}
-                  className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-xl px-4 py-3 text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24">
-                    <path
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      fill="#4285F4"
+                {GOOGLE_CLIENT_ID && (
+                  <div className="w-full flex justify-center">
+                    <GoogleLogin
+                      onSuccess={handleGoogleLogin}
+                      onError={() => {
+                        setError(
+                          'Google login failed. Please try again or use email/password login.',
+                        );
+                      }}
+                      text="continue_with"
+                      shape="rectangular"
+                      width="100%"
                     />
-                    <path
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      fill="#34A853"
-                    />
-                    <path
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                      fill="#FBBC05"
-                    />
-                    <path
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                      fill="#EA4335"
-                    />
-                  </svg>
-                  Continue with Google
-                </button>
+                  </div>
+                )}
 
-                <button
-                  type="button"
-                  onClick={() => handleSocialLogin('facebook')}
-                  className="w-full flex items-center justify-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-white bg-[#1877F2] hover:bg-[#166FE5] transition-colors"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                  </svg>
-                  Continue with Facebook
-                </button>
+                {FACEBOOK_APP_ID && (
+                  <FacebookLogin
+                    appId={FACEBOOK_APP_ID}
+                    onSuccess={handleFacebookLogin}
+                    onFail={(error) => {
+                      console.error('Facebook login error:', error);
+                      setError('Facebook login failed. Please try again or use email/password login.');
+                    }}
+                    render={({ onClick }) => (
+                      <button
+                        type="button"
+                        onClick={onClick}
+                        className="w-full flex items-center justify-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-white bg-[#1877F2] hover:bg-[#166FE5] transition-colors"
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                        </svg>
+                        Continue with Facebook
+                      </button>
+                    )}
+                  />
+                )}
 
-                <button
-                  type="button"
-                  onClick={() => handleSocialLogin('apple')}
-                  className="w-full flex items-center justify-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-white bg-black hover:bg-gray-900 transition-colors"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-                  </svg>
-                  Continue with Apple
-                </button>
+                {APPLE_CLIENT_ID && (
+                  <AppleLogin
+                    clientId={APPLE_CLIENT_ID}
+                    redirectURI={window.location.origin}
+                    callback={handleAppleLogin}
+                    scope="email name"
+                    responseType="code id_token"
+                    responseMode="form_post"
+                    render={(props) => (
+                      <button
+                        type="button"
+                        onClick={props.onClick}
+                        className="w-full flex items-center justify-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-white bg-black hover:bg-gray-900 transition-colors"
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                        </svg>
+                        Continue with Apple
+                      </button>
+                    )}
+                  />
+                )}
               </div>
             </>
           )}

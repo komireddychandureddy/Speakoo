@@ -11,6 +11,7 @@ import {
   Param,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -154,6 +155,8 @@ export class AuthController {
   // ─── Social login (OAuth stub) ─────────────────────────────────────────────
 
   @Public()
+  @UseGuards(CaptchaGuard)
+  @Throttle({ auth: { ttl: 15 * 60_000, limit: 5 } })
   @Post('social/:provider')
   @HttpCode(HttpStatus.OK)
   async socialLogin(

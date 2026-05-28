@@ -10,6 +10,9 @@ import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import { randomUUID } from 'crypto';
 import { Twilio } from 'twilio';
+import { OAuth2Client } from 'google-auth-library';
+import axios from 'axios';
+import { verifyIdToken } from 'apple-signin-auth';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
@@ -338,8 +341,7 @@ export class AuthService {
 
   /**
    * Social login handler.
-   * In production, this would validate OAuth tokens with Google, Facebook, or Apple.
-   * For now, returns "not implemented" error to guide clients.
+   * Validates OAuth tokens with Google, Facebook, or Apple.
    */
   async socialLogin(
     provider: string,
@@ -352,11 +354,306 @@ export class AuthService {
       throw new BadRequestException(`Unsupported provider: ${provider}`);
     }
 
-    // TODO: Implement OAuth token validation for each provider
-    // For now, return error to prevent misuse
-    throw new BadRequestException(
-      `Social login via ${normalizedProvider} is not yet implemented. Please sign up with email and password.`,
-    );
+    if (normalizedProvider === 'google') {
+      return this.googleLogin(token);
+    }
+
+    if (normalizedProvider === 'facebook') {
+      return this.facebookLogin(token);
+    }
+
+    if (normalizedProvider === 'apple') {
+      return this.appleLogin(token);
+    }
+
+    throw new BadRequestException(`Unsupported provider: ${provider}`);
+  }
+
+  private async googleLogin(
+    idToken: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID');
+    if (!clientId) {
+      throw new BadRequestException(
+        'Google login is not configured on this server. Please use email/password login.',
+      );
+    }
+
+    const client = new OAuth2Client(clientId);
+    let payload: { email?: string; email_verified?: boolean; name?: string; sub?: string };
+
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken,
+        audience: clientId,
+      });
+      const ticketPayload = ticket.getPayload();
+      if (!ticketPayload) {
+        throw new BadRequestException('Invalid Google ID token');
+      }
+      payload = ticketPayload;
+    } catch (err) {
+      this.logger.error('Google token verification failed', err);
+      throw new BadRequestException('Invalid Google ID token');
+    }
+
+    if (!payload.email || !payload.sub) {
+      throw new BadRequestException('Google account must have a verified email');
+    }
+
+    if (payload.email_verified === false) {
+      throw new BadRequestException(
+        'Google email is not verified. Please verify your email at Google and try again.',
+      );
+    }
+
+    // Look up by provider ID first (prevents account takeover via email change)
+    let socialAccount = await this.prisma.socialAccount.findUnique({
+      where: { provider_providerId: { provider: 'google', providerId: payload.sub } },
+      include: { user: true },
+    });
+
+    if (socialAccount) {
+      // Existing social login — return tokens
+      return this.issueTokens(socialAccount.user.id, socialAccount.user.email, socialAccount.user.role);
+    }
+
+    // No existing social account — check if email exists
+    let user = await this.prisma.user.findUnique({ where: { email: payload.email } });
+
+    if (user) {
+      // Email exists — link this Google account to existing user
+      await this.prisma.socialAccount.create({
+        data: {
+          userId: user.id,
+          provider: 'google',
+          providerId: payload.sub,
+        },
+      });
+      this.logger.log(`Google account linked to existing user: ${user.id} (${payload.email})`);
+    } else {
+      // Create new user + social account
+      const passwordHash = await bcrypt.hash(randomUUID(), BCRYPT_ROUNDS);
+      user = await this.prisma.user.create({
+        data: {
+          email: payload.email,
+          passwordHash, // Random — social users don't authenticate via password
+          role: UserRole.learner,
+          isVerified: true, // Google email_verified checked above
+          profile: {
+            create: {
+              displayName: payload.name ?? payload.email.split('@')[0],
+            },
+          },
+          socialAccounts: {
+            create: {
+              provider: 'google',
+              providerId: payload.sub,
+            },
+          },
+        },
+      });
+      this.logger.log(`User created via Google OAuth: ${user.id} (${payload.email})`);
+    }
+
+    return this.issueTokens(user.id, user.email, user.role);
+  }
+
+  private async facebookLogin(
+    accessToken: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const appId = this.config.get<string>('FACEBOOK_APP_ID');
+    const appSecret = this.config.get<string>('FACEBOOK_APP_SECRET');
+
+    if (!appId || !appSecret) {
+      throw new BadRequestException(
+        'Facebook login is not configured on this server. Please use email/password login.',
+      );
+    }
+
+    try {
+      // Verify the access token and get user data
+      const { data } = await axios.get<{
+        id: string;
+        email?: string;
+        name?: string;
+      }>(`https://graph.facebook.com/me`, {
+        params: {
+          fields: 'id,email,name',
+          access_token: accessToken,
+        },
+      });
+
+      if (!data.email) {
+        throw new BadRequestException(
+          'Facebook account must have a verified email',
+        );
+      }
+
+      // Verify the token belongs to our app
+      const debugResponse = await axios.get<{
+        data: { app_id: string; is_valid: boolean };
+      }>(`https://graph.facebook.com/debug_token`, {
+        params: {
+          input_token: accessToken,
+          access_token: `${appId}|${appSecret}`,
+        },
+      });
+
+      if (
+        !debugResponse.data.data.is_valid ||
+        debugResponse.data.data.app_id !== appId
+      ) {
+        throw new BadRequestException('Invalid Facebook access token');
+      }
+
+      // Look up by provider ID first (prevents account takeover via email change)
+      let socialAccount = await this.prisma.socialAccount.findUnique({
+        where: { provider_providerId: { provider: 'facebook', providerId: data.id } },
+        include: { user: true },
+      });
+
+      if (socialAccount) {
+        // Existing social login — return tokens
+        return this.issueTokens(socialAccount.user.id, socialAccount.user.email, socialAccount.user.role);
+      }
+
+      // No existing social account — check if email exists
+      let user = await this.prisma.user.findUnique({
+        where: { email: data.email },
+      });
+
+      if (user) {
+        // Email exists — link this Facebook account to existing user
+        await this.prisma.socialAccount.create({
+          data: {
+            userId: user.id,
+            provider: 'facebook',
+            providerId: data.id,
+          },
+        });
+        this.logger.log(`Facebook account linked to existing user: ${user.id} (${data.email})`);
+      } else {
+        // Create new user + social account
+        const passwordHash = await bcrypt.hash(randomUUID(), BCRYPT_ROUNDS);
+        user = await this.prisma.user.create({
+          data: {
+            email: data.email,
+            passwordHash, // Random — social users don't authenticate via password
+            role: UserRole.learner,
+            isVerified: true, // Facebook emails are considered verified
+            profile: {
+              create: {
+                displayName: data.name ?? data.email.split('@')[0],
+              },
+            },
+            socialAccounts: {
+              create: {
+                provider: 'facebook',
+                providerId: data.id,
+              },
+            },
+          },
+        });
+        this.logger.log(
+          `User created via Facebook OAuth: ${user.id} (${data.email})`,
+        );
+      }
+
+      return this.issueTokens(user.id, user.email, user.role);
+    } catch (err) {
+      this.logger.error('Facebook token verification failed', err);
+      if (err instanceof BadRequestException) throw err;
+      throw new BadRequestException('Invalid Facebook access token');
+    }
+  }
+
+  private async appleLogin(
+    idToken: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const clientId = this.config.get<string>('APPLE_CLIENT_ID');
+
+    if (!clientId) {
+      throw new BadRequestException(
+        'Apple login is not configured on this server. Please use email/password login.',
+      );
+    }
+
+    try {
+      // Verify the ID token with Apple's public keys
+      const appleIdTokenPayload = await verifyIdToken(idToken, {
+        audience: clientId,
+      });
+
+      if (!appleIdTokenPayload.email || !appleIdTokenPayload.sub) {
+        throw new BadRequestException(
+          'Apple account must have a verified email',
+        );
+      }
+
+      // Check if this is an Apple Private Relay email
+      const isPrivateRelay = appleIdTokenPayload.email.endsWith('privaterelay.appleid.com');
+
+      // Look up by provider ID first (prevents account takeover via email change)
+      let socialAccount = await this.prisma.socialAccount.findUnique({
+        where: { provider_providerId: { provider: 'apple', providerId: appleIdTokenPayload.sub } },
+        include: { user: true },
+      });
+
+      if (socialAccount) {
+        // Existing social login — return tokens
+        return this.issueTokens(socialAccount.user.id, socialAccount.user.email, socialAccount.user.role);
+      }
+
+      // No existing social account — check if email exists
+      let user = await this.prisma.user.findUnique({
+        where: { email: appleIdTokenPayload.email },
+      });
+
+      if (user) {
+        // Email exists — link this Apple account to existing user
+        await this.prisma.socialAccount.create({
+          data: {
+            userId: user.id,
+            provider: 'apple',
+            providerId: appleIdTokenPayload.sub,
+          },
+        });
+        this.logger.log(`Apple account linked to existing user: ${user.id} (${appleIdTokenPayload.email})`);
+      } else {
+        // Create new user + social account
+        const passwordHash = await bcrypt.hash(randomUUID(), BCRYPT_ROUNDS);
+        user = await this.prisma.user.create({
+          data: {
+            email: appleIdTokenPayload.email,
+            passwordHash, // Random — social users don't authenticate via password
+            role: UserRole.learner,
+            // Do NOT set isVerified for Apple Private Relay — prevents user from changing to real email
+            isVerified: !isPrivateRelay,
+            profile: {
+              create: {
+                displayName: appleIdTokenPayload.email.split('@')[0],
+              },
+            },
+            socialAccounts: {
+              create: {
+                provider: 'apple',
+                providerId: appleIdTokenPayload.sub,
+              },
+            },
+          },
+        });
+        this.logger.log(
+          `User created via Apple Sign In: ${user.id} (${appleIdTokenPayload.email}, privateRelay=${isPrivateRelay})`,
+        );
+      }
+
+      return this.issueTokens(user.id, user.email, user.role);
+    } catch (err) {
+      this.logger.error('Apple token verification failed', err);
+      if (err instanceof BadRequestException) throw err;
+      throw new BadRequestException('Invalid Apple ID token');
+    }
   }
 
   // ─── hCaptcha verification ────────────────────────────────────────────────
