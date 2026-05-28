@@ -1,4 +1,5 @@
 ﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { I18nProvider } from './core/i18n/I18nContext';
 import { LocaleProvider } from './core/locale/LocaleContext';
 import { bootstrapAuth } from './core/network/authApi';
@@ -45,10 +46,13 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 bootstrapAuth();
 
 export default function App() {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+  
   return (
-    <I18nProvider>
-      <LocaleProvider>
-        <BrowserRouter>
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <I18nProvider>
+        <LocaleProvider>
+          <BrowserRouter>
       <Routes>
         <Route path="/" element={<WelcomePage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -102,5 +106,6 @@ export default function App() {
         </BrowserRouter>
       </LocaleProvider>
     </I18nProvider>
+    </GoogleOAuthProvider>
   );
 }

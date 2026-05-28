@@ -34,7 +34,7 @@ function persistAuthState(accessToken: string, user: AuthUser): void {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Registers a new learner account.
+ * Registers a new learner account with email (and optionally phone number).
  * Returns the authenticated user and stores the access token.
  */
 export async function apiRegister(
@@ -42,12 +42,14 @@ export async function apiRegister(
   email: string,
   password: string,
   captchaToken?: string,
+  phoneNumber?: string,
 ): Promise<AuthUser> {
   const { data } = await apiClient.post<AuthResponse>('auth/register', {
     displayName,
     email,
     password,
     captchaToken,
+    ...(phoneNumber && { phoneNumber }),
   });
   setAccessToken(data.accessToken);
 
@@ -63,25 +65,29 @@ export async function apiRegister(
 }
 
 /**
- * Logs in with email + password.
+ * Logs in with email OR phone + password.
  * Returns the authenticated user and stores the access token.
  */
 export async function apiLogin(
-  email: string,
+  identifier: string,
   password: string,
   captchaToken?: string,
 ): Promise<AuthUser> {
-  const { data } = await apiClient.post<AuthResponse>('auth/login', {
-    email,
+  // Detect if identifier is email or phone (phone starts with +)
+  const isPhone = identifier.trim().startsWith('+');
+  const payload: Record<string, string> = {
     password,
-    captchaToken,
-  });
+    ...(isPhone ? { phone: identifier.trim() } : { email: identifier.trim().toLowerCase() }),
+    ...(captchaToken && { captchaToken }),
+  };
+
+  const { data } = await apiClient.post<AuthResponse>('auth/login', payload);
   setAccessToken(data.accessToken);
 
   const me = await apiClient.get<MeResponse>('users/me');
   const user: AuthUser = {
     id: me.data.id,
-    name: me.data.profile?.displayName ?? email.split('@')[0],
+    name: me.data.profile?.displayName ?? (isPhone ? identifier : identifier.split('@')[0]),
     email: me.data.email,
     role: me.data.role,
   };
@@ -158,8 +164,8 @@ export function parseAuthError(err: unknown): string {
     if (!err.response) return 'Cannot reach the server. Please check your connection and try again.';
     const status = err.response.status;
     const message: unknown = err.response.data?.message;
-    if (status === 409) return 'An account with this email already exists.';
-    if (status === 401) return 'Invalid email or password.';
+    if (status === 409) return 'An account with this email or phone number already exists.';
+    if (status === 401) return 'Invalid credentials. Please check your email/phone and password.';
     if (status === 429) return 'Too many attempts. Please wait 15 minutes.';
     if (typeof message === 'string' && message.length > 0) return message;
     if (Array.isArray(message) && typeof message[0] === 'string') return message[0] as string;
