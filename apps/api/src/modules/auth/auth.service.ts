@@ -408,14 +408,18 @@ export class AuthService {
     }
 
     // Look up by provider ID first (prevents account takeover via email change)
-    let socialAccount = await this.prisma.socialAccount.findUnique({
+    const socialAccount = await this.prisma.socialAccount.findUnique({
       where: { provider_providerId: { provider: 'google', providerId: payload.sub } },
       include: { user: true },
     });
 
     if (socialAccount) {
       // Existing social login — return tokens
-      return this.issueTokens(socialAccount.user.id, socialAccount.user.email, socialAccount.user.role);
+      return this.issueTokens(
+        socialAccount.user.id,
+        socialAccount.user.email,
+        socialAccount.user.role,
+      );
     }
 
     // No existing social account — check if email exists
@@ -485,9 +489,7 @@ export class AuthService {
       });
 
       if (!data.email) {
-        throw new BadRequestException(
-          'Facebook account must have a verified email',
-        );
+        throw new BadRequestException('Facebook account must have a verified email');
       }
 
       // Verify the token belongs to our app
@@ -500,22 +502,23 @@ export class AuthService {
         },
       });
 
-      if (
-        !debugResponse.data.data.is_valid ||
-        debugResponse.data.data.app_id !== appId
-      ) {
+      if (!debugResponse.data.data.is_valid || debugResponse.data.data.app_id !== appId) {
         throw new BadRequestException('Invalid Facebook access token');
       }
 
       // Look up by provider ID first (prevents account takeover via email change)
-      let socialAccount = await this.prisma.socialAccount.findUnique({
+      const socialAccount = await this.prisma.socialAccount.findUnique({
         where: { provider_providerId: { provider: 'facebook', providerId: data.id } },
         include: { user: true },
       });
 
       if (socialAccount) {
         // Existing social login — return tokens
-        return this.issueTokens(socialAccount.user.id, socialAccount.user.email, socialAccount.user.role);
+        return this.issueTokens(
+          socialAccount.user.id,
+          socialAccount.user.email,
+          socialAccount.user.role,
+        );
       }
 
       // No existing social account — check if email exists
@@ -555,9 +558,7 @@ export class AuthService {
             },
           },
         });
-        this.logger.log(
-          `User created via Facebook OAuth: ${user.id} (${data.email})`,
-        );
+        this.logger.log(`User created via Facebook OAuth: ${user.id} (${data.email})`);
       }
 
       return this.issueTokens(user.id, user.email, user.role);
@@ -586,23 +587,25 @@ export class AuthService {
       });
 
       if (!appleIdTokenPayload.email || !appleIdTokenPayload.sub) {
-        throw new BadRequestException(
-          'Apple account must have a verified email',
-        );
+        throw new BadRequestException('Apple account must have a verified email');
       }
 
       // Check if this is an Apple Private Relay email
       const isPrivateRelay = appleIdTokenPayload.email.endsWith('privaterelay.appleid.com');
 
       // Look up by provider ID first (prevents account takeover via email change)
-      let socialAccount = await this.prisma.socialAccount.findUnique({
+      const socialAccount = await this.prisma.socialAccount.findUnique({
         where: { provider_providerId: { provider: 'apple', providerId: appleIdTokenPayload.sub } },
         include: { user: true },
       });
 
       if (socialAccount) {
         // Existing social login — return tokens
-        return this.issueTokens(socialAccount.user.id, socialAccount.user.email, socialAccount.user.role);
+        return this.issueTokens(
+          socialAccount.user.id,
+          socialAccount.user.email,
+          socialAccount.user.role,
+        );
       }
 
       // No existing social account — check if email exists
@@ -619,7 +622,9 @@ export class AuthService {
             providerId: appleIdTokenPayload.sub,
           },
         });
-        this.logger.log(`Apple account linked to existing user: ${user.id} (${appleIdTokenPayload.email})`);
+        this.logger.log(
+          `Apple account linked to existing user: ${user.id} (${appleIdTokenPayload.email})`,
+        );
       } else {
         // Create new user + social account
         const passwordHash = await bcrypt.hash(randomUUID(), BCRYPT_ROUNDS);

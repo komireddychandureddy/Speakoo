@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePracticeSessionDto } from './dto/create-practice-session.dto';
 import { PracticeSessionStatus } from '@prisma/client';
@@ -57,7 +62,10 @@ export class PracticeRepository {
         include: { _count: { select: { participants: true } } },
       });
       if (!session) throw new NotFoundException('Practice session not found');
-      if (session.status === PracticeSessionStatus.completed || session.status === PracticeSessionStatus.cancelled) {
+      if (
+        session.status === PracticeSessionStatus.completed ||
+        session.status === PracticeSessionStatus.cancelled
+      ) {
         throw new ConflictException('Session is no longer open for joining');
       }
       if (session._count.participants >= session.maxParticipants) {

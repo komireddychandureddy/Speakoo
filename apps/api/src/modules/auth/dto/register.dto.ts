@@ -20,5 +20,6 @@ export class RegisterDto {
 
   @IsOptional()
   @IsString()
+  @MinLength(1, { message: 'captchaToken must not be empty' })
   captchaToken?: string;
 }

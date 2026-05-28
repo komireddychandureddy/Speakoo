@@ -7,10 +7,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { CaptchaGuard } from './guards/captcha.guard';
 
 @Module({
-  imports: [
-    PassportModule,
-    JwtModule.register({}),
-  ],
+  imports: [PassportModule, JwtModule.register({})],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, CaptchaGuard],
   exports: [AuthService],

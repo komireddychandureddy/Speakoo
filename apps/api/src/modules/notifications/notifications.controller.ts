@@ -9,10 +9,7 @@ export class NotificationsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get('me')
-  getMyNotifications(
-    @CurrentUser() user: User,
-    @Query() query: NotificationQueryDto,
-  ) {
+  getMyNotifications(@CurrentUser() user: User, @Query() query: NotificationQueryDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     return this.prisma.notificationLog.findMany({

@@ -4,9 +4,7 @@ import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('health')
 export class HealthController {
-  constructor(
-    private readonly health: HealthCheckService,
-  ) {}
+  constructor(private readonly health: HealthCheckService) {}
 
   @Public()
   @Get()

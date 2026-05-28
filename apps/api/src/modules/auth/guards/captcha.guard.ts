@@ -80,7 +80,9 @@ export class CaptchaGuard implements CanActivate {
 
       const req = https.request(options, (res) => {
         let data = '';
-        res.on('data', (chunk: string) => { data += chunk; });
+        res.on('data', (chunk: string) => {
+          data += chunk;
+        });
         res.on('end', () => {
           try {
             const json = JSON.parse(data) as { success: boolean };

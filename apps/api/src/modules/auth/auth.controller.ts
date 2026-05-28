@@ -96,10 +96,7 @@ export class AuthController {
 
   @Post('verify-email')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async verifyEmail(
-    @Req() req: Request & { user: { sub: string } },
-    @Body() dto: VerifyEmailDto,
-  ) {
+  async verifyEmail(@Req() req: Request & { user: { sub: string } }, @Body() dto: VerifyEmailDto) {
     await this.authService.verifyEmail(req.user.sub, dto.code);
   }
 
@@ -129,10 +126,7 @@ export class AuthController {
   @Public()
   @Post('verify-phone')
   @HttpCode(HttpStatus.OK)
-  async verifyPhone(
-    @Body() dto: VerifyPhoneDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async verifyPhone(@Body() dto: VerifyPhoneDto, @Res({ passthrough: true }) res: Response) {
     const tokens = await this.authService.verifyPhoneOtp(dto.phone, dto.otp);
     this.setRefreshCookie(res, tokens.refreshToken);
     return { accessToken: tokens.accessToken };

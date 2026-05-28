@@ -26,10 +26,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [
-        `.env.${process.env.NODE_ENV ?? 'development'}`,
-        '.env',
-      ],
+      envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env'],
     }),
 
     ThrottlerModule.forRoot([

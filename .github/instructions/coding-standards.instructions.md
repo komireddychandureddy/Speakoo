@@ -9,6 +9,88 @@ Follow these patterns to achieve zero review comments.
 
 ---
 
+## CRITICAL: hCaptcha & Validation Issues
+
+### Rule 54: Optional DTO Fields With Validation Must Reject Empty Strings
+
+**Rule:** When a DTO field is `@IsOptional()` with string validation (e.g., `@IsString()`, `@MinLength()`), class-validator will NOT skip validation for empty strings `""`. The field must either be `undefined`/omitted, or pass all validators. Add `@MinLength(1)` to reject empty strings when the field is present.
+
+```typescript
+// ✅ CORRECT — rejects empty strings when captchaToken is present
+export class RegisterDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1, { message: 'captchaToken must not be empty' })
+  captchaToken?: string;
+}
+
+// ❌ WRONG — @IsString() alone accepts "" (empty string)
+export class RegisterDto {
+  @IsOptional()
+  @IsString()
+  captchaToken?: string;  // "" passes validation, causes issues
+}
+```
+
+Frontend must send `undefined` (omit the field) when no value exists:
+```typescript
+// ✅ CORRECT
+const payload = {
+  email: email.trim(),
+  password: password,
+  captchaToken: captchaToken?.trim() || undefined,  // undefined if empty
+};
+
+// ❌ WRONG — sends empty string
+const payload = {
+  email: email.trim(),
+  password: password,
+  captchaToken: captchaToken,  // "" if user hasn't filled it
+};
+```
+
+This issue caused "property captchaToken should not exist" errors when `forbidNonWhitelisted: true` was set in ValidationPipe.
+
+---
+
+## Rule 55: Phone Number Inputs Must Use Country Code Dropdowns with Geolocation
+
+**Rule:** Never use plain text inputs for phone numbers. Implement a country code selector with:
+1. Flag + dial code dropdown (searchable)
+2. Auto-detection via browser geolocation API (with permission)
+3. Fallback to timezone-based detection
+4. E.164 format validation
+
+```tsx
+// ✅ CORRECT — PhoneInput component with country selector
+<PhoneInput
+  value={signupPhone}
+  onChange={setSignupPhone}
+  placeholder="Phone Number (optional)"
+  autoComplete="tel"
+/>
+
+// Component features:
+// - Detects country from navigator.geolocation (with permission)
+// - Falls back to Intl.DateTimeFormat().resolvedOptions().timeZone
+// - Constructs E.164 format: selectedCountry.dial + phoneNumber
+// - Validates digits only in number field
+// - Displays: 🇺🇸 +1 | 2025550100
+
+// ❌ WRONG — plain text with format hint
+<input
+  type="tel"
+  placeholder="Phone Number (e.g., +1234567890)"
+  value={phone}
+  onChange={(e) => setPhone(e.target.value)}
+/>
+<p className="text-xs text-gray-500">Use E.164 format (e.g., +1234567890)</p>
+```
+
+Users should never manually type the `+` or country code — the dropdown handles it.
+
+---
+
 ## 1. NestJS Controller Route Ordering
 
 **Rule:** Always declare static routes _before_ dynamic parameterised routes.

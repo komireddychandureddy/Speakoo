@@ -90,8 +90,7 @@ describe('NotificationsService', () => {
       const addCalls = mockQueueAdd.mock.calls.map((c) => c[0]);
       const reminders = addCalls.filter(
         (d) =>
-          d.type === NotificationType.reminder_60min ||
-          d.type === NotificationType.reminder_10min,
+          d.type === NotificationType.reminder_60min || d.type === NotificationType.reminder_10min,
       );
       expect(reminders).toHaveLength(0);
     });
