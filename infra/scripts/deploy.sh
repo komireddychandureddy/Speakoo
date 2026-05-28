@@ -34,35 +34,21 @@ if [ ! -f "$DOCKER_DIR/.env" ]; then
     exit 1
 fi
 
-echo "[1/6] Installing API dependencies for migration tooling..."
-cd "$API_DIR"
-npm ci
-echo "✓ Dependencies installed"
-
-echo ""
-echo "[2/6] Generating Prisma client for migrations..."
-npx prisma generate
-echo "✓ Prisma client generated"
-
-echo ""
-echo "[3/6] Starting Docker services..."
+echo "[1/3] Running database migrations..."
 cd "$DOCKER_DIR"
+# docker compose run starts postgres/redis (via depends_on + healthcheck) then runs migrations
+# in the pre-built GHCR image — no local npm/build-tools required
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api npx prisma migrate deploy
+echo "✓ Migrations applied"
+
+echo ""
+echo "[2/3] Starting all services..."
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 echo "✓ Services started"
 
 echo ""
-echo "[4/6] Waiting for database to be ready..."
-sleep 10
-
-echo ""
-echo "[5/6] Running database migrations..."
-cd "$API_DIR"
-npx prisma migrate deploy
-echo "✓ Migrations applied"
-
-echo ""
-echo "[6/6] Testing API health..."
-sleep 5
+echo "[3/3] Testing API health..."
+sleep 15
 HEALTH_CHECK=$(curl -s http://localhost:3000/api/v1/health || echo "failed")
 if [[ $HEALTH_CHECK == *"ok"* ]]; then
     echo "✓ API is healthy!"

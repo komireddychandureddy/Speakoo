@@ -25,7 +25,7 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 # Backup database first
-echo "[1/8] Creating database backup..."
+echo "[1/5] Creating database backup..."
 if [ -f "$APP_ROOT/infra/scripts/backup-db.sh" ]; then
     bash "$APP_ROOT/infra/scripts/backup-db.sh"
 else
@@ -33,47 +33,28 @@ else
 fi
 
 echo ""
-echo "[2/8] Stopping services..."
+echo "[2/5] Stopping services..."
 cd "$DOCKER_DIR"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 
 echo ""
-echo "[3/8] Pulling latest changes..."
+echo "[3/5] Pulling latest changes..."
 cd "$APP_ROOT"
 git pull origin main
 echo "✓ Code updated"
 
 echo ""
-echo "[4/8] Installing dependencies..."
-cd "$API_DIR"
-npm ci
-echo "✓ Dependencies updated"
-
-echo ""
-echo "[5/8] Generating Prisma client..."
-npx prisma generate
-echo "✓ Prisma client generated"
-
-echo ""
-echo "[6/8] Building API..."
-npm run build
-echo "✓ API built"
-
-echo ""
-echo "[7/8] Starting services..."
+echo "[4/5] Running database migrations..."
 cd "$DOCKER_DIR"
+# docker compose run starts postgres/redis (via depends_on + healthcheck) then runs migrations
+# in the pre-built GHCR image — no local npm/build-tools required
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api npx prisma migrate deploy
+echo "✓ Migrations applied"
+
+echo ""
+echo "[5/5] Starting services..."
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 echo "✓ Services started"
-
-echo ""
-echo "Waiting for services to be healthy..."
-sleep 10
-
-echo ""
-echo "[8/8] Running migrations..."
-cd "$API_DIR"
-npx prisma migrate deploy
-echo "✓ Migrations applied"
 
 echo ""
 echo "======================================"

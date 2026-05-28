@@ -44,14 +44,18 @@ else
     echo "✓ Docker already installed"
 fi
 
-# Install Node.js 20
+# Install Node.js 20 (upgrade if existing version is older)
 echo "[3/8] Installing Node.js 20..."
-if ! command -v node &> /dev/null; then
+NODE_MAJOR=0
+if command -v node &> /dev/null; then
+    NODE_MAJOR=$(node -e "process.stdout.write(process.versions.node.split('.')[0])")
+fi
+if [ "$NODE_MAJOR" -lt 20 ] 2>/dev/null; then
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
     apt install -y nodejs
     echo "✓ Node.js installed: $(node --version)"
 else
-    echo "✓ Node.js already installed: $(node --version)"
+    echo "✓ Node.js already installed and up to date: $(node --version)"
 fi
 
 # Install Git
