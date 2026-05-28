@@ -211,3 +211,4 @@ PLATFORM_FEE_PERCENT=5
 - ❌ Running `npm run build` in deployment scripts when `docker-compose.prod.yml` uses pre-built GHCR images
 - ❌ Async auto-detection overwrites user input — always track if user has manually selected a value before applying auto-detected defaults (Rule 56)
 - ❌ Sending precise lat/long to third-party APIs for non-essential features like country detection — use timezone-based detection instead (Rule 57)
+- ❌ Optional API parameters like `captchaToken: undefined` — use spread syntax `...(value && { key: value })` to exclude undefined properties (Rule 54)

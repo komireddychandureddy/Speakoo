@@ -32,24 +32,27 @@ export class RegisterDto {
 }
 ```
 
-Frontend must send `undefined` (omit the field) when no value exists:
+Frontend must **omit the field entirely** when no value exists using the spread operator:
 ```typescript
-// ✅ CORRECT
+// ✅ CORRECT — spread operator excludes undefined properties
 const payload = {
   email: email.trim(),
   password: password,
-  captchaToken: captchaToken?.trim() || undefined,  // undefined if empty
+  ...(captchaToken?.trim() && { captchaToken: captchaToken.trim() }),
 };
 
-// ❌ WRONG — sends empty string
+// ❌ WRONG — sends undefined or empty string
 const payload = {
   email: email.trim(),
   password: password,
-  captchaToken: captchaToken,  // "" if user hasn't filled it
+  captchaToken: captchaToken?.trim() || undefined,  // property still exists
 };
 ```
 
-This issue caused "property captchaToken should not exist" errors when `forbidNonWhitelisted: true` was set in ValidationPipe.
+With `forbidNonWhitelisted: true` in ValidationPipe, sending `captchaToken: undefined` fails because the property exists but doesn't pass `@IsString()` validation.
+
+**Error symptom:**  
+`property captchaToken should not exist` (when `undefined` violates DTO decorators).
 
 ---
 
@@ -1210,3 +1213,35 @@ docker compose up -d
 ```
 
 This is a variant of rule 45 but applies specifically to deployment (not update) scripts where the database may not exist yet.
+
+---
+
+## 54. Optional API Parameters Must Use Spread Syntax to Exclude Undefined
+
+**Rule:** When sending optional parameters to an API, use the spread operator (`...(value && { key: value })`) to **conditionally include the property only when defined**. Never directly assign optional parameters like `captchaToken: undefined` — with `forbidNonWhitelisted: true` in the ValidationPipe, the backend rejects requests containing `undefined` properties because the property exists but fails DTO validation.
+
+```typescript
+// ✅ CORRECT — only include captchaToken when it has a value
+await apiClient.post('/auth/register', {
+  displayName,
+  email,
+  password,
+  ...(captchaToken && { captchaToken }),
+  ...(phoneNumber && { phoneNumber }),
+});
+
+// ❌ WRONG — captchaToken: undefined becomes a property in the JSON body
+await apiClient.post('/auth/register', {
+  displayName,
+  email,
+  password,
+  captchaToken,  // included even when undefined
+  ...(phoneNumber && { phoneNumber }),
+});
+```
+
+**Why this fails:**  
+When JavaScript serializes `{ captchaToken: undefined }` to JSON, the property key exists with value `null` or is sent as `captchaToken: undefined`. The NestJS `ValidationPipe` with `forbidNonWhitelisted: true` sees the property but rejects it because `undefined` doesn't pass `@IsString()` or `@MinLength(1)` validation.
+
+**Error symptom:**  
+`property captchaToken should not exist` (when `undefined` violates DTO decorators).

@@ -48,7 +48,7 @@ export async function apiRegister(
     displayName,
     email,
     password,
-    captchaToken,
+    ...(captchaToken && { captchaToken }),
     ...(phoneNumber && { phoneNumber }),
   });
   setAccessToken(data.accessToken);
