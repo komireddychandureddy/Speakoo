@@ -60,12 +60,7 @@ npm run build
 echo "✓ API built"
 
 echo ""
-echo "[7/8] Running migrations..."
-npx prisma migrate deploy
-echo "✓ Migrations applied"
-
-echo ""
-echo "[8/8] Starting services..."
+echo "[7/8] Starting services..."
 cd "$DOCKER_DIR"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 echo "✓ Services started"
@@ -73,6 +68,12 @@ echo "✓ Services started"
 echo ""
 echo "Waiting for services to be healthy..."
 sleep 10
+
+echo ""
+echo "[8/8] Running migrations..."
+cd "$API_DIR"
+npx prisma migrate deploy
+echo "✓ Migrations applied"
 
 echo ""
 echo "======================================"

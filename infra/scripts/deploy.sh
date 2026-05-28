@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Speakoo Deployment Script
-# This script deploys the Speakoo application
+# This script deploys the Speakoo application using pre-built GHCR images
 # Run as regular user (not root): bash deploy.sh
 
 set -e  # Exit on error
@@ -12,8 +12,8 @@ echo "======================================"
 echo ""
 
 # Check we're in the right directory
-if [ ! -f "package.json" ]; then
-    echo "Error: Must run from repository root (where package.json exists)"
+if [ ! -d "apps/api" ] || [ ! -d "infra/docker" ]; then
+    echo "Error: Must run from repository root (apps/api and infra/docker must exist)"
     exit 1
 fi
 
@@ -34,39 +34,34 @@ if [ ! -f "$DOCKER_DIR/.env" ]; then
     exit 1
 fi
 
-echo "[1/7] Installing API dependencies..."
+echo "[1/6] Installing API dependencies for migration tooling..."
 cd "$API_DIR"
 npm ci
 echo "✓ Dependencies installed"
 
 echo ""
-echo "[2/7] Generating Prisma client..."
+echo "[2/6] Generating Prisma client for migrations..."
 npx prisma generate
 echo "✓ Prisma client generated"
 
 echo ""
-echo "[3/7] Building API..."
-npm run build
-echo "✓ API built successfully"
-
-echo ""
-echo "[4/7] Running database migrations..."
-npx prisma migrate deploy
-echo "✓ Migrations applied"
-
-echo ""
-echo "[5/7] Starting Docker services..."
+echo "[3/6] Starting Docker services..."
 cd "$DOCKER_DIR"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 echo "✓ Services started"
 
 echo ""
-echo "[6/7] Waiting for services to be healthy..."
+echo "[4/6] Waiting for database to be ready..."
 sleep 10
-docker compose ps
 
 echo ""
-echo "[7/7] Testing API health..."
+echo "[5/6] Running database migrations..."
+cd "$API_DIR"
+npx prisma migrate deploy
+echo "✓ Migrations applied"
+
+echo ""
+echo "[6/6] Testing API health..."
 sleep 5
 HEALTH_CHECK=$(curl -s http://localhost:3000/api/v1/health || echo "failed")
 if [[ $HEALTH_CHECK == *"ok"* ]]; then

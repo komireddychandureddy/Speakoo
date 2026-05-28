@@ -2,11 +2,16 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
-import { useGoogleLogin } from '@react-oauth/google';
-import FacebookLogin from '@greatsumini/react-facebook-login';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
+import FacebookLogin from 'react-facebook-login';
 import AppleLogin from 'react-apple-login';
-import { apiLogin, apiRegister, parseAuthError } from '../../core/network/authApi';
-import apiClient from '../../core/network/apiClient';
+import {
+  apiLogin,
+  apiRegister,
+  parseAuthError,
+  type AuthUser,
+} from '../../core/network/authApi';
+import apiClient, { setAccessToken } from '../../core/network/apiClient';
 
 const HCAPTCHA_SITE_KEY = import.meta.env['VITE_HCAPTCHA_SITE_KEY'] as string;
 const GOOGLE_CLIENT_ID = import.meta.env['VITE_GOOGLE_CLIENT_ID'] as string;
@@ -124,68 +129,52 @@ export default function LoginPage() {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'facebook' | 'apple') => {
-    setError('');
-    
-    if (provider === 'google') {
-      googleLogin();
-    } else if (provider === 'facebook') {
-      // Facebook login is triggered by the FacebookLogin component
-      // Handler is in handleFacebookLogin
-    } else if (provider === 'apple') {
-      // Apple login is triggered by the AppleLogin component
-      // Handler is in handleAppleLogin
-    }
+  // Helper to persist social login auth state consistently
+  const persistSocialAuth = async (accessToken: string): Promise<void> => {
+    setAccessToken(accessToken);
+
+    const meResponse = await apiClient.get<{
+      id: string;
+      email: string;
+      role: 'learner' | 'tutor' | 'admin';
+      profile: { displayName: string | null } | null;
+    }>('users/me');
+
+    const user: AuthUser = {
+      id: meResponse.data.id,
+      name: meResponse.data.profile?.displayName ?? meResponse.data.email.split('@')[0],
+      email: meResponse.data.email,
+      role: meResponse.data.role,
+    };
+
+    localStorage.setItem('speakoo_access_token', accessToken);
+    localStorage.setItem('speakoo_user', JSON.stringify(user));
   };
 
-  // Google OAuth login hook
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setError('');
-      setLoading(true);
-      try {
-        // Exchange the authorization code for ID token by calling Google's token endpoint
-        const tokenInfoResponse = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            code: tokenResponse.code,
-            client_id: GOOGLE_CLIENT_ID,
-            redirect_uri: window.location.origin,
-            grant_type: 'authorization_code',
-          }),
-        });
-        
-        const tokenInfo = await tokenInfoResponse.json();
-        
-        if (!tokenInfo.id_token) {
-          throw new Error('Failed to obtain ID token from Google');
-        }
-        
-        // Send the ID token to our backend
-        const response = await apiClient.post('auth/social/google', { token: tokenInfo.id_token });
-        
-        // Store the access token
-        localStorage.setItem('speakoo_token', response.data.accessToken);
-        
-        // Fetch user profile
-        const meResponse = await apiClient.get('users/me');
-        localStorage.setItem('speakoo_user', JSON.stringify(meResponse.data));
-        
-        navigate('/dashboard');
-      } catch (err) {
-        console.error('Google login error:', err);
-        setError(parseAuthError(err));
-      } finally {
-        setLoading(false);
-      }
-    },
-    onError: (error) => {
-      console.error('Google OAuth error:', error);
+  // Google OAuth login handler (credential flow gives us ID token directly)
+  const handleGoogleLogin = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
       setError('Google login failed. Please try again or use email/password login.');
-    },
-    flow: 'auth-code',
-  });
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+    try {
+      // Send the ID token to our backend
+      const response = await apiClient.post<{ accessToken: string }>('auth/social/google', {
+        token: credentialResponse.credential,
+      });
+
+      await persistSocialAuth(response.data.accessToken);
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Google login error:', err);
+      setError(parseAuthError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Facebook OAuth login handler
   const handleFacebookLogin = async (response: { accessToken?: string }) => {
@@ -198,17 +187,12 @@ export default function LoginPage() {
     setLoading(true);
     try {
       // Send the access token to our backend
-      const backendResponse = await apiClient.post('auth/social/facebook', {
-        token: response.accessToken,
-      });
+      const backendResponse = await apiClient.post<{ accessToken: string }>(
+        'auth/social/facebook',
+        { token: response.accessToken },
+      );
 
-      // Store the access token
-      localStorage.setItem('speakoo_token', backendResponse.data.accessToken);
-
-      // Fetch user profile
-      const meResponse = await apiClient.get('users/me');
-      localStorage.setItem('speakoo_user', JSON.stringify(meResponse.data));
-
+      await persistSocialAuth(backendResponse.data.accessToken);
       navigate('/dashboard');
     } catch (err) {
       console.error('Facebook login error:', err);
@@ -229,17 +213,12 @@ export default function LoginPage() {
     setLoading(true);
     try {
       // Send the ID token to our backend
-      const backendResponse = await apiClient.post('auth/social/apple', {
-        token: response.authorization.id_token,
-      });
+      const backendResponse = await apiClient.post<{ accessToken: string }>(
+        'auth/social/apple',
+        { token: response.authorization.id_token },
+      );
 
-      // Store the access token
-      localStorage.setItem('speakoo_token', backendResponse.data.accessToken);
-
-      // Fetch user profile
-      const meResponse = await apiClient.get('users/me');
-      localStorage.setItem('speakoo_user', JSON.stringify(meResponse.data));
-
+      await persistSocialAuth(backendResponse.data.accessToken);
       navigate('/dashboard');
     } catch (err) {
       console.error('Apple login error:', err);
@@ -468,31 +447,21 @@ export default function LoginPage() {
 
               {/* Social login buttons */}
               <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => handleSocialLogin('google')}
-                  className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-xl px-4 py-3 text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24">
-                    <path
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      fill="#4285F4"
+                {GOOGLE_CLIENT_ID && (
+                  <div className="w-full flex justify-center">
+                    <GoogleLogin
+                      onSuccess={handleGoogleLogin}
+                      onError={() => {
+                        setError(
+                          'Google login failed. Please try again or use email/password login.',
+                        );
+                      }}
+                      text="continue_with"
+                      shape="rectangular"
+                      width="100%"
                     />
-                    <path
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      fill="#34A853"
-                    />
-                    <path
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                      fill="#FBBC05"
-                    />
-                    <path
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                      fill="#EA4335"
-                    />
-                  </svg>
-                  Continue with Google
-                </button>
+                  </div>
+                )}
 
                 {FACEBOOK_APP_ID && (
                   <FacebookLogin
