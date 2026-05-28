@@ -161,12 +161,17 @@ export class AuthService {
     const from = this.config.getOrThrow<string>('RESEND_FROM_EMAIL');
     const appName = this.config.get<string>('APP_NAME', 'Speakoo');
 
-    await this.resend.emails.send({
+    const { error: sendError } = await this.resend.emails.send({
       from,
       to: user.email,
       subject: `${appName} — Verify your email`,
       html: `<p>Your email verification code is: <strong>${code}</strong></p><p>It expires in 10 minutes.</p>`,
     });
+
+    if (sendError) {
+      this.logger.error(`Failed to send verification email to ${user.email}: ${sendError.message}`);
+      throw new BadRequestException('Failed to send verification email — please try again later');
+    }
 
     this.logger.log(`Verification email sent to ${user.email}`);
   }
@@ -187,12 +192,17 @@ export class AuthService {
     const from = this.config.getOrThrow<string>('RESEND_FROM_EMAIL');
     const appName = this.config.get<string>('APP_NAME', 'Speakoo');
 
-    await this.resend.emails.send({
+    const { error: sendError } = await this.resend.emails.send({
       from,
       to: user.email,
       subject: `${appName} — Reset your password`,
       html: `<p>Your password reset code is: <strong>${code}</strong></p><p>It expires in 10 minutes.</p>`,
     });
+
+    if (sendError) {
+      this.logger.error(`Failed to send password reset email to ${user.email}: ${sendError.message}`);
+      throw new BadRequestException('Failed to send password reset email — please try again later');
+    }
 
     this.logger.log(`Password reset email sent to ${user.email}`);
   }
@@ -259,12 +269,17 @@ export class AuthService {
     const from = this.config.getOrThrow<string>('RESEND_FROM_EMAIL');
     const appName = this.config.get<string>('APP_NAME', 'Speakoo');
 
-    await this.resend.emails.send({
+    const { error: sendError } = await this.resend.emails.send({
       from,
       to: user.email,
       subject: `${appName} — Verify your email`,
       html: `<p>Your email verification code is: <strong>${code}</strong></p><p>It expires in 10 minutes.</p>`,
     });
+
+    if (sendError) {
+      this.logger.error(`Failed to resend verification email to ${user.email}: ${sendError.message}`);
+      throw new BadRequestException('Failed to send verification email — please try again later');
+    }
 
     this.logger.log(`Verification email resent to ${user.email}`);
   }
