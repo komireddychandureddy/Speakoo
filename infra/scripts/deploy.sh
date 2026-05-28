@@ -50,20 +50,25 @@ if [ -z "$IMAGE_TAG_VAL" ] || [ "$IMAGE_TAG_VAL" = "REPLACE_ME" ]; then
     exit 1
 fi
 
-echo "[1/3] Running database migrations..."
+echo "[1/4] Pulling latest Docker image..."
 cd "$DOCKER_DIR"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull api
+echo "✓ Image updated"
+
+echo ""
+echo "[2/4] Running database migrations..."
 # docker compose run starts postgres/redis (via depends_on + healthcheck) then runs migrations
 # in the pre-built GHCR image — no local npm/build-tools required
 docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api npx prisma migrate deploy
 echo "✓ Migrations applied"
 
 echo ""
-echo "[2/3] Starting all services..."
+echo "[3/4] Starting all services..."
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 echo "✓ Services started"
 
 echo ""
-echo "[3/3] Testing API health..."
+echo "[4/4] Testing API health..."
 sleep 15
 HEALTH_CHECK=$(curl -s http://localhost:3000/api/v1/health || echo "failed")
 if [[ $HEALTH_CHECK == *"ok"* ]]; then

@@ -89,14 +89,14 @@ jobs:
             docker compose \
               -f /opt/speakoo/infra/docker/docker-compose.yml \
               -f /opt/speakoo/infra/docker/docker-compose.prod.yml \
-              --env-file /opt/speakoo/.env \
+              --env-file /opt/speakoo/infra/docker/.env \
               pull api
 
             # Run pending Prisma migrations
             docker compose \
               -f /opt/speakoo/infra/docker/docker-compose.yml \
               -f /opt/speakoo/infra/docker/docker-compose.prod.yml \
-              --env-file /opt/speakoo/.env \
+              --env-file /opt/speakoo/infra/docker/.env \
               run --rm api \
               npx prisma migrate deploy
 
@@ -104,7 +104,7 @@ jobs:
             docker compose \
               -f /opt/speakoo/infra/docker/docker-compose.yml \
               -f /opt/speakoo/infra/docker/docker-compose.prod.yml \
-              --env-file /opt/speakoo/.env \
+              --env-file /opt/speakoo/infra/docker/.env \
               up -d --remove-orphans
 
             # Clean up dangling images

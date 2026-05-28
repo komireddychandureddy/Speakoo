@@ -60,21 +60,26 @@ cd "$DOCKER_DIR"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 
 echo ""
-echo "[3/5] Pulling latest changes..."
+echo "[3/6] Pulling latest code..."
 cd "$APP_ROOT"
 git pull origin main
 echo "✓ Code updated"
 
 echo ""
-echo "[4/5] Running database migrations..."
+echo "[4/6] Pulling latest Docker image..."
 cd "$DOCKER_DIR"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull api
+echo "✓ Image updated"
+
+echo ""
+echo "[5/6] Running database migrations..."
 # docker compose run starts postgres/redis (via depends_on + healthcheck) then runs migrations
 # in the pre-built GHCR image — no local npm/build-tools required
 docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api npx prisma migrate deploy
 echo "✓ Migrations applied"
 
 echo ""
-echo "[5/5] Starting services..."
+echo "[6/6] Starting services..."
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 echo "✓ Services started"
 
