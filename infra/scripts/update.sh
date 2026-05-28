@@ -47,7 +47,7 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 # Backup database first
-echo "[1/5] Creating database backup..."
+echo "[1/6] Creating database backup..."
 if [ -f "$APP_ROOT/infra/scripts/backup-db.sh" ]; then
     bash "$APP_ROOT/infra/scripts/backup-db.sh"
 else
@@ -55,7 +55,7 @@ else
 fi
 
 echo ""
-echo "[2/5] Stopping services..."
+echo "[2/6] Stopping services..."
 cd "$DOCKER_DIR"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 
@@ -68,6 +68,12 @@ echo "✓ Code updated"
 echo ""
 echo "[4/6] Pulling latest Docker image..."
 cd "$DOCKER_DIR"
+GHCR_TOKEN_VAL=$(grep -E "^GHCR_TOKEN=" "$DOCKER_DIR/.env" 2>/dev/null | cut -d'=' -f2 | tr -d '"' | xargs)
+if [ -n "$GHCR_TOKEN_VAL" ] && [ "$GHCR_TOKEN_VAL" != "REPLACE_ME" ]; then
+    echo "$GHCR_TOKEN_VAL" | docker login ghcr.io -u "$GHCR_OWNER_VAL" --password-stdin
+else
+    echo "⚠ GHCR_TOKEN not set in .env — skipping login (image must be public)"
+fi
 docker compose -f docker-compose.yml -f docker-compose.prod.yml pull api
 echo "✓ Image updated"
 
