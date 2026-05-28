@@ -157,6 +157,175 @@ await authProvider.login(
 
 ---
 
+## Frontend Changes (React Web App)
+
+### 1. Updated Auth API Client (`apps/web/src/core/network/authApi.ts`)
+
+#### apiLogin Method
+- Now accepts `identifier` parameter instead of `email`
+- Auto-detects phone numbers (starts with `+`)
+- Sends appropriate field to backend based on format
+
+**Implementation:**
+```typescript
+export async function apiLogin(
+  identifier: string,
+  password: string,
+  captchaToken?: string
+): Promise<LoginResponse> {
+  const isPhone = identifier.trim().startsWith('+');
+  const payload = isPhone 
+    ? { phone: identifier.trim(), password }
+    : { email: identifier.trim(), password };
+  
+  if (captchaToken) {
+    (payload as any).captchaToken = captchaToken;
+  }
+  
+  const { data } = await apiClient.post<LoginResponse>('/auth/login', payload);
+  return data;
+}
+```
+
+#### apiRegister Method
+- Added optional `phoneNumber` parameter
+- Conditionally includes phone number in request payload
+
+**Implementation:**
+```typescript
+export async function apiRegister(
+  displayName: string,
+  email: string,
+  password: string,
+  captchaToken?: string,
+  phoneNumber?: string
+): Promise<RegisterResponse> {
+  const { data } = await apiClient.post<RegisterResponse>('/auth/register', {
+    displayName,
+    email,
+    password,
+    ...(captchaToken && { captchaToken }),
+    ...(phoneNumber && { phoneNumber }),
+  });
+  return data;
+}
+```
+
+#### Error Messages
+- Updated `parseAuthError` to reflect email/phone support:
+  - "Invalid credentials. Please check your email/phone and password."
+  - "An account with this email or phone number already exists."
+
+### 2. Login Page (`apps/web/src/pages/Auth/LoginPage.tsx`)
+
+#### State Changes
+- Renamed `loginEmail` to `loginIdentifier`
+- Added `signupPhone` state variable for optional phone registration
+
+#### Login Handler
+- Updated to support email OR phone login
+- E.164 format validation for phone numbers
+- Auto-detects input type and validates accordingly
+
+**Implementation:**
+```typescript
+const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
+  const identifier = loginIdentifier.trim();
+  
+  // Validate phone format if starts with +
+  if (identifier.startsWith('+') && !/^\+[1-9]\d{7,14}$/.test(identifier)) {
+    setError('Invalid phone format. Use E.164 format (e.g., +1234567890)');
+    return;
+  }
+  
+  try {
+    await apiLogin(identifier, loginPassword, loginCaptchaToken || undefined);
+    // ... success handling
+  } catch (err) {
+    setError(parseAuthError(err));
+  }
+};
+```
+
+#### Register Handler
+- Added optional phone field validation
+- E.164 format validation for phone numbers
+- Sends phone to backend if provided
+
+**Implementation:**
+```typescript
+const handleSignup = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  // Validate optional phone format
+  if (signupPhone.trim() && !/^\+[1-9]\d{7,14}$/.test(signupPhone.trim())) {
+    setError('Invalid phone format. Use E.164 format (e.g., +1234567890)');
+    return;
+  }
+  
+  try {
+    await apiRegister(
+      signupName,
+      signupEmail,
+      signupPassword,
+      signupCaptchaToken || undefined,
+      signupPhone.trim() || undefined
+    );
+    // ... success handling
+  } catch (err) {
+    setError(parseAuthError(err));
+  }
+};
+```
+
+#### UI Changes
+
+**Login Form:**
+```tsx
+<input
+  type="text"
+  placeholder="Email or Phone Number"
+  value={loginIdentifier}
+  onChange={(e) => setLoginIdentifier(e.target.value)}
+  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
+  autoComplete="username"
+/>
+<p className="text-xs text-gray-500 mt-1 ml-1">
+  For phone, use E.164 format (e.g., +1234567890)
+</p>
+```
+
+**Registration Form:**
+```tsx
+<input
+  type="tel"
+  placeholder="Phone Number (optional)"
+  value={signupPhone}
+  onChange={(e) => setSignupPhone(e.target.value)}
+  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
+/>
+<p className="text-xs text-gray-500 mt-1 ml-1">
+  Use E.164 format (e.g., +1234567890)
+</p>
+```
+
+### User Experience (React Web)
+
+**Login:**
+- Single unified input field accepts email OR phone
+- Helper text guides users on E.164 format
+- Auto-detection based on `+` prefix
+- Clear error messages for invalid formats
+
+**Registration:**
+- Email is required (primary identifier)
+- Phone number is optional
+- E.164 format validation with helper text
+- Backend sends dual OTPs if phone provided
+
+---
+
 ## Testing Guide
 
 ### Backend Tests
@@ -195,6 +364,8 @@ curl -X POST http://localhost:3000/api/v1/auth/register \
 
 ### Frontend Tests
 
+**Flutter Mobile App:**
+
 1. **Login Screen:**
    - Try logging in with email
    - Try logging in with phone (E.164 format)
@@ -217,6 +388,30 @@ curl -X POST http://localhost:3000/api/v1/auth/register \
    - Test email OTP verification
    - Test phone OTP verification
    - Test resend OTP functionality
+
+**React Web App:**
+
+1. **Login Page - Login Tab:**
+   - Test login with email: `user@example.com`
+   - Test login with phone: `+1234567890`
+   - Test invalid phone format (should show error)
+   - Test empty fields (should show validation error)
+   - Verify helper text is displayed
+
+2. **Login Page - Sign Up Tab:**
+   - Test registration with email only
+   - Test registration with email + phone
+   - Test invalid phone format (should show error)
+   - Verify phone field is truly optional (can submit without phone)
+   - Test email format validation
+   - Verify helper text guides E.164 format
+
+3. **Browser Testing:**
+   - Clear cache: `Ctrl + Shift + Delete` or `Ctrl + F5`
+   - Test on production: `https://speakoo.duckdns.org`
+   - Verify unified login input works
+   - Verify optional phone registration works
+   - Check that backend sends dual OTPs when phone provided
 
 ---
 

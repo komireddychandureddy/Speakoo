@@ -1,7 +1,7 @@
 # Speakoo — Project Status & Pending Work
 
-> **Last updated:** 2026-05-27  
-> **Branches:** `bugfix/users-integration` (current) | `feat/m1-m8-implementation` | `main`
+> **Last updated:** 2026-05-28  
+> **Branches:** `main` (current)
 
 ---
 
@@ -29,6 +29,8 @@
 | Flutter — Notifications | ⚠️ Partial | screen exists, no backend controller |
 | Flutter — Admin | ⚠️ Partial | screens exist, **data layer missing** |
 | Flutter — Tutor Dashboard | ⚠️ Partial | screens exist, **data layer missing** |
+| React Web — Auth | ✅ Complete | login (email/phone), register (email + optional phone) |
+| React Web — Deployment | ✅ Complete | production build, deployed to speakoo.duckdns.org |
 
 ---
 
@@ -60,8 +62,31 @@
 
 ---
 
-## Implemented This Session (2026-05-27)
+## Implemented This Session (2026-05-28)
 
+### Authentication Enhancements (Flutter Mobile)
+- [x] **Backend: Enhanced Login DTO** — supports email OR phone login with E.164 validation
+- [x] **Backend: Updated Register DTO** — added optional `phoneNumber` field for email registration
+- [x] **Backend: Auth Service** — login finds users by email OR phone; register stores phone + sends dual OTPs
+- [x] **Flutter: Auth Provider** — login accepts email/phone params; register includes phoneNumber
+- [x] **Flutter: Login Screen** — unified "Email or Phone Number" field with smart auto-detection
+- [x] **Flutter: Register Screen** — email tab now includes optional phone field with country code dropdown
+
+### Authentication Enhancements (React Web)
+- [x] **React: authApi.ts** — `apiLogin` accepts email OR phone (auto-detects via `+` prefix); `apiRegister` includes optional phone
+- [x] **React: LoginPage.tsx** — login form uses unified "Email or Phone Number" input with E.164 validation
+- [x] **React: LoginPage.tsx** — registration form includes optional "Phone Number" field with E.164 validation
+- [x] **Production Build** — `apps/web` built successfully (494.48 kB bundle, no errors)
+- [x] **Production Deployment** — deployed to `https://speakoo.duckdns.org` via manual upload to `/var/www/html/`
+- [x] **Testing** — verified email login, phone login, and optional phone registration on production
+
+### Documentation Updates
+- [x] **AUTH_IMPROVEMENTS.md** — added comprehensive React web implementation section with code examples
+- [x] **DEPLOYMENT_GUIDE.md** — updated Part 6 with React web deployment steps (removed Flutter web)
+- [x] **DEPLOYMENT_CHECKLIST.md** — updated web deployment section for React (removed Flutter)
+- [x] **Docs Cleanup** — removed 4 outdated files (design.md, scenario.md, FLUTTER_WEB_DEPLOYMENT.md, DEPLOY_WEB_NOW.md)
+
+### Previous Session (2026-05-27)
 - [x] Fixed `app_router.dart` — broken OTP screen import + added tutor-home/admin routes
 - [x] Created `booking_repository.dart` + `booking_provider.dart` — all booking screens wired to real API
 - [x] Created `profile_repository.dart` + `profile_provider.dart` — profile screen wired to real API
