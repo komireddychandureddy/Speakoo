@@ -17,21 +17,31 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController();
+  final _identifierCtrl = TextEditingController(); // Email or Phone
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
 
   @override
   void dispose() {
-    _emailCtrl.dispose();
+    _identifierCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
 
+  bool _isPhoneNumber(String value) {
+    // Simple check: starts with + and contains only digits after
+    return RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(value);
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    final identifier = _identifierCtrl.text.trim();
+    final isPhone = _isPhoneNumber(identifier);
+    
     await ref.read(authProvider.notifier).login(
-          email: _emailCtrl.text.trim(),
+          email: isPhone ? null : identifier,
+          phone: isPhone ? identifier : null,
           password: _passwordCtrl.text,
         );
     if (!mounted) return;
@@ -108,15 +118,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ).animate(delay: 300.ms).fadeIn(),
                 const SizedBox(height: 36),
                 SpeakooTextField(
-                  label: 'Email Address',
-                  hint: 'you@example.com',
-                  controller: _emailCtrl,
-                  prefixIcon: Icons.email_outlined,
+                  label: 'Email or Phone Number',
+                  hint: 'you@example.com or +12025550100',
+                  controller: _identifierCtrl,
+                  prefixIcon: Icons.person_outline,
                   keyboardType: TextInputType.emailAddress,
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Email is required';
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Email or phone number is required';
+                    }
+                    final trimmed = v.trim();
+                    // Check if it's a phone number format
+                    final phoneRx = RegExp(r'^\+[1-9]\d{7,14}$');
                     final emailRx = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-                    if (!emailRx.hasMatch(v.trim())) return 'Enter a valid email';
+                    
+                    if (!phoneRx.hasMatch(trimmed) && !emailRx.hasMatch(trimmed)) {
+                      return 'Enter a valid email or phone (E.164 format: +12025550100)';
+                    }
                     return null;
                   },
                 ).animate(delay: 400.ms).fadeIn().slideY(begin: 0.1),

@@ -37,8 +37,18 @@ export class AuthService {
 
   async register(dto: RegisterDto, role: UserRole = UserRole.learner) {
     await this.verifyCaptcha(dto.captchaToken);
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (existing) throw new ConflictException('Email already registered');
+
+    // Check if email is already registered
+    const existingEmail = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (existingEmail) throw new ConflictException('Email already registered');
+
+    // Check if phone is already registered (if provided)
+    if (dto.phoneNumber) {
+      const existingPhone = await this.prisma.user.findUnique({
+        where: { phoneNumber: dto.phoneNumber },
+      });
+      if (existingPhone) throw new ConflictException('Phone number already registered');
+    }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
 
@@ -47,14 +57,26 @@ export class AuthService {
         email: dto.email,
         passwordHash,
         role,
+        phoneNumber: dto.phoneNumber,
         profile: {
-          create: { displayName: dto.displayName },
+          create: {
+            displayName: dto.displayName,
+            phoneNumber: dto.phoneNumber,
+          },
         },
       },
       include: { profile: true },
     });
 
+    // Send email verification OTP
     await this.sendVerificationEmail(user.id);
+
+    // Send phone verification OTP if phone number provided
+    if (dto.phoneNumber) {
+      const code = await this.createOtp(user.id, OtpPurpose.phone_verification);
+      await this.sendSmsOtp(dto.phoneNumber, code);
+      this.logger.log(`Phone verification OTP sent to ${dto.phoneNumber}`);
+    }
 
     this.logger.log(`User registered: ${user.id}`);
     return this.issueTokens(user.id, user.email, user.role);
@@ -62,7 +84,22 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     await this.verifyCaptcha(dto.captchaToken);
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+
+    // Validate that at least one identifier is provided
+    if (!dto.email && !dto.phone) {
+      throw new UnauthorizedException('Email or phone number is required');
+    }
+
+    // Find user by email or phone
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          dto.email ? { email: dto.email } : undefined,
+          dto.phone ? { phoneNumber: dto.phone } : undefined,
+        ].filter(Boolean),
+      },
+    });
+
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
     const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);

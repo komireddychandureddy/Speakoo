@@ -55,10 +55,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_tabCtrl.index == 0) {
+      // Email tab - can optionally include phone number
+      final phoneInput = _phoneCtrl.text.trim();
+      final fullPhone = phoneInput.isNotEmpty ? '$_countryCode$phoneInput' : null;
+      
       await ref.read(authProvider.notifier).register(
             email: _emailCtrl.text.trim(),
             password: _passwordCtrl.text,
             fullName: _nameCtrl.text.trim(),
+            phoneNumber: fullPhone,
           );
     } else {
       await ref.read(authProvider.notifier).registerWithPhone(
@@ -182,7 +187,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                 ).animate(delay: 300.ms).fadeIn(),
                 const SizedBox(height: 16),
                 SizedBox(
-                  height: 230,
+                  height: 420,
                   child: TabBarView(
                     controller: _tabCtrl,
                     children: [
@@ -190,12 +195,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                         emailCtrl: _emailCtrl,
                         passwordCtrl: _passwordCtrl,
                         confirmCtrl: _confirmCtrl,
+                        phoneCtrl: _phoneCtrl,
+                        countryCode: _countryCode,
+                        countryCodes: _countryCodes,
                         obscure: _obscure,
                         obscureConfirm: _obscureConfirm,
                         onToggleObscure: () =>
                             setState(() => _obscure = !_obscure),
                         onToggleConfirm: () =>
                             setState(() => _obscureConfirm = !_obscureConfirm),
+                        onCodeChanged: (c) => setState(() => _countryCode = c!),
                       ),
                       _PhoneFields(
                         phoneCtrl: _phoneCtrl,
@@ -248,28 +257,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
 
 // ── Helper Widgets ────────────────────────────────────────────────────────────
 
-class _EmailFields extends StatelessWidget {
-  final TextEditingController emailCtrl;
-  final TextEditingController passwordCtrl;
-  final TextEditingController confirmCtrl;
+class _ETextEditingController phoneCtrl;
+  final String countryCode;
+  final List<String> countryCodes;
   final bool obscure;
   final bool obscureConfirm;
   final VoidCallback onToggleObscure;
   final VoidCallback onToggleConfirm;
+  final ValueChanged<String?> onCodeChanged;
 
   const _EmailFields({
     required this.emailCtrl,
     required this.passwordCtrl,
     required this.confirmCtrl,
+    required this.phoneCtrl,
+    required this.countryCode,
+    required this.countryCodes,
     required this.obscure,
     required this.obscureConfirm,
     required this.onToggleObscure,
     required this.onToggleConfirm,
+    required this.onCodeChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SpeakooTextField(
           label: 'Email Address',
@@ -282,6 +296,61 @@ class _EmailFields extends StatelessWidget {
             if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(v.trim())) {
               return 'Enter a valid email';
             }
+            return null;
+          },
+        ),
+        const SizedBox(height: 12),
+        const Text('Phone Number (Optional)',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary)),
+        const SizedBox(height: 6),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 54,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: countryCode,
+                  items: countryCodes
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: onCodeChanged,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w500),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SpeakooTextField(
+                label: '',
+                hint: '555 123 4567',
+                controller: phoneCtrl,
+                prefixIcon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
+                validator: (v) {
+                  // Optional field - only validate if not empty
+                  if (v != null && v.trim().isNotEmpty && v.trim().length < 7) {
+                    return 'Enter a valid number';
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12
             return null;
           },
         ),

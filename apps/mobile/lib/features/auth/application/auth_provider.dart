@@ -155,13 +155,22 @@ class AuthNotifier extends Notifier<AuthState> {
     );
   }
 
-  Future<void> login({required String email, required String password}) async {
+  Future<void> login({
+    String? email,
+    String? phone,
+    required String password,
+  }) async {
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
     try {
-      final response = await _dio.post(
-        '/auth/login',
-        data: {'email': email, 'password': password},
-      );
+      final Map<String, dynamic> data = {'password': password};
+      if (email != null && email.isNotEmpty) {
+        data['email'] = email;
+      }
+      if (phone != null && phone.isNotEmpty) {
+        data['phone'] = phone;
+      }
+
+      final response = await _dio.post('/auth/login', data: data);
       await _authenticateFromTokenResponse(
         Map<String, dynamic>.from(response.data as Map),
       );
@@ -177,16 +186,21 @@ class AuthNotifier extends Notifier<AuthState> {
     required String email,
     required String password,
     required String fullName,
-    String? phone,
+    String? phoneNumber,
   }) async {
-    final hasPhoneInput = phone != null && phone.isNotEmpty;
+    final hasPhoneInput = phoneNumber != null && phoneNumber.isNotEmpty;
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
     try {
-      final response = await _dio.post('/auth/register', data: {
+      final Map<String, dynamic> data = {
         'email': email,
         'password': password,
         'displayName': fullName,
-      });
+      };
+      if (hasPhoneInput) {
+        data['phoneNumber'] = phoneNumber;
+      }
+
+      final response = await _dio.post('/auth/register', data: data);
 
       final responseData = Map<String, dynamic>.from(response.data as Map);
       final accessToken = responseData['accessToken'] as String?;
@@ -195,10 +209,10 @@ class AuthNotifier extends Notifier<AuthState> {
       }
 
       state = AuthState(
-        status: AuthStatus.needsEmailOtp,
+        status: hasPhoneInput ? AuthStatus.needsPhoneOtp : AuthStatus.needsEmailOtp,
         pendingEmail: email,
         pendingRole: 'learner',
-        pendingPhone: hasPhoneInput ? phone : null,
+        pendingPhone: hasPhoneInput ? phoneNumber : null,
       );
     } on DioException catch (e) {
       state = AuthState(
