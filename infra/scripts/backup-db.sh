@@ -11,7 +11,7 @@ BACKUP_DIR="$HOME/speakoo-backups"
 DATE=$(date +%Y%m%d_%H%M%S)
 CONTAINER_NAME="speakoo-postgres"
 DB_NAME="speakoo_prod"
-DB_USER="speakoo_user"
+DB_USER="speakoo"
 RETENTION_DAYS=7
 
 # Ensure backup directory exists
