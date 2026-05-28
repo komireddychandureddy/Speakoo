@@ -97,7 +97,7 @@ jobs:
               -f /opt/speakoo/infra/docker/docker-compose.yml \
               -f /opt/speakoo/infra/docker/docker-compose.prod.yml \
               --env-file /opt/speakoo/.env \
-              run --rm --no-deps api \
+              run --rm api \
               npx prisma migrate deploy
 
             # Rolling restart
