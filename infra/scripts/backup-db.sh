@@ -6,7 +6,8 @@
 
 set -e
 
-BACKUP_DIR="/var/backups/speakoo"
+# Use home directory for backups (user-writable)
+BACKUP_DIR="$HOME/speakoo-backups"
 DATE=$(date +%Y%m%d_%H%M%S)
 CONTAINER_NAME="speakoo-postgres"
 DB_NAME="speakoo_prod"
