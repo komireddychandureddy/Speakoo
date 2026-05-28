@@ -24,11 +24,11 @@ export class RegisterDto {
   captchaToken?: string;
 }
 
-// ❌ WRONG — @IsString() alone accepts "" (empty string)
+// ❌ WRONG — empty string passes @IsString() but fails hCaptcha verification
 export class RegisterDto {
   @IsOptional()
   @IsString()
-  captchaToken?: string;  // "" passes validation, causes issues
+  captchaToken?: string;  // "" passes class-validator but breaks backend logic
 }
 ```
 
@@ -53,13 +53,13 @@ This issue caused "property captchaToken should not exist" errors when `forbidNo
 
 ---
 
-## Rule 55: Phone Number Inputs Must Use Country Code Dropdowns with Geolocation
+## Rule 55: Phone Number Inputs Must Use Country Code Dropdowns with Timezone Detection
 
 **Rule:** Never use plain text inputs for phone numbers. Implement a country code selector with:
 1. Flag + dial code dropdown (searchable)
-2. Auto-detection via browser geolocation API (with permission)
-3. Fallback to timezone-based detection
-4. E.164 format validation
+2. Auto-detection via browser timezone (privacy-friendly, no geolocation)
+3. E.164 format validation
+4. User manual selection takes precedence over auto-detection
 
 ```tsx
 // ✅ CORRECT — PhoneInput component with country selector
@@ -71,11 +71,12 @@ This issue caused "property captchaToken should not exist" errors when `forbidNo
 />
 
 // Component features:
-// - Detects country from navigator.geolocation (with permission)
-// - Falls back to Intl.DateTimeFormat().resolvedOptions().timeZone
+// - Detects country from Intl.DateTimeFormat().resolvedOptions().timeZone
+// - NO geolocation API (privacy risk - see Rule 57)
 // - Constructs E.164 format: selectedCountry.dial + phoneNumber
 // - Validates digits only in number field
 // - Displays: 🇺🇸 +1 | 2025550100
+// - Tracks userSelectedCountry flag to prevent async overwrites (Rule 56)
 
 // ❌ WRONG — plain text with format hint
 <input
@@ -88,6 +89,80 @@ This issue caused "property captchaToken should not exist" errors when `forbidNo
 ```
 
 Users should never manually type the `+` or country code — the dropdown handles it.
+
+---
+
+## Rule 56: Async Auto-Detection Must Not Overwrite User Input
+
+**Rule:** When implementing auto-detection features (country, timezone, currency, etc.) that run asynchronously, always track whether the user has manually selected a value. Never apply auto-detected values if the user has already made a choice, even if the detection finishes later.
+
+```tsx
+// ✅ CORRECT — tracks user selection to prevent async overwrites
+const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
+const [userSelectedCountry, setUserSelectedCountry] = useState(false);
+
+useEffect(() => {
+  const detectCountry = () => {
+    if (userSelectedCountry) return;  // ← prevent overwriting user choice
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const country = detectFromTimezone(timezone);
+    if (country) setSelectedCountry(country);
+  };
+  detectCountry();
+}, [userSelectedCountry]);
+
+const handleCountrySelect = (country: Country) => {
+  setSelectedCountry(country);
+  setUserSelectedCountry(true);  // ← mark as user-selected
+};
+
+// ❌ WRONG — async detection overwrites user's manual selection
+useEffect(() => {
+  navigator.geolocation.getCurrentPosition(async (position) => {
+    const country = await detectFromCoords(position);
+    setSelectedCountry(country);  // overwrites user choice after delay
+  });
+}, []);  // no userSelectedCountry guard
+```
+
+This issue causes frustrating UX: user selects their country, continues filling the form, then their selection is silently replaced a few seconds later.
+
+---
+
+## Rule 57: Never Send Precise Geolocation to Third-Party APIs for Non-Essential Features
+
+**Rule:** Avoid using `navigator.geolocation` to send precise latitude/longitude to third-party services unless absolutely necessary for core functionality (e.g., rideshare apps). For features like country detection, currency selection, or timezone inference, use privacy-friendly alternatives:
+1. Browser timezone: `Intl.DateTimeFormat().resolvedOptions().timeZone`
+2. Server-side IP geolocation (coarse, e.g., country-level only)
+3. User-agent locale: `navigator.language`
+
+Never expose exact user coordinates from login/signup forms or marketing pages.
+
+```tsx
+// ✅ CORRECT — privacy-friendly timezone detection
+const detectCountry = () => {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timezoneMap: Record<string, string> = {
+    'America/New_York': 'US',
+    'Europe/London': 'GB',
+    'Asia/Kolkata': 'IN',
+    // ...
+  };
+  const countryCode = timezoneMap[timezone];
+  return COUNTRIES.find(c => c.code === countryCode);
+};
+
+// ❌ WRONG — sends precise lat/long to third-party BigDataCloud API
+navigator.geolocation.getCurrentPosition(async (position) => {
+  const response = await fetch(
+    `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}`
+  );
+  const data = await response.json();
+  // User's exact location now tracked by third party
+});
+```
+
+This violates GDPR/privacy principles by exposing precise location data for non-essential features without explicit consent for that purpose.
 
 ---
 

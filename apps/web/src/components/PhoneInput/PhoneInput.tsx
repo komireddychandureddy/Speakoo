@@ -70,45 +70,19 @@ export default function PhoneInput({
   const [phoneNumber, setPhoneNumber] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [userSelectedCountry, setUserSelectedCountry] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Detect country from geolocation API
+  // Detect country from timezone only (privacy-friendly, no geolocation)
   useEffect(() => {
-    const detectCountry = async () => {
+    const detectCountry = () => {
       try {
-        // Try to get user's timezone and map to country
+        // Only apply auto-detection if user hasn't manually selected a country
+        if (userSelectedCountry) return;
+
+        // Use timezone to detect country (privacy-friendly, no precise location)
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        
-        // Try geolocation API (requires HTTPS and user permission)
-        if ('geolocation' in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            async (position) => {
-              try {
-                // Use a free geocoding API to get country from coordinates
-                const response = await fetch(
-                  `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`
-                );
-                const data = await response.json();
-                const countryCode = data.countryCode;
-                
-                const country = COUNTRIES.find((c) => c.code === countryCode);
-                if (country) {
-                  setSelectedCountry(country);
-                }
-              } catch (error) {
-                console.error('Geocoding error:', error);
-                fallbackToTimezone(timezone);
-              }
-            },
-            (error) => {
-              console.error('Geolocation error:', error);
-              fallbackToTimezone(timezone);
-            },
-            { timeout: 5000 }
-          );
-        } else {
-          fallbackToTimezone(timezone);
-        }
+        fallbackToTimezone(timezone);
       } catch (error) {
         console.error('Country detection error:', error);
       }
@@ -141,7 +115,7 @@ export default function PhoneInput({
     };
 
     detectCountry();
-  }, []);
+  }, [userSelectedCountry]);
 
   // Parse existing value if provided
   useEffect(() => {
@@ -218,6 +192,7 @@ export default function PhoneInput({
                     type="button"
                     onClick={() => {
                       setSelectedCountry(country);
+                      setUserSelectedCountry(true);
                       setDropdownOpen(false);
                       setSearchQuery('');
                     }}

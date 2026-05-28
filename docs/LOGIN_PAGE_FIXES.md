@@ -8,8 +8,9 @@
 
 **Root Cause**: 
 - `@IsOptional()` only skips validation when field is `undefined` or missing
-- Empty strings `""` still trigger validation
-- With `forbidNonWhitelisted: true`, an empty string that only has `@IsString()` decorator was being rejected
+- Empty strings `""` pass `@IsString()` validation successfully
+- However, an empty string captchaToken fails backend verification logic (hCaptcha expects either undefined or a valid token)
+- Adding `@MinLength(1)` ensures that if captchaToken is present, it must be a non-empty string
 
 **Fix**:
 - Added `@MinLength(1)` to `RegisterDto.captchaToken` to explicitly reject empty strings

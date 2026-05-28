@@ -5,6 +5,7 @@ import HCaptcha from '@hcaptcha/react-hcaptcha';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import FacebookLogin from '@greatsumini/react-facebook-login';
 import AppleLogin from 'react-apple-login';
+import PhoneInput from '../../components/PhoneInput/PhoneInput';
 import {
   apiLogin,
   apiRegister,
