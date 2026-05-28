@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTutorProfileDto } from './dto/create-tutor-profile.dto';
 import { CreateAvailabilitySlotDto } from './dto/create-availability-slot.dto';
@@ -69,7 +74,17 @@ export class TutorsRepository {
           ...(dto.minCents !== undefined ? { hourlyRateCents: { gte: dto.minCents } } : {}),
           ...(dto.maxCents !== undefined ? { hourlyRateCents: { lte: dto.maxCents } } : {}),
         },
-        include: { user: { select: { id: true, role: true, profile: { select: { displayName: true, avatarUrl: true, bio: true, countryCode: true } } } } },
+        include: {
+          user: {
+            select: {
+              id: true,
+              role: true,
+              profile: {
+                select: { displayName: true, avatarUrl: true, bio: true, countryCode: true },
+              },
+            },
+          },
+        },
         orderBy: { hourlyRateCents: 'asc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -89,7 +104,16 @@ export class TutorsRepository {
   findPublicTutorProfile(userId: string) {
     return this.prisma.tutorProfile.findUniqueOrThrow({
       where: { userId },
-      include: { user: { select: { id: true, profile: { select: { displayName: true, avatarUrl: true, bio: true, countryCode: true } } } } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            profile: {
+              select: { displayName: true, avatarUrl: true, bio: true, countryCode: true },
+            },
+          },
+        },
+      },
     });
   }
 }

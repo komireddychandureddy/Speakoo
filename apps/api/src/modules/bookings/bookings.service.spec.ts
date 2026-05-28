@@ -43,9 +43,17 @@ describe('BookingsService', () => {
       const booking = { id: 'b1', learnerId: 'l1' };
       mockRepo.createBooking.mockResolvedValue(booking);
 
-      const result = await service.createBooking('l1', { slotId: 's1', tutorId: 't1', language: 'English' });
+      const result = await service.createBooking('l1', {
+        slotId: 's1',
+        tutorId: 't1',
+        language: 'English',
+      });
 
-      expect(mockRepo.createBooking).toHaveBeenCalledWith('l1', { slotId: 's1', tutorId: 't1', language: 'English' });
+      expect(mockRepo.createBooking).toHaveBeenCalledWith('l1', {
+        slotId: 's1',
+        tutorId: 't1',
+        language: 'English',
+      });
       expect(result).toBe(booking);
     });
   });

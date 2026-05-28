@@ -95,9 +95,9 @@ describe('PaymentsService', () => {
         throw new Error('Invalid signature');
       });
 
-      await expect(
-        service.handleWebhook(Buffer.from('body'), 'bad-sig'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.handleWebhook(Buffer.from('body'), 'bad-sig')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('returns received:true and processes payment_intent.succeeded', async () => {

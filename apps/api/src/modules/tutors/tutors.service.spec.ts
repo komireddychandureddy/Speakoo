@@ -19,10 +19,7 @@ describe('TutorsService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        TutorsService,
-        { provide: TutorsRepository, useValue: mockRepo },
-      ],
+      providers: [TutorsService, { provide: TutorsRepository, useValue: mockRepo }],
     }).compile();
 
     service = module.get<TutorsService>(TutorsService);
@@ -33,7 +30,9 @@ describe('TutorsService', () => {
     const profile = { userId: 'u1', bio: 'Hello' };
     mockRepo.upsertProfile.mockResolvedValue(profile);
 
-    const result = await service.upsertProfile('u1', { bio: 'Hello' } as unknown as CreateTutorProfileDto);
+    const result = await service.upsertProfile('u1', {
+      bio: 'Hello',
+    } as unknown as CreateTutorProfileDto);
 
     expect(mockRepo.upsertProfile).toHaveBeenCalledWith('u1', { bio: 'Hello' });
     expect(result).toBe(profile);
@@ -50,7 +49,9 @@ describe('TutorsService', () => {
     const slot = { id: 's1', tutorId: 'u1' };
     mockRepo.createSlot.mockResolvedValue(slot);
 
-    const result = await service.createSlot('u1', { startsAt: new Date() } as unknown as CreateAvailabilitySlotDto);
+    const result = await service.createSlot('u1', {
+      startsAt: new Date(),
+    } as unknown as CreateAvailabilitySlotDto);
 
     expect(mockRepo.createSlot).toHaveBeenCalledWith('u1', { startsAt: expect.any(Date) });
     expect(result).toBe(slot);

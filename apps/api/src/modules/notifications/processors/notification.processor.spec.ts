@@ -107,9 +107,7 @@ describe('NotificationProcessor', () => {
     mockTwilioMessagesCreate.mockResolvedValue({ sid: 'SM1' });
     mockPrisma.notificationLog.create.mockResolvedValue({});
 
-    await processor.handle(
-      makeJob({ ...baseJobData, channel: NotificationChannel.whatsapp }),
-    );
+    await processor.handle(makeJob({ ...baseJobData, channel: NotificationChannel.whatsapp }));
 
     expect(mockTwilioMessagesCreate).toHaveBeenCalledWith(
       expect.objectContaining({ to: 'whatsapp:+15005550006' }),
@@ -126,9 +124,7 @@ describe('NotificationProcessor', () => {
     });
     mockPrisma.notificationLog.create.mockResolvedValue({});
 
-    await processor.handle(
-      makeJob({ ...baseJobData, channel: NotificationChannel.whatsapp }),
-    );
+    await processor.handle(makeJob({ ...baseJobData, channel: NotificationChannel.whatsapp }));
 
     expect(mockTwilioMessagesCreate).not.toHaveBeenCalled();
     expect(mockPrisma.notificationLog.create).toHaveBeenCalled();

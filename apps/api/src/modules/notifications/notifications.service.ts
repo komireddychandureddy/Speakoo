@@ -27,9 +27,24 @@ export class NotificationsService {
     const booking = await this.prisma.booking.findUniqueOrThrow({ where: { id: bookingId } });
 
     // Immediate notifications
-    await this.enqueue({ userId: booking.learnerId, bookingId, type: NotificationType.booking_confirmed, channel: NotificationChannel.email });
-    await this.enqueue({ userId: booking.learnerId, bookingId, type: NotificationType.booking_confirmed, channel: NotificationChannel.whatsapp });
-    await this.enqueue({ userId: booking.tutorId, bookingId, type: NotificationType.booking_confirmed, channel: NotificationChannel.email });
+    await this.enqueue({
+      userId: booking.learnerId,
+      bookingId,
+      type: NotificationType.booking_confirmed,
+      channel: NotificationChannel.email,
+    });
+    await this.enqueue({
+      userId: booking.learnerId,
+      bookingId,
+      type: NotificationType.booking_confirmed,
+      channel: NotificationChannel.whatsapp,
+    });
+    await this.enqueue({
+      userId: booking.tutorId,
+      bookingId,
+      type: NotificationType.booking_confirmed,
+      channel: NotificationChannel.email,
+    });
 
     // Delayed reminders
     const reminder60 = new Date(sessionStartTime.getTime() - 60 * 60 * 1000);
@@ -37,22 +52,37 @@ export class NotificationsService {
     const now = Date.now();
 
     if (reminder60.getTime() > now) {
-      await this.enqueue({
-        userId: booking.learnerId, bookingId,
-        type: NotificationType.reminder_60min, channel: NotificationChannel.email,
-      }, reminder60.getTime() - now);
+      await this.enqueue(
+        {
+          userId: booking.learnerId,
+          bookingId,
+          type: NotificationType.reminder_60min,
+          channel: NotificationChannel.email,
+        },
+        reminder60.getTime() - now,
+      );
 
-      await this.enqueue({
-        userId: booking.learnerId, bookingId,
-        type: NotificationType.reminder_60min, channel: NotificationChannel.whatsapp,
-      }, reminder60.getTime() - now);
+      await this.enqueue(
+        {
+          userId: booking.learnerId,
+          bookingId,
+          type: NotificationType.reminder_60min,
+          channel: NotificationChannel.whatsapp,
+        },
+        reminder60.getTime() - now,
+      );
     }
 
     if (reminder10.getTime() > now) {
-      await this.enqueue({
-        userId: booking.learnerId, bookingId,
-        type: NotificationType.reminder_10min, channel: NotificationChannel.email,
-      }, reminder10.getTime() - now);
+      await this.enqueue(
+        {
+          userId: booking.learnerId,
+          bookingId,
+          type: NotificationType.reminder_10min,
+          channel: NotificationChannel.email,
+        },
+        reminder10.getTime() - now,
+      );
     }
   }
 

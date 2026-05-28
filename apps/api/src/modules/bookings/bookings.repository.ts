@@ -1,4 +1,10 @@
-import { Injectable, ConflictException, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingStatus, SlotStatus } from '@prisma/client';
@@ -89,7 +95,10 @@ export class BookingsRepository {
     });
   }
 
-  async cancelBooking(id: string, userId: string): Promise<{ refundAmountCents: number; stripePaymentIntent: string | null }> {
+  async cancelBooking(
+    id: string,
+    userId: string,
+  ): Promise<{ refundAmountCents: number; stripePaymentIntent: string | null }> {
     return this.prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findUniqueOrThrow({
         where: { id },
@@ -130,4 +139,3 @@ export class BookingsRepository {
     });
   }
 }
-

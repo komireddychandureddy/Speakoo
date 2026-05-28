@@ -209,3 +209,5 @@ PLATFORM_FEE_PERCENT=5
 - ❌ Social login endpoints without `@Public()`, `@UseGuards(CaptchaGuard)`, and `@Throttle({ auth: { ttl: 15 * 60_000, limit: 5 } })`
 - ❌ Running `npx prisma migrate deploy` before `docker compose up` — database must be running before migrations
 - ❌ Running `npm run build` in deployment scripts when `docker-compose.prod.yml` uses pre-built GHCR images
+- ❌ Async auto-detection overwrites user input — always track if user has manually selected a value before applying auto-detected defaults (Rule 56)
+- ❌ Sending precise lat/long to third-party APIs for non-essential features like country detection — use timezone-based detection instead (Rule 57)

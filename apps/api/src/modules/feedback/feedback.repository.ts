@@ -43,14 +43,10 @@ export class FeedbackRepository {
 
     const now = new Date();
     const lastSession = existing?.lastSession;
-    const daysSinceLast = lastSession
-      ? (now.getTime() - lastSession.getTime()) / 86_400_000
-      : null;
+    const daysSinceLast = lastSession ? (now.getTime() - lastSession.getTime()) / 86_400_000 : null;
 
     const streakDays =
-      daysSinceLast !== null && daysSinceLast <= 1
-        ? (existing?.streakDays ?? 0) + 1
-        : 1;
+      daysSinceLast !== null && daysSinceLast <= 1 ? (existing?.streakDays ?? 0) + 1 : 1;
 
     const updated = await this.prisma.learnerPoints.upsert({
       where: { learnerId },

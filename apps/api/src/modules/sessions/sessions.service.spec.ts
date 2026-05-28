@@ -136,7 +136,6 @@ describe('SessionsService', () => {
         id: 'b1',
         tutorId: 't1',
         status: BookingStatus.pending,
-
       });
 
       await expect(service.startSession('b1', 't1')).rejects.toThrow(ConflictException);

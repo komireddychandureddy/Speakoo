@@ -33,8 +33,10 @@ export class BookingsService {
   }
 
   async cancelBooking(id: string, userId: string) {
-    const { refundAmountCents, stripePaymentIntent } =
-      await this.bookingsRepository.cancelBooking(id, userId);
+    const { refundAmountCents, stripePaymentIntent } = await this.bookingsRepository.cancelBooking(
+      id,
+      userId,
+    );
 
     if (refundAmountCents > 0 && stripePaymentIntent) {
       try {

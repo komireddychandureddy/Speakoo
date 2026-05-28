@@ -5,6 +5,7 @@ import HCaptcha from '@hcaptcha/react-hcaptcha';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import FacebookLogin from '@greatsumini/react-facebook-login';
 import AppleLogin from 'react-apple-login';
+import PhoneInput from '../../components/PhoneInput/PhoneInput';
 import {
   apiLogin,
   apiRegister,
@@ -68,7 +69,7 @@ export default function LoginPage() {
       await apiLogin(
         loginIdentifier.trim(),
         loginPassword,
-        loginCaptchaToken && loginCaptchaToken.trim() ? loginCaptchaToken.trim() : undefined,
+        loginCaptchaToken?.trim() || undefined,
       );
       navigate('/dashboard');
     } catch (err) {
@@ -101,7 +102,7 @@ export default function LoginPage() {
         signupName.trim(),
         signupEmail.trim().toLowerCase(),
         signupPw,
-        signupCaptchaToken && signupCaptchaToken.trim() ? signupCaptchaToken.trim() : undefined,
+        signupCaptchaToken?.trim() || undefined,
         signupPhone.trim() || undefined,
       );
       navigate(`/verify-email?email=${encodeURIComponent(signupEmail.trim().toLowerCase())}`);
@@ -392,19 +393,12 @@ export default function LoginPage() {
                     className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
                     autoComplete="email"
                   />
-                  <div>
-                    <input
-                      type="tel"
-                      placeholder="Phone Number (optional)"
-                      value={signupPhone}
-                      onChange={(e) => setSignupPhone(e.target.value)}
-                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]"
-                      autoComplete="tel"
-                    />
-                    <p className="text-xs text-gray-500 mt-1 ml-1">
-                      Use E.164 format (e.g., +1234567890)
-                    </p>
-                  </div>
+                  <PhoneInput
+                    value={signupPhone}
+                    onChange={setSignupPhone}
+                    placeholder="Phone Number (optional)"
+                    autoComplete="tel"
+                  />
                   <div className="relative">
                     <input
                       type={showPw ? 'text' : 'password'}
