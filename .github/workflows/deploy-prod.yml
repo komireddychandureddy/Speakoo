@@ -59,11 +59,12 @@ jobs:
           GHCR_ACTOR: ${{ github.actor }}
           GHCR_OWNER: ${{ github.repository_owner }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          VITE_HCAPTCHA_SITE_KEY: ${{ secrets.VITE_HCAPTCHA_SITE_KEY }}
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          envs: GHCR_TOKEN,GHCR_ACTOR,GHCR_OWNER,IMAGE_TAG
+          envs: GHCR_TOKEN,GHCR_ACTOR,GHCR_OWNER,IMAGE_TAG,VITE_HCAPTCHA_SITE_KEY
           script: |
             set -euo pipefail
 
@@ -79,6 +80,8 @@ jobs:
             docker run --rm \
               -v /opt/speakoo/apps/web:/app \
               -w /app \
+              -e VITE_API_BASE_URL=https://speakoo.duckdns.org/api/v1 \
+              -e VITE_HCAPTCHA_SITE_KEY="${VITE_HCAPTCHA_SITE_KEY}" \
               node:20-alpine \
               sh -c "npm ci && npm run build"
 

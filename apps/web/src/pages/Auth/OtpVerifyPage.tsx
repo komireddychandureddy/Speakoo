@@ -75,7 +75,7 @@ export default function OtpVerifyPage() {
   async function handleResend() {
     if (resendCooldown > 0) return;
     try {
-      await apiClient.post('/auth/resend-email-otp', { email });
+      await apiClient.post('auth/resend-email-otp', { email });
       setResendCooldown(60);
       const interval = setInterval(() => {
         setResendCooldown((prev) => {

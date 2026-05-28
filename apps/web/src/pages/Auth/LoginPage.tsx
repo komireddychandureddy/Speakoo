@@ -85,7 +85,7 @@ export default function LoginPage() {
     if (!forgotEmail.trim()) return setError('Please enter your email address.');
     setLoading(true);
     try {
-      await apiClient.post('/auth/forgot-password', { email: forgotEmail.trim().toLowerCase() });
+      await apiClient.post('auth/forgot-password', { email: forgotEmail.trim().toLowerCase() });
       setForgotSent(true);
     } catch (err) {
       setError(parseAuthError(err));
@@ -100,7 +100,7 @@ export default function LoginPage() {
     try {
       // TODO: Integrate real OAuth SDKs (Google OAuth, Facebook SDK, Apple Sign In)
       // For now, show the backend error that guides users to email/password login
-      await apiClient.post(`/auth/social/${provider}`, { token: 'temp_token_pending_oauth_sdk' });
+      await apiClient.post(`auth/social/${provider}`, { token: 'temp_token_pending_oauth_sdk' });
       navigate('/dashboard');
     } catch (err) {
       setError(parseAuthError(err));
