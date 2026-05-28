@@ -91,13 +91,13 @@ export class AuthService {
     }
 
     // Find user by email or phone
+    const orConditions = [
+      dto.email ? { email: dto.email } : undefined,
+      dto.phone ? { phoneNumber: dto.phone } : undefined,
+    ].filter((x): x is NonNullable<typeof x> => x !== undefined);
+
     const user = await this.prisma.user.findFirst({
-      where: {
-        OR: [
-          dto.email ? { email: dto.email } : undefined,
-          dto.phone ? { phoneNumber: dto.phone } : undefined,
-        ].filter(Boolean),
-      },
+      where: { OR: orConditions },
     });
 
     if (!user) throw new UnauthorizedException('Invalid credentials');
