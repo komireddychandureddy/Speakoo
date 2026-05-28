@@ -30,7 +30,23 @@ fi
 
 if [ ! -f "$DOCKER_DIR/.env" ]; then
     echo "Error: .env not found in infra/docker/"
-    echo "Please create it with Docker environment variables"
+    echo "Please create it from infra/docker/.env.example"
+    exit 1
+fi
+
+# Validate required production variables
+GHCR_OWNER_VAL=$(grep -E "^GHCR_OWNER=" "$DOCKER_DIR/.env" 2>/dev/null | cut -d'=' -f2 | tr -d '"' | xargs)
+IMAGE_TAG_VAL=$(grep -E "^IMAGE_TAG=" "$DOCKER_DIR/.env" 2>/dev/null | cut -d'=' -f2 | tr -d '"' | xargs)
+
+if [ -z "$GHCR_OWNER_VAL" ] || [ "$GHCR_OWNER_VAL" = "REPLACE_ME" ]; then
+    echo "Error: GHCR_OWNER is not set in infra/docker/.env"
+    echo "Add: GHCR_OWNER=<your-github-username-or-org>"
+    exit 1
+fi
+
+if [ -z "$IMAGE_TAG_VAL" ] || [ "$IMAGE_TAG_VAL" = "REPLACE_ME" ]; then
+    echo "Error: IMAGE_TAG is not set in infra/docker/.env"
+    echo "Add: IMAGE_TAG=latest"
     exit 1
 fi
 
