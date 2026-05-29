@@ -72,10 +72,14 @@ export default function SessionRoomPage() {
     setInputText('');
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/session-room/${session.id}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/session-room/${session.id}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Copy failed (e.g., non-HTTPS context or permission denied)
+    }
   };
 
   const handleLeave = () => {

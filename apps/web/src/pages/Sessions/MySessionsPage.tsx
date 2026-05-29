@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SESSIONS } from '../../data/mockData';
 import type { Session } from '../../data/mockData';

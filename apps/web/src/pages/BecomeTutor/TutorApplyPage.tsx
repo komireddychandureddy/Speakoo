@@ -203,7 +203,7 @@ export default function TutorApplyPage() {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Phone Number &amp; Country *</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Phone Number &amp; Country</label>
                   <PhoneInput
                     value={form.phone}
                     onChange={(v) => update('phone', v)}
@@ -213,7 +213,7 @@ export default function TutorApplyPage() {
                   />
                   {form.country && (
                     <p className="text-xs text-gray-500 mt-1">
-                      Country auto-detected: <strong>{form.country}</strong>
+                      Country selected: <strong>{form.country}</strong>
                     </p>
                   )}
                 </div>
