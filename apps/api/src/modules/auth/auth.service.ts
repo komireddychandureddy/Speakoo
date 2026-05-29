@@ -80,11 +80,17 @@ export class AuthService {
       );
     }
 
-    // Send phone verification OTP if phone number provided
+    // Send phone verification OTP if phone number provided — failure must not block registration
     if (dto.phoneNumber) {
-      const code = await this.createOtp(user.id, OtpPurpose.phone_verification);
-      await this.sendSmsOtp(dto.phoneNumber, code);
-      this.logger.log(`Phone verification OTP sent to ${dto.phoneNumber}`);
+      try {
+        const code = await this.createOtp(user.id, OtpPurpose.phone_verification);
+        await this.sendSmsOtp(dto.phoneNumber, code);
+        this.logger.log(`Phone verification OTP sent to ${dto.phoneNumber}`);
+      } catch (err) {
+        this.logger.error(
+          `Registration SMS OTP failed for ${user.phoneNumber} (user created, verify later): ${(err as Error).message}`,
+        );
+      }
     }
 
     this.logger.log(`User registered: ${user.id}`);
