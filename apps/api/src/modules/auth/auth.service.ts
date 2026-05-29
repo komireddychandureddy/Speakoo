@@ -71,7 +71,7 @@ export class AuthService {
       include: { profile: true },
     });
 
-    // Send email verification OTP â€” failure must not block registration
+    // Send email verification OTP — failure must not block registration
     try {
       await this.sendVerificationEmail(user.id);
     } catch (err) {
@@ -138,7 +138,7 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  // â”€â”€â”€ OTP helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── OTP helpers ──────────────────────────────────────────────────────────
 
   /**
    * In production: random 6-digit OTP.
@@ -167,53 +167,17 @@ export class AuthService {
     this.logger.log(`SMS OTP sent to ${phone}`);
   }
 
-  private buildOtpEmailHtml(
-    appName: string,
-    heading: string,
-    code: string,
-    purpose: string,
-  ): string {
-    return `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0">
-    <tr><td align="center">
-      <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden">
-        <tr><td style="background:#16a34a;padding:24px 32px;text-align:center">
-          <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700">${appName}</h1>
-        </td></tr>
-        <tr><td style="padding:32px;color:#111827">
-          <h2 style="margin:0 0 8px;font-size:20px">${heading}</h2>
-          <p style="margin:0 0 24px;color:#6b7280;font-size:14px">Use the code below to ${purpose}. It expires in <strong>10 minutes</strong>.</p>
-          <div style="background:#f0fdf4;border:2px dashed #16a34a;border-radius:8px;padding:20px;text-align:center;margin:0 0 24px">
-            <span style="font-size:36px;font-weight:700;letter-spacing:12px;color:#15803d">${code}</span>
-          </div>
-          <p style="margin:0;color:#9ca3af;font-size:12px">If you did not request this code, you can safely ignore this email.</p>
-        </td></tr>
-        <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb">
-          <p style="margin:0;color:#9ca3af;font-size:12px">&copy; ${new Date().getFullYear()} ${appName}. All rights reserved.</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-  }
-
   private async sendEmailOtp(
     to: string,
-    subject: string,
-    html: string,
+    templateId: string,
+    variables: Record<string, string | number>,
     failureLogPrefix: string,
     failureMessage: string,
   ): Promise<void> {
     const { error } = await this.resend.emails.send({
       from: this.config.getOrThrow('RESEND_FROM_EMAIL'),
       to,
-      subject,
-      html,
+      template: { id: templateId, variables },
     });
     if (error) {
       this.logger.error(`${failureLogPrefix}: ${error.message}`);
@@ -253,26 +217,22 @@ export class AuthService {
     await this.prisma.otpCode.update({ where: { id: otpRecord.id }, data: { used: true } });
   }
 
-  // â”€â”€â”€ Email verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Email verification ────────────────────────────────────────────────────
 
   async sendVerificationEmail(userId: string): Promise<void> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     if (user.isVerified) return;
 
     const code = await this.createOtp(userId, OtpPurpose.email_verification);
+    const templateId = this.config.getOrThrow<string>('RESEND_OTP_TEMPLATE_ID');
     const appName = this.config.get<string>('APP_NAME', 'Speakoo');
 
     await this.sendEmailOtp(
       user.email,
-      `${appName} â€” Verify your email`,
-      this.buildOtpEmailHtml(
-        appName,
-        'Verify your email address',
-        code,
-        'verify your email address',
-      ),
+      templateId,
+      { OTP_CODE: code, APP_NAME: appName },
       `Failed to send verification email to ${user.email}`,
-      'Failed to send verification email â€” please try again later',
+      'Failed to send verification email — please try again later',
     );
 
     this.logger.log(`Verification email sent to ${user.email}`);
@@ -283,7 +243,7 @@ export class AuthService {
     await this.prisma.user.update({ where: { id: userId }, data: { isVerified: true } });
   }
 
-  // â”€â”€â”€ Password reset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Password reset ────────────────────────────────────────────────────────
 
   async sendPasswordResetEmail(email: string): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { email } });
@@ -291,14 +251,15 @@ export class AuthService {
     if (!user) return;
 
     const code = await this.createOtp(user.id, OtpPurpose.password_reset);
+    const templateId = this.config.getOrThrow<string>('RESEND_OTP_TEMPLATE_ID');
     const appName = this.config.get<string>('APP_NAME', 'Speakoo');
 
     await this.sendEmailOtp(
       user.email,
-      `${appName} â€” Reset your password`,
-      this.buildOtpEmailHtml(appName, 'Reset your password', code, 'reset your password'),
+      templateId,
+      { OTP_CODE: code, APP_NAME: appName },
       `Failed to send password reset email to ${user.email}`,
-      'Failed to send password reset email â€” please try again later',
+      'Failed to send password reset email — please try again later',
     );
 
     this.logger.log(`Password reset email sent to ${user.email}`);
@@ -314,13 +275,13 @@ export class AuthService {
     await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
   }
 
-  // â”€â”€â”€ Phone registration / verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Phone registration / verification ───────────────────────────────────────
 
   async registerPhone(dto: RegisterPhoneDto): Promise<void> {
     const existing = await this.prisma.user.findUnique({ where: { phoneNumber: dto.phone } });
     if (existing) throw new ConflictException('Phone number already registered');
 
-    // Random placeholder password hash â€” user will authenticate via OTP only
+    // Random placeholder password hash — user will authenticate via OTP only
     const passwordHash = await bcrypt.hash(randomUUID(), BCRYPT_ROUNDS);
 
     const user = await this.prisma.user.create({
@@ -360,22 +321,18 @@ export class AuthService {
 
   async resendEmailOtp(email: string): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user || user.isVerified) return; // silent â€” prevents email enumeration
+    if (!user || user.isVerified) return; // silent — prevents email enumeration
 
     const code = await this.createOtp(user.id, OtpPurpose.email_verification);
+    const templateId = this.config.getOrThrow<string>('RESEND_OTP_TEMPLATE_ID');
     const appName = this.config.get<string>('APP_NAME', 'Speakoo');
 
     await this.sendEmailOtp(
       user.email,
-      `${appName} â€” Verify your email`,
-      this.buildOtpEmailHtml(
-        appName,
-        'Verify your email address',
-        code,
-        'verify your email address',
-      ),
+      templateId,
+      { OTP_CODE: code, APP_NAME: appName },
       `Failed to resend verification email to ${user.email}`,
-      'Failed to resend verification email â€” please try again later',
+      'Failed to resend verification email — please try again later',
     );
 
     this.logger.log(`Verification email resent to ${user.email}`);
@@ -383,12 +340,12 @@ export class AuthService {
 
   async resendPhoneOtp(phone: string): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { phoneNumber: phone } });
-    if (!user) return; // silent â€” prevents phone enumeration
+    if (!user) return; // silent — prevents phone enumeration
     const code = await this.createOtp(user.id, OtpPurpose.phone_verification);
     await this.sendSmsOtp(phone, code);
   }
 
-  // â”€â”€â”€ Social login (OAuth stub) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Social login (OAuth stub) ─────────────────────────────────────────────
 
   /**
    * Social login handler.
@@ -465,7 +422,7 @@ export class AuthService {
     });
 
     if (socialAccount) {
-      // Existing social login â€” return tokens
+      // Existing social login — return tokens
       return this.issueTokens(
         socialAccount.user.id,
         socialAccount.user.email,
@@ -473,11 +430,11 @@ export class AuthService {
       );
     }
 
-    // No existing social account â€” check if email exists
+    // No existing social account — check if email exists
     let user = await this.prisma.user.findUnique({ where: { email: payload.email } });
 
     if (user) {
-      // Email exists â€” link this Google account to existing user
+      // Email exists — link this Google account to existing user
       await this.prisma.socialAccount.create({
         data: {
           userId: user.id,
@@ -492,7 +449,7 @@ export class AuthService {
       user = await this.prisma.user.create({
         data: {
           email: payload.email,
-          passwordHash, // Random â€” social users don't authenticate via password
+          passwordHash, // Random — social users don't authenticate via password
           role: UserRole.learner,
           isVerified: true, // Google email_verified checked above
           profile: {
@@ -564,7 +521,7 @@ export class AuthService {
       });
 
       if (socialAccount) {
-        // Existing social login â€” return tokens
+        // Existing social login — return tokens
         return this.issueTokens(
           socialAccount.user.id,
           socialAccount.user.email,
@@ -572,13 +529,13 @@ export class AuthService {
         );
       }
 
-      // No existing social account â€” check if email exists
+      // No existing social account — check if email exists
       let user = await this.prisma.user.findUnique({
         where: { email: data.email },
       });
 
       if (user) {
-        // Email exists â€” link this Facebook account to existing user
+        // Email exists — link this Facebook account to existing user
         await this.prisma.socialAccount.create({
           data: {
             userId: user.id,
@@ -593,7 +550,7 @@ export class AuthService {
         user = await this.prisma.user.create({
           data: {
             email: data.email,
-            passwordHash, // Random â€” social users don't authenticate via password
+            passwordHash, // Random — social users don't authenticate via password
             role: UserRole.learner,
             isVerified: true, // Facebook emails are considered verified
             profile: {
@@ -651,7 +608,7 @@ export class AuthService {
       });
 
       if (socialAccount) {
-        // Existing social login â€” return tokens
+        // Existing social login — return tokens
         return this.issueTokens(
           socialAccount.user.id,
           socialAccount.user.email,
@@ -659,13 +616,13 @@ export class AuthService {
         );
       }
 
-      // No existing social account â€” check if email exists
+      // No existing social account — check if email exists
       let user = await this.prisma.user.findUnique({
         where: { email: appleIdTokenPayload.email },
       });
 
       if (user) {
-        // Email exists â€” link this Apple account to existing user
+        // Email exists — link this Apple account to existing user
         await this.prisma.socialAccount.create({
           data: {
             userId: user.id,
@@ -682,9 +639,9 @@ export class AuthService {
         user = await this.prisma.user.create({
           data: {
             email: appleIdTokenPayload.email,
-            passwordHash, // Random â€” social users don't authenticate via password
+            passwordHash, // Random — social users don't authenticate via password
             role: UserRole.learner,
-            // Do NOT set isVerified for Apple Private Relay â€” prevents user from changing to real email
+            // Do NOT set isVerified for Apple Private Relay — prevents user from changing to real email
             isVerified: !isPrivateRelay,
             profile: {
               create: {
@@ -712,7 +669,7 @@ export class AuthService {
     }
   }
 
-  // â”€â”€â”€ hCaptcha verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── hCaptcha verification ────────────────────────────────────────────────
 
   /**
    * Verifies a hCaptcha token with the hCaptcha siteverify API.
@@ -740,13 +697,11 @@ export class AuthService {
       json = (await res.json()) as { success: boolean };
     } catch (err) {
       this.logger.error('hCaptcha siteverify request failed', err);
-      throw new BadRequestException('Captcha verification failed â€” please try again');
+      throw new BadRequestException('Captcha verification failed — please try again');
     }
 
     if (!json.success) {
-      throw new BadRequestException(
-        'Captcha verification failed â€” please complete the challenge',
-      );
+      throw new BadRequestException('Captcha verification failed — please complete the challenge');
     }
   }
 }
