@@ -54,6 +54,7 @@ const COUNTRIES = [
 interface PhoneInputProps {
   value: string;
   onChange: (value: string) => void;
+  onCountryChange?: (countryName: string) => void;
   placeholder?: string;
   className?: string;
   autoComplete?: string;
@@ -62,6 +63,7 @@ interface PhoneInputProps {
 export default function PhoneInput({
   value,
   onChange,
+  onCountryChange,
   placeholder = 'Phone Number',
   className = '',
   autoComplete = 'tel',
@@ -133,7 +135,8 @@ export default function PhoneInput({
   useEffect(() => {
     const fullNumber = phoneNumber ? `${selectedCountry.dial}${phoneNumber}` : '';
     onChange(fullNumber);
-  }, [selectedCountry, phoneNumber, onChange]);
+    onCountryChange?.(selectedCountry.name);
+  }, [selectedCountry, phoneNumber, onChange, onCountryChange]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

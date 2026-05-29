@@ -87,10 +87,10 @@ export default function TutorDashboardPage() {
                     <p className="text-xs text-gray-500">{s.lang} · {s.duration}</p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex flex-col items-end gap-1">
                   <p className="text-xs text-gray-600 font-medium">{s.time}</p>
                   <span
-                    className={`text-xs font-semibold px-2 py-0.5 rounded-full mt-1 inline-block ${
+                    className={`text-xs font-semibold px-2 py-0.5 rounded-full inline-block ${
                       s.status === 'confirmed'
                         ? 'bg-[#BBF7D0] text-[#14783D]'
                         : 'bg-yellow-100 text-yellow-700'
@@ -98,6 +98,14 @@ export default function TutorDashboardPage() {
                   >
                     {s.status}
                   </span>
+                  {s.status === 'confirmed' && (
+                    <button
+                      onClick={() => navigate('/session-room/' + s.id)}
+                      className="text-xs bg-[#43A047] text-white px-3 py-1 rounded-lg font-semibold hover:bg-[#2E7D32] transition-colors"
+                    >
+                      Join
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

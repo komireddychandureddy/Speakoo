@@ -1,4 +1,5 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SESSIONS } from '../../data/mockData';
 import type { Session } from '../../data/mockData';
 import SessionReportModal from './SessionReportModal';
@@ -23,6 +24,7 @@ const STATUS_COLORS: Record<TabStatus, string> = {
 
 export default function MySessionsPage() {
   const [activeTab, setActiveTab] = useState<TabStatus>('upcoming');
+  const navigate = useNavigate();
   const [reportSession, setReportSession] = useState<Session | null>(null);
   const [chatSession, setChatSession] = useState<Session | null>(null);
 
@@ -104,7 +106,7 @@ export default function MySessionsPage() {
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-2 mt-4">
                 {session.status === 'upcoming' && (
-                  <button className="btn-primary">Join Session</button>
+                  <button className="btn-primary" onClick={() => navigate('/session-room/' + session.id)}>Join Session</button>
                 )}
                 {session.status === 'completed' && (
                   <>
