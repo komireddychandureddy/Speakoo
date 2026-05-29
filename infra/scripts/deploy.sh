@@ -52,6 +52,15 @@ fi
 
 echo "[1/4] Pulling latest Docker image..."
 cd "$DOCKER_DIR"
+GHCR_TOKEN_VAL=$(grep -E "^GHCR_TOKEN=" "$DOCKER_DIR/.env" 2>/dev/null | cut -d'=' -f2 | tr -d '"' | xargs)
+if [ -z "$GHCR_TOKEN_VAL" ] || [ "$GHCR_TOKEN_VAL" = "REPLACE_ME" ]; then
+    echo "Error: GHCR_TOKEN is not set in infra/docker/.env"
+    echo "Create a GitHub Personal Access Token with read:packages scope at:"
+    echo "  https://github.com/settings/tokens"
+    echo "Then add it to infra/docker/.env: GHCR_TOKEN=<your-token>"
+    exit 1
+fi
+echo "$GHCR_TOKEN_VAL" | docker login ghcr.io -u "$GHCR_OWNER_VAL" --password-stdin
 docker compose -f docker-compose.yml -f docker-compose.prod.yml pull api
 echo "✓ Image updated"
 
