@@ -33,8 +33,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   // Login fields
-  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginIdentifier, setLoginIdentifier] = useState(() => {
+    // Load saved identifier if "Remember me" was checked
+    try {
+      return localStorage.getItem('speakoo_remember_me') || '';
+    } catch {
+      return '';
+    }
+  });
   const [loginPassword, setLoginPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [loginCaptchaToken, setLoginCaptchaToken] = useState('');
   const loginCaptchaRef = useRef<HCaptcha>(null);
 
@@ -61,6 +69,21 @@ export default function LoginPage() {
       const phonePattern = /^\+[1-9]\d{7,14}$/;
       if (!phonePattern.test(loginIdentifier.trim())) {
         return setError('Invalid phone number format. Use E.164 format (e.g., +1234567890).');
+      }
+    }
+    
+    // Handle "Remember me" preference
+    if (rememberMe) {
+      try {
+        localStorage.setItem('speakoo_remember_me', loginIdentifier.trim());
+      } catch {
+        // Silently handle localStorage errors
+      }
+    } else {
+      try {
+        localStorage.removeItem('speakoo_remember_me');
+      } catch {
+        // Silently handle localStorage errors
       }
     }
     
@@ -239,12 +262,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#43A047] to-[#1B5E20] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#1B5E20] via-[#2E7D32] to-[#43A047] flex items-center justify-center p-4">
+      {/* Decorative background elements */}
+      <div className="absolute top-0 left-0 w-96 h-96 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/2 translate-y-1/2" />
+
+      <div className="w-full max-w-md bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl overflow-hidden relative z-10">
         {/* Brand header */}
-        <div className="bg-[#1E2720] px-8 py-6 text-center">
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">Speakoo</h1>
-          <p className="text-green-300 text-sm mt-1">Your Language Learning Journey Starts Here</p>
+        <div className="bg-gradient-to-r from-[#1B5E20] to-[#43A047] px-8 py-8 text-center">
+          <h1 className="text-4xl font-extrabold text-white tracking-tight">Speakoo</h1>
+          <p className="text-green-100 text-sm mt-2">Your Language Learning Journey Starts Here</p>
         </div>
 
         <div className="px-8 py-6">
@@ -358,7 +385,16 @@ export default function LoginPage() {
                       {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
-                  <div className="text-right">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-[#43A047] focus:ring-[#43A047] cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-600">Remember me</span>
+                    </label>
                     <button
                       type="button"
                       onClick={() => {
