@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react';
+import PhoneInput from '../../components/PhoneInput/PhoneInput';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -25,11 +26,6 @@ interface FormData {
   // Step 4
   agreed: boolean;
 }
-
-const COUNTRIES = [
-  'India', 'United States', 'United Kingdom', 'Canada', 'Australia',
-  'France', 'Germany', 'Mexico', 'Brazil', 'Japan', 'South Korea', 'Other',
-];
 
 const ALL_LANGUAGES = [
   'English', 'French', 'Spanish', 'Mandarin', 'Japanese',
@@ -57,7 +53,7 @@ export default function TutorApplyPage() {
   const [submitted, setSubmitted] = useState(false);
   const [refNumber, setRefNumber] = useState('');
   const [form, setForm] = useState<FormData>({
-    firstName: '', lastName: '', email: '', phone: '', country: '', city: '',
+    firstName: '', lastName: '', email: '', phone: '', country: 'United States', city: '',
     languages: [], proficiency: '', certifications: [], yearsExp: '',
     bio: '', teachingStyle: '', maxSessions: '', availability: [],
     agreed: false,
@@ -206,26 +202,20 @@ export default function TutorApplyPage() {
                     className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#43A047] focus:ring-1 focus:ring-[#43A047]"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Phone Number</label>
-                  <input
-                    type="tel"
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Phone Number &amp; Country *</label>
+                  <PhoneInput
                     value={form.phone}
-                    onChange={(e) => update('phone', e.target.value)}
-                    placeholder="+1 555 000 0000"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#43A047] focus:ring-1 focus:ring-[#43A047]"
+                    onChange={(v) => update('phone', v)}
+                    onCountryChange={(name) => update('country', name)}
+                    placeholder="Phone Number (optional)"
+                    autoComplete="tel"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Country *</label>
-                  <select
-                    value={form.country}
-                    onChange={(e) => update('country', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#43A047] focus:ring-1 focus:ring-[#43A047] bg-white"
-                  >
-                    <option value="">Select country</option>
-                    {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  {form.country && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Country auto-detected: <strong>{form.country}</strong>
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">City</label>

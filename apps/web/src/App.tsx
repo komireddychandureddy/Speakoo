@@ -8,6 +8,7 @@ import LoginPage from './pages/Auth/LoginPage';
 import OtpVerifyPage from './pages/Auth/OtpVerifyPage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
 import MySessionsPage from './pages/Sessions/MySessionsPage';
+import SessionRoomPage from './pages/Sessions/SessionRoomPage';
 import BookSessionPage from './pages/Booking/BookSessionPage';
 import AllTutorsPage from './pages/Tutors/AllTutorsPage';
 import TutorDetailsPage from './pages/Tutors/TutorDetailsPage';
@@ -40,6 +41,30 @@ import AdminApplicationDetailPage from './pages/Admin/AdminApplicationDetailPage
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const user = localStorage.getItem('speakoo_user');
   return user ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function AdminPrivateRoute({ children }: { children: React.ReactNode }) {
+  const raw = localStorage.getItem('speakoo_user');
+  if (!raw) return <Navigate to="/login" replace />;
+  try {
+    const user = JSON.parse(raw) as { role?: string };
+    if (user.role !== 'admin') return <Navigate to="/dashboard" replace />;
+    return <>{children}</>;
+  } catch {
+    return <Navigate to="/login" replace />;
+  }
+}
+
+function TutorPrivateRoute({ children }: { children: React.ReactNode }) {
+  const raw = localStorage.getItem('speakoo_user');
+  if (!raw) return <Navigate to="/login" replace />;
+  try {
+    const user = JSON.parse(raw) as { role?: string };
+    if (user.role !== 'tutor' && user.role !== 'admin') return <Navigate to="/dashboard" replace />;
+    return <>{children}</>;
+  } catch {
+    return <Navigate to="/login" replace />;
+  }
 }
 
 // Restore the access token from localStorage on app start
@@ -88,12 +113,13 @@ export default function App() {
           <Route path="/practice/exercise" element={<PracticeExercisePage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/community/:id" element={<CommunityThreadPage />} />
+          <Route path="/session-room/:id" element={<SessionRoomPage />} />
         </Route>
         <Route
           element={
-            <PrivateRoute>
+            <AdminPrivateRoute>
               <AdminLayout />
-            </PrivateRoute>
+            </AdminPrivateRoute>
           }
         >
           <Route path="/admin" element={<AdminDashboardPage />} />

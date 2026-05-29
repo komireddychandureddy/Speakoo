@@ -66,12 +66,14 @@ export default function LoginPage() {
     
     setLoading(true);
     try {
-      await apiLogin(
+      const user = await apiLogin(
         loginIdentifier.trim(),
         loginPassword,
         loginCaptchaToken?.trim() || undefined,
       );
-      navigate('/dashboard');
+      if (user.role === 'admin') navigate('/admin');
+      else if (user.role === 'tutor') navigate('/tutor-dashboard');
+      else navigate('/dashboard');
     } catch (err) {
       setError(parseAuthError(err));
       loginCaptchaRef.current?.resetCaptcha();
@@ -131,7 +133,7 @@ export default function LoginPage() {
   };
 
   // Helper to persist social login auth state consistently
-  const persistSocialAuth = async (accessToken: string): Promise<void> => {
+  const persistSocialAuth = async (accessToken: string): Promise<AuthUser> => {
     setAccessToken(accessToken);
 
     const meResponse = await apiClient.get<{
@@ -150,6 +152,13 @@ export default function LoginPage() {
 
     localStorage.setItem('speakoo_access_token', accessToken);
     localStorage.setItem('speakoo_user', JSON.stringify(user));
+    return user;
+  };
+
+  const navigateByRole = (role: 'learner' | 'tutor' | 'admin') => {
+    if (role === 'admin') navigate('/admin');
+    else if (role === 'tutor') navigate('/tutor-dashboard');
+    else navigate('/dashboard');
   };
 
   // Google OAuth login handler (credential flow gives us ID token directly)
@@ -167,8 +176,8 @@ export default function LoginPage() {
         token: credentialResponse.credential,
       });
 
-      await persistSocialAuth(response.data.accessToken);
-      navigate('/dashboard');
+      const user = await persistSocialAuth(response.data.accessToken);
+      navigateByRole(user.role);
     } catch (err) {
       console.error('Google login error:', err);
       setError(parseAuthError(err));
@@ -193,8 +202,8 @@ export default function LoginPage() {
         { token: response.accessToken },
       );
 
-      await persistSocialAuth(backendResponse.data.accessToken);
-      navigate('/dashboard');
+      const user = await persistSocialAuth(backendResponse.data.accessToken);
+      navigateByRole(user.role);
     } catch (err) {
       console.error('Facebook login error:', err);
       setError(parseAuthError(err));
@@ -219,8 +228,8 @@ export default function LoginPage() {
         { token: response.authorization.id_token },
       );
 
-      await persistSocialAuth(backendResponse.data.accessToken);
-      navigate('/dashboard');
+      const user = await persistSocialAuth(backendResponse.data.accessToken);
+      navigateByRole(user.role);
     } catch (err) {
       console.error('Apple login error:', err);
       setError(parseAuthError(err));
