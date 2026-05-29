@@ -11,19 +11,11 @@ import { NotificationChannel } from '@prisma/client';
 @Processor(NOTIFICATION_QUEUE)
 export class NotificationProcessor {
   private readonly logger = new Logger(NotificationProcessor.name);
-  private readonly resend: Resend;
-  private readonly twilio: ReturnType<typeof Twilio>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-  ) {
-    this.resend = new Resend(this.config.getOrThrow('RESEND_API_KEY'));
-    this.twilio = Twilio(
-      this.config.getOrThrow('TWILIO_ACCOUNT_SID'),
-      this.config.getOrThrow('TWILIO_AUTH_TOKEN'),
-    );
-  }
+  ) {}
 
   @Process()
   async handle(job: Job<NotificationJobData>) {
@@ -39,7 +31,8 @@ export class NotificationProcessor {
     });
 
     if (channel === NotificationChannel.email) {
-      await this.resend.emails.send({
+      const resend = new Resend(this.config.getOrThrow('RESEND_API_KEY'));
+      await resend.emails.send({
         from: this.config.getOrThrow('RESEND_FROM_EMAIL'),
         to: user.email,
         subject: this.getSubject(type),
@@ -48,12 +41,20 @@ export class NotificationProcessor {
     }
 
     if (channel === NotificationChannel.whatsapp) {
+      if (this.config.get('NODE_ENV') !== 'production') {
+        this.logger.log(`Skipping WhatsApp notification for user ${userId} (non-production environment)`);
+        return;
+      }
       const phoneNumber = user.profile?.phoneNumber;
       if (!phoneNumber) {
         this.logger.warn(`Skipping WhatsApp for user ${userId}: no phone number on profile`);
         return;
       }
-      await this.twilio.messages.create({
+      const twilio = Twilio(
+        this.config.getOrThrow('TWILIO_ACCOUNT_SID'),
+        this.config.getOrThrow('TWILIO_AUTH_TOKEN'),
+      );
+      await twilio.messages.create({
         from: this.config.getOrThrow('TWILIO_WHATSAPP_FROM'),
         to: `whatsapp:${phoneNumber}`,
         body: this.getBody(type, user.profile?.displayName ?? 'there'),

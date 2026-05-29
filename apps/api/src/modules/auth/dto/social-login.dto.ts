@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, MinLength } from 'class-validator';
 
 export class SocialLoginDto {
   @IsString()
@@ -7,5 +7,6 @@ export class SocialLoginDto {
 
   @IsOptional()
   @IsString()
+  @MinLength(1, { message: 'captchaToken must not be empty' })
   captchaToken?: string;
 }
