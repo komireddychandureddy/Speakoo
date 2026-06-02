@@ -44,4 +44,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:3000/api/v1/health || exit 1
 
-CMD ["node", "dist/src/main"]
+CMD ["/bin/sh", "-c", "if [ -f dist/main.js ] || [ -f dist/main ]; then exec node dist/main; else exec node dist/src/main; fi"]
