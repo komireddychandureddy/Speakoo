@@ -2,7 +2,13 @@
 import { PrismaClient, UserRole, SlotStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is required to run prisma/seed.ts');
+}
+
+const prisma = new PrismaClient({ datasourceUrl: databaseUrl });
 const BCRYPT_ROUNDS = 12;
 
 async function main() {

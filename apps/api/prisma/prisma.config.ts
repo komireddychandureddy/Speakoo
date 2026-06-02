@@ -11,6 +11,7 @@ export default defineConfig({
   schema: path.resolve(__dirname, 'schema.prisma'),
   migrations: {
     path: path.resolve(__dirname, 'migrations'),
+    seed: 'ts-node --transpile-only --compiler-options \'{"module":"CommonJS"}\' prisma/seed.ts',
   },
   datasource: {
     url: process.env.DATABASE_URL!,
