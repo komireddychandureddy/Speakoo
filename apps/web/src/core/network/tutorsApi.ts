@@ -43,6 +43,20 @@ export interface SearchTutorsParams {
   limit?: number;
 }
 
+export interface RecommendedTutor extends TutorProfile {
+  recommendationScore: number;
+  rating: {
+    average: number;
+    count: number;
+  };
+}
+
+export interface RecommendTutorsParams {
+  language?: string;
+  maxCents?: number;
+  limit?: number;
+}
+
 // ─── API calls ────────────────────────────────────────────────────────────────
 
 export async function searchTutors(params: SearchTutorsParams = {}): Promise<TutorSearchResult> {
@@ -81,5 +95,14 @@ export async function createSlot(
 
 export async function getMySlots(): Promise<AvailabilitySlot[]> {
   const { data } = await apiClient.get<AvailabilitySlot[]>('tutors/slots');
+  return data;
+}
+
+export async function getRecommendedTutors(
+  params: RecommendTutorsParams = {},
+): Promise<RecommendedTutor[]> {
+  const { data } = await apiClient.get<RecommendedTutor[]>('tutors/recommendations/me', {
+    params,
+  });
   return data;
 }

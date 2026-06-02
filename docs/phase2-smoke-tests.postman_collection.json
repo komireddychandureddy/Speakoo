@@ -1,0 +1,312 @@
+{
+  "info": {
+    "name": "Speakoo Phase 2 Smoke Tests",
+    "description": "Postman collection for validating Phase 2 APIs: learning module, progress/badges, recommendations, and subscriptions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Learner Progress",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{learnerAccessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/users/me/progress",
+          "host": ["{{baseUrl}}"],
+          "path": ["users", "me", "progress"]
+        }
+      }
+    },
+    {
+      "name": "Learner Badges",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{learnerAccessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/users/me/badges",
+          "host": ["{{baseUrl}}"],
+          "path": ["users", "me", "badges"]
+        }
+      }
+    },
+    {
+      "name": "Create Learning Path (Admin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"slug\": \"spanish-a2-core\",\n  \"title\": \"Spanish A2 Core Path\",\n  \"description\": \"Structured A2 journey for conversation, grammar, and listening.\",\n  \"language\": \"Spanish\",\n  \"cefrLevel\": \"A2\",\n  \"isActive\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/learning/paths",
+          "host": ["{{baseUrl}}"],
+          "path": ["learning", "paths"]
+        }
+      }
+    },
+    {
+      "name": "Add Learning Step (Admin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"stepOrder\": 1,\n  \"title\": \"Daily Situations Vocabulary\",\n  \"description\": \"Learn and apply vocabulary for travel and routines.\",\n  \"skill\": \"vocabulary\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/learning/paths/{{existingPathId}}/steps",
+          "host": ["{{baseUrl}}"],
+          "path": ["learning", "paths", "{{existingPathId}}", "steps"]
+        }
+      }
+    },
+    {
+      "name": "Enroll In Path (Learner)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{learnerAccessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/learning/paths/{{existingPathId}}/enroll",
+          "host": ["{{baseUrl}}"],
+          "path": ["learning", "paths", "{{existingPathId}}", "enroll"]
+        }
+      }
+    },
+    {
+      "name": "Learner Paths",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{learnerAccessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/learning/paths/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["learning", "paths", "me"]
+        }
+      }
+    },
+    {
+      "name": "Tutor Upsert Session Note",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{tutorAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookingId\": \"{{existingBookingId}}\",\n  \"summary\": \"Strong progress in dialogue flow and listening confidence.\",\n  \"strengths\": \"Pronunciation clarity and topic engagement\",\n  \"weaknesses\": \"Past tense consistency\",\n  \"nextSteps\": \"Practice 15 min daily with irregular verbs\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/learning/session-notes",
+          "host": ["{{baseUrl}}"],
+          "path": ["learning", "session-notes"]
+        }
+      }
+    },
+    {
+      "name": "Learner Session Notes",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{learnerAccessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/learning/session-notes/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["learning", "session-notes", "me"]
+        }
+      }
+    },
+    {
+      "name": "Tutor Assign Homework",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{tutorAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"learnerId\": \"{{existingLearnerId}}\",\n  \"bookingId\": \"{{existingBookingId}}\",\n  \"title\": \"A2 Listening Drill\",\n  \"description\": \"Complete 2 listening clips and summarize each in 4-5 lines.\",\n  \"dueAt\": \"2026-06-10T18:00:00.000Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/learning/homework",
+          "host": ["{{baseUrl}}"],
+          "path": ["learning", "homework"]
+        }
+      }
+    },
+    {
+      "name": "Learner Homework List",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{learnerAccessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/learning/homework/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["learning", "homework", "me"]
+        }
+      }
+    },
+    {
+      "name": "Learner Submit Homework",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{learnerAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"submissionText\": \"Clip 1: The speaker discusses weekend routines... Clip 2: The speaker compares travel plans...\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/learning/homework/{{existingHomeworkId}}/submit",
+          "host": ["{{baseUrl}}"],
+          "path": ["learning", "homework", "{{existingHomeworkId}}", "submit"]
+        }
+      }
+    },
+    {
+      "name": "Tutor Review Homework",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{tutorAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"feedbackText\": \"Good comprehension. Focus on tense agreement in summary sentences.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/learning/homework/{{existingHomeworkId}}/review",
+          "host": ["{{baseUrl}}"],
+          "path": ["learning", "homework", "{{existingHomeworkId}}", "review"]
+        }
+      }
+    },
+    {
+      "name": "Recommended Tutors (Learner)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{learnerAccessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/tutors/recommendations/me?language=Spanish&limit=6",
+          "host": ["{{baseUrl}}"],
+          "path": ["tutors", "recommendations", "me"],
+          "query": [
+            { "key": "language", "value": "Spanish" },
+            { "key": "limit", "value": "6" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Subscription Plans (Public)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/payments/subscriptions/plans",
+          "host": ["{{baseUrl}}"],
+          "path": ["payments", "subscriptions", "plans"]
+        }
+      }
+    },
+    {
+      "name": "Subscribe To Plan (Learner)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{learnerAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"planId\": \"{{existingPlanId}}\",\n  \"paymentMethodId\": \"pm_card_visa\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/payments/subscriptions/subscribe",
+          "host": ["{{baseUrl}}"],
+          "path": ["payments", "subscriptions", "subscribe"]
+        }
+      }
+    },
+    {
+      "name": "Current Subscription (Learner)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{learnerAccessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/payments/subscriptions/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["payments", "subscriptions", "me"]
+        }
+      }
+    },
+    {
+      "name": "Cancel Subscription (Learner)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{learnerAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Switching plan\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/payments/subscriptions/cancel",
+          "host": ["{{baseUrl}}"],
+          "path": ["payments", "subscriptions", "cancel"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api/v1" },
+    { "key": "adminAccessToken", "value": "REPLACE_ADMIN_JWT" },
+    { "key": "tutorAccessToken", "value": "REPLACE_TUTOR_JWT" },
+    { "key": "learnerAccessToken", "value": "REPLACE_LEARNER_JWT" },
+    { "key": "existingBookingId", "value": "REPLACE_BOOKING_UUID" },
+    { "key": "existingLearnerId", "value": "REPLACE_LEARNER_UUID" },
+    { "key": "existingPathId", "value": "REPLACE_PATH_UUID" },
+    { "key": "existingHomeworkId", "value": "REPLACE_HOMEWORK_UUID" },
+    { "key": "existingPlanId", "value": "REPLACE_PLAN_UUID" }
+  ]
+}

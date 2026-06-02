@@ -212,3 +212,117 @@ MINIO_ACCESS_KEY=
 MINIO_SECRET_KEY=
 PLATFORM_FEE_PERCENT=5
 ```
+
+---
+
+## Phase 2 Roadmap (2026-06 to 2026-08)
+
+### Objective
+Ship growth + trust + retention features in 3 waves while preserving production stability.
+
+### Wave A (Weeks 1-3) — Trust & Safety
+
+| Item | Status | Owner | ETA |
+|---|---|---|---|
+| Incident reporting API (learner/tutor submit) | ✅ Implemented | Backend | Done |
+| Admin incident triage API (list/filter/resolve) | ✅ Implemented | Backend | Done |
+| Incident DB schema + migration | ✅ Implemented | Backend | Done |
+| Admin UI for incident queue | ⏳ Planned | Web | Week 2 |
+| Tutor KYC document workflow | ⏳ Planned | Backend/Web | Week 3 |
+
+### Wave B (Weeks 4-6) — Discovery & Matching 2.0
+
+| Item | Status | Owner | ETA |
+|---|---|---|---|
+| Tutor ranking score service (quality + reliability + price) | ⏳ Planned | Backend | Week 4 |
+| Personalized recommendation endpoint | ⏳ Planned | Backend | Week 5 |
+| Learner preference profile (goals, budget, timezone) | ⏳ Planned | Backend/Mobile/Web | Week 5 |
+| Search UX update with recommendation cards | ⏳ Planned | Mobile/Web | Week 6 |
+
+### Wave C (Weeks 7-9) — Subscriptions & Outcome Tracking
+
+| Item | Status | Owner | ETA |
+|---|---|---|---|
+| Monthly subscription plans + credit grants | ⏳ Planned | Backend/Payments | Week 7 |
+| Subscription management APIs/webhooks | ⏳ Planned | Backend | Week 8 |
+| Learning path + session notes + homework model | ⏳ Planned | Backend | Week 8 |
+| Learner progress timeline UI | ⏳ Planned | Mobile/Web | Week 9 |
+
+### Newly Implemented in This Phase Kickoff
+
+- Added `IncidentReport` model with category, status, priority, evidence, and admin triage fields.
+- Added migration `20260602120000_add_incident_reports`.
+- Added Safety module routes:
+  - `POST /api/v1/safety/incidents`
+  - `GET /api/v1/safety/incidents/me`
+  - `GET /api/v1/safety/incidents` (admin)
+  - `GET /api/v1/safety/incidents/:id` (admin)
+  - `PATCH /api/v1/safety/incidents/:id/triage` (admin)
+
+### Newly Implemented (Current Session)
+
+- Item 1 completed: learning outcomes backend
+  - Added Prisma enum/model set for `LearningPath`, `LearningPathStep`, `LearnerPathEnrollment`, `SessionNote`, and `HomeworkAssignment`.
+  - Added migration `20260602173000_add_learning_outcomes`.
+  - Added new module `apps/api/src/modules/learning` and registered it in `AppModule`.
+  - Implemented role-safe APIs for path setup/enrollment, session notes, and homework assignment/submission/review.
+
+- Item 2 completed: web progress and milestone UI
+  - Updated `apps/web/src/core/network/usersApi.ts` with progress/badge interfaces and API calls.
+  - Replaced mock `apps/web/src/pages/Leaderboard/LeaderboardPage.tsx` with live `users/me/progress` + `users/me/badges` rendering.
+
+- Item 3 completed: mobile recommendations, subscription, and preferences wiring
+  - Added recommendation provider integration in `apps/mobile/lib/features/tutors/application/tutors_provider.dart` and wired `LearnerHomeScreen` to backend recommendations.
+  - Added mobile subscription data/provider/screen:
+    - `apps/mobile/lib/features/profile/data/subscription_repository.dart`
+    - `apps/mobile/lib/features/profile/application/subscription_provider.dart`
+    - `apps/mobile/lib/features/profile/presentation/screens/subscription_screen.dart`
+  - Added preferences screen and routing:
+    - `apps/mobile/lib/features/profile/presentation/screens/preferences_screen.dart`
+    - router updates in `apps/mobile/lib/core/router/app_router.dart`
+  - Extended profile model/provider/repository to support `targetLanguage`, `learningGoals`, `maxBudgetCents`.
+- Added `TutorKycSubmission` model and migration `20260602133000_add_tutor_kyc_submissions`.
+- Added tutor/admin KYC endpoints:
+  - `POST /api/v1/tutors/kyc/submissions`
+  - `GET /api/v1/tutors/kyc/submissions/me`
+  - `GET /api/v1/tutors/kyc/submissions` (admin)
+  - `POST /api/v1/tutors/kyc/submissions/:id/review` (admin)
+- Added learner recommendation endpoint:
+  - `GET /api/v1/tutors/recommendations/me`
+  - Ranking combines language match, rating, review volume, and affordability.
+- Added transaction risk analytics endpoint and admin UI:
+  - `GET /api/v1/payments/risks/transactions?days=7` (admin)
+  - Detects high-value transfers, rapid transaction bursts, duplicate payout references, and payout-booking mismatches.
+  - Web admin view available under `/admin/risks`.
+- Replaced web subscription page mock flow with real backend integration:
+  - `GET /api/v1/payments/subscriptions/plans`
+  - `POST /api/v1/payments/subscriptions/subscribe`
+  - `GET /api/v1/payments/subscriptions/me`
+  - `POST /api/v1/payments/subscriptions/cancel`
+  - Stripe webhook handling for `customer.subscription.updated`, `customer.subscription.deleted`, and `invoice.paid`
+    to sync subscription status and grant renewal credits.
+- Replaced web credits page mock history with wallet APIs:
+  - `GET /api/v1/payments/wallet`
+  - `GET /api/v1/payments/wallet/transactions`
+- Added learner preference wiring on web settings page backed by:
+  - `PATCH /api/v1/users/me/profile` with `targetLanguage`, `learningGoals`, `maxBudgetCents`, and `timezone`.
+- Added learner progress timeline endpoint:
+  - `GET /api/v1/users/me/progress`
+  - Returns summary (sessions, points, badges, latest CEFR), CEFR history, and session-by-session timeline.
+- Added subscriptions + recurring credits backend:
+  - Models: `SubscriptionPlan`, `UserSubscription`
+  - Endpoints:
+    - `GET /api/v1/payments/subscriptions/plans`
+    - `POST /api/v1/payments/subscriptions/plans` (admin)
+    - `POST /api/v1/payments/subscriptions/subscribe`
+    - `GET /api/v1/payments/subscriptions/me`
+    - `POST /api/v1/payments/subscriptions/cancel`
+    - `POST /api/v1/payments/subscriptions/grants/run` (admin)
+  - Initial cycle credit grant logic writes to wallet ledger with idempotent reference keys.
+- Added web learner dashboard recommendation cards consuming `tutors/recommendations/me`.
+
+### Tracking Rules
+
+- Every Phase 2 task must have: issue ID, owner, ETA, and acceptance criteria.
+- No item moves to ✅ without API contract + validation + role guard verification.
+- Priority order for implementation: Trust & Safety > Matching > Subscription > Outcomes.

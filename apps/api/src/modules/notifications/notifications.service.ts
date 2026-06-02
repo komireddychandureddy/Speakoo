@@ -26,14 +26,18 @@ export class NotificationsService {
 
   private async ensureDeviceTokensTable() {
     if (!this.deviceTokensTableReady) {
-      this.deviceTokensTableReady = this.prisma.$executeRawUnsafe(`
+      this.deviceTokensTableReady = this.prisma
+        .$executeRawUnsafe(
+          `
         CREATE TABLE IF NOT EXISTS device_tokens (
           user_id UUID NOT NULL,
           token TEXT NOT NULL UNIQUE,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           PRIMARY KEY (user_id, token)
         )
-      `).then(() => undefined);
+      `,
+        )
+        .then(() => undefined);
     }
     await this.deviceTokensTableReady;
   }

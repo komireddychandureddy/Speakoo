@@ -20,6 +20,8 @@ import '../../features/session/presentation/screens/session_complete_screen.dart
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/profile_setup_screen.dart';
 import '../../features/profile/presentation/screens/wallet_screen.dart';
+import '../../features/profile/presentation/screens/preferences_screen.dart';
+import '../../features/profile/presentation/screens/subscription_screen.dart';
 import '../../features/tutors/presentation/screens/tutor_profile_screen.dart';
 import '../../features/notifications/presentation/screens/notification_center_screen.dart';
 
@@ -121,6 +123,8 @@ GoRouter appRouter(AppRouterRef ref) {
       ),
       GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
       GoRoute(path: '/wallet', builder: (_, __) => const WalletScreen()),
+      GoRoute(path: '/preferences', builder: (_, __) => const PreferencesScreen()),
+      GoRoute(path: '/subscription', builder: (_, __) => const SubscriptionScreen()),
       GoRoute(path: '/notifications', builder: (_, __) => const NotificationCenterScreen()),
 
       // Tutor routes

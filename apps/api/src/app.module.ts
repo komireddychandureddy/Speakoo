@@ -19,6 +19,8 @@ import { GroupSessionsModule } from './modules/group-sessions/group-sessions.mod
 import { HealthModule } from './modules/health/health.module';
 import { PracticeModule } from './modules/practice/practice.module';
 import { CommunityModule } from './modules/community/community.module';
+import { SafetyModule } from './modules/safety/safety.module';
+import { LearningModule } from './modules/learning/learning.module';
 import { GlobalJwtAuthGuard } from './modules/auth/guards/global-jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -65,6 +67,8 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     HealthModule,
     PracticeModule,
     CommunityModule,
+    SafetyModule,
+    LearningModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: GlobalJwtAuthGuard },

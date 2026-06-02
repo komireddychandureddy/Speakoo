@@ -7,45 +7,10 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/language_chip.dart';
 import '../../../../core/widgets/tutor_card.dart';
 import '../../../auth/application/auth_provider.dart';
+import '../../../tutors/application/tutors_provider.dart';
 
 const _featuredLanguages = [
   'English', 'Spanish', 'French', 'Mandarin', 'Arabic', 'Portuguese',
-];
-
-final _mockTutors = [
-  const TutorModel(
-    id: '1',
-    name: 'Sofia Martinez',
-    avatar: '',
-    languages: ['Spanish', 'English'],
-    rating: 4.9,
-    reviewCount: 312,
-    hourlyRate: 28,
-    headline: 'Native Spanish tutor from Madrid • 7 yrs exp',
-    isOnline: true,
-  ),
-  const TutorModel(
-    id: '2',
-    name: 'Liang Wei',
-    avatar: '',
-    languages: ['Mandarin', 'English'],
-    rating: 4.8,
-    reviewCount: 204,
-    hourlyRate: 24,
-    headline: 'HSK examiner • Business Mandarin specialist',
-    isOnline: false,
-  ),
-  const TutorModel(
-    id: '3',
-    name: 'Amélie Dubois',
-    avatar: '',
-    languages: ['French', 'English'],
-    rating: 5.0,
-    reviewCount: 98,
-    hourlyRate: 32,
-    headline: 'DELF/DALF certified • Paris native',
-    isOnline: true,
-  ),
 ];
 
 class LearnerHomeScreen extends ConsumerStatefulWidget {
@@ -104,12 +69,12 @@ class _HomeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = selectedLanguage == null
-        ? _mockTutors
-        : _mockTutors.where((t) => t.languages.contains(selectedLanguage)).toList();
+    return Consumer(builder: (context, ref, _) {
+      final recommendedAsync = ref.watch(recommendedTutorsProvider(selectedLanguage));
 
-    return CustomScrollView(
-      slivers: [
+      return CustomScrollView(
+        slivers: [
+
         // Header
         SliverToBoxAdapter(
           child: Container(
@@ -236,29 +201,87 @@ class _HomeTab extends StatelessWidget {
           ),
         ),
 
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, i) => Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: TutorCard(
-                  tutor: filtered[i],
-                  onTap: () => context.push('/tutors/${filtered[i].id}'),
-                  onBook: () => context.push('/tutors/${filtered[i].id}'),
-                )
-                    .animate(delay: Duration(milliseconds: i * 80))
-                    .fadeIn()
-                    .slideY(begin: 0.08),
-              ),
-              childCount: filtered.length,
+        ...recommendedAsync.when(
+          loading: () => [
+            const SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverToBoxAdapter(child: TutorCardShimmer()),
             ),
-          ),
+            const SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverToBoxAdapter(child: TutorCardShimmer()),
+            ),
+          ],
+          error: (_, __) => [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Could not load recommendations right now.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          data: (profiles) {
+            if (profiles.isEmpty) {
+              return [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'No recommendations yet. Try a different language.',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ),
+                ),
+              ];
+            }
+
+            final tutors = profiles.map((p) => p.toTutorModel()).toList();
+
+            return [
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: TutorCard(
+                        tutor: tutors[i],
+                        onTap: () => context.push('/tutors/${tutors[i].id}'),
+                        onBook: () => context.push('/tutors/${tutors[i].id}'),
+                      )
+                          .animate(delay: Duration(milliseconds: i * 80))
+                          .fadeIn()
+                          .slideY(begin: 0.08),
+                    ),
+                    childCount: tutors.length,
+                  ),
+                ),
+              ),
+            ];
+          },
         ),
 
         const SliverToBoxAdapter(child: SizedBox(height: 28)),
       ],
-    );
+      );
+    });
   }
 }
 

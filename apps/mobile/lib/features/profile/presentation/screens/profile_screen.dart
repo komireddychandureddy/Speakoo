@@ -148,13 +148,15 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       const Divider(height: 1, indent: 56),
                       _SettingsTile(
-                        icon: Icons.language_outlined,
-                        label: 'App Language',
-                        trailing: const Text('English',
-                            style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 13)),
-                        onTap: () {},
+                        icon: Icons.school_outlined,
+                        label: 'Learning Preferences',
+                        onTap: () => context.push('/preferences'),
+                      ),
+                      const Divider(height: 1, indent: 56),
+                      _SettingsTile(
+                        icon: Icons.workspace_premium_outlined,
+                        label: 'Subscription',
+                        onTap: () => context.push('/subscription'),
                       ),
                       const Divider(height: 1, indent: 56),
                       _SettingsTile(

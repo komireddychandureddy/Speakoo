@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bell, Globe, Shield, Palette, ChevronRight } from 'lucide-react';
+import { getMe, updateMyProfile } from '../../core/network/usersApi';
 
 interface Toggle { label: string; description: string; value: boolean; }
 
@@ -18,6 +19,23 @@ export default function SettingsPage() {
 
   const [language, setLanguage] = useState('English');
   const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const [targetLanguage, setTargetLanguage] = useState('English');
+  const [learningGoals, setLearningGoals] = useState('');
+  const [maxBudget, setMaxBudget] = useState(2000);
+  const [savingPrefs, setSavingPrefs] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    getMe()
+      .then((me) => {
+        if (me.profile?.timezone) setTimezone(me.profile.timezone);
+        if (me.profile?.nativeLanguage) setLanguage(me.profile.nativeLanguage);
+        if (me.profile?.targetLanguage) setTargetLanguage(me.profile.targetLanguage);
+        if (me.profile?.learningGoals) setLearningGoals(me.profile.learningGoals);
+        if (me.profile?.maxBudgetCents) setMaxBudget(me.profile.maxBudgetCents);
+      })
+      .catch(() => {});
+  }, []);
 
   const toggle = (
     setter: React.Dispatch<React.SetStateAction<Record<string, Toggle>>>,
@@ -85,6 +103,70 @@ export default function SettingsPage() {
             />
             <p className="text-[11px] text-gray-400 mt-1">Detected automatically from your browser.</p>
           </div>
+        </div>
+      </div>
+
+      {/* Learning Preferences */}
+      <div className="card px-5 py-5">
+        <SectionHeader icon={<Globe size={18} />} title="Learning Preferences" />
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-semibold text-gray-800 block mb-1">Target Language</label>
+            <select
+              value={targetLanguage}
+              onChange={(e) => setTargetLanguage(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-[#EEEEEE] bg-[#F9FBF9] text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]/30 focus:border-[#43A047]"
+            >
+              {['English', 'Hindi', 'French', 'Spanish', 'Mandarin', 'Arabic'].map((l) => (
+                <option key={l} value={l}>{l}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-gray-800 block mb-1">Learning Goals</label>
+            <textarea
+              value={learningGoals}
+              onChange={(e) => setLearningGoals(e.target.value)}
+              rows={3}
+              placeholder="Describe your current goals (exam prep, speaking fluency, business communication...)"
+              className="w-full px-3 py-2 rounded-lg border border-[#EEEEEE] bg-[#F9FBF9] text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]/30 focus:border-[#43A047]"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-gray-800 block mb-1">Max Budget Per Session (cents)</label>
+            <input
+              type="number"
+              min={100}
+              value={maxBudget}
+              onChange={(e) => setMaxBudget(Number(e.target.value || 100))}
+              className="w-full px-3 py-2 rounded-lg border border-[#EEEEEE] bg-[#F9FBF9] text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]/30 focus:border-[#43A047]"
+            />
+          </div>
+          <button
+            onClick={async () => {
+              setSavingPrefs(true);
+              setSaveMessage(null);
+              try {
+                await updateMyProfile({
+                  timezone,
+                  nativeLanguage: language,
+                  targetLanguage,
+                  learningGoals,
+                  maxBudgetCents: maxBudget,
+                });
+                setSaveMessage('Preferences saved');
+              } catch {
+                setSaveMessage('Failed to save preferences');
+              } finally {
+                setSavingPrefs(false);
+              }
+            }}
+            disabled={savingPrefs}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-[#43A047] text-white hover:bg-[#2E7D32] disabled:opacity-60"
+          >
+            {savingPrefs ? 'Saving...' : 'Save Preferences'}
+          </button>
+          {saveMessage && <p className="text-xs text-[#616161]">{saveMessage}</p>}
         </div>
       </div>
 

@@ -1,4 +1,16 @@
-import { Controller, Post, Get, Param, Headers, Body, RawBodyRequest, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  Headers,
+  Body,
+  RawBodyRequest,
+  Req,
+  Query,
+  DefaultValuePipe,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { PaymentsService } from './payments.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -6,6 +18,9 @@ import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { PurchaseCreditsDto } from './dto/purchase-credits.dto';
 import { WalletTopupDto } from './dto/wallet-topup.dto';
+import { SubscribePlanDto } from './dto/subscribe-plan.dto';
+import { UpsertSubscriptionPlanDto } from './dto/upsert-subscription-plan.dto';
+import { CancelSubscriptionDto } from './dto/cancel-subscription.dto';
 import { User } from '@prisma/client';
 
 @Controller('payments')
@@ -31,6 +46,48 @@ export class PaymentsController {
   @Get('wallet/transactions')
   getWalletTransactions(@CurrentUser() user: User) {
     return this.paymentsService.getWalletTransactions(user.id);
+  }
+
+  @Public()
+  @Get('subscriptions/plans')
+  listSubscriptionPlans() {
+    return this.paymentsService.listSubscriptionPlans();
+  }
+
+  @Roles('admin')
+  @Post('subscriptions/plans')
+  upsertSubscriptionPlan(@Body() dto: UpsertSubscriptionPlanDto) {
+    return this.paymentsService.upsertSubscriptionPlan(dto);
+  }
+
+  @Roles('learner')
+  @Post('subscriptions/subscribe')
+  subscribePlan(@CurrentUser() user: User, @Body() dto: SubscribePlanDto) {
+    return this.paymentsService.subscribePlan(user.id, dto.planId, dto.paymentMethodId);
+  }
+
+  @Roles('learner')
+  @Get('subscriptions/me')
+  getMySubscription(@CurrentUser() user: User) {
+    return this.paymentsService.getMySubscription(user.id);
+  }
+
+  @Roles('learner')
+  @Post('subscriptions/cancel')
+  cancelMySubscription(@CurrentUser() user: User, @Body() dto: CancelSubscriptionDto) {
+    return this.paymentsService.cancelMySubscription(user.id, dto.reason);
+  }
+
+  @Roles('admin')
+  @Post('subscriptions/grants/run')
+  runCreditGrants() {
+    return this.paymentsService.runSubscriptionCreditGrants();
+  }
+
+  @Roles('admin')
+  @Get('risks/transactions')
+  getTransactionRisks(@Query('days', new DefaultValuePipe(7), ParseIntPipe) days: number) {
+    return this.paymentsService.getTransactionRiskSignals(days);
   }
 
   @Post('wallet/topup')

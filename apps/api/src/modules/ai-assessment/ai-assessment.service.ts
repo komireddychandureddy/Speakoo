@@ -50,7 +50,9 @@ export class AiAssessmentService {
           return { userId, cefrLevel: match[1] };
         }
       } catch (error) {
-        this.logger.warn(`OpenAI CEFR assessment failed; falling back to heuristic: ${String(error)}`);
+        this.logger.warn(
+          `OpenAI CEFR assessment failed; falling back to heuristic: ${String(error)}`,
+        );
       }
     }
 

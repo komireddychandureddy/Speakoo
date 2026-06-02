@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsUrl, MaxLength, Matches } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsUrl, Matches, MaxLength, Min } from 'class-validator';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -13,6 +13,20 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   nativeLanguage?: string;
+
+  @IsOptional()
+  @IsString()
+  targetLanguage?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  learningGoals?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(100)
+  maxBudgetCents?: number;
 
   @IsOptional()
   @IsString()

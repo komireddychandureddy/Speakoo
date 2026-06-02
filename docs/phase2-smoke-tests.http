@@ -1,0 +1,135 @@
+@baseUrl = http://localhost:3000/api/v1
+@adminAccessToken = REPLACE_ADMIN_JWT
+@tutorAccessToken = REPLACE_TUTOR_JWT
+@learnerAccessToken = REPLACE_LEARNER_JWT
+@existingBookingId = REPLACE_BOOKING_UUID
+@existingLearnerId = REPLACE_LEARNER_UUID
+@existingPathId = REPLACE_PATH_UUID
+@existingHomeworkId = REPLACE_HOMEWORK_UUID
+
+### Health check
+GET {{baseUrl}}/health
+
+### Learner progress
+GET {{baseUrl}}/users/me/progress
+Authorization: Bearer {{learnerAccessToken}}
+
+### Learner badges
+GET {{baseUrl}}/users/me/badges
+Authorization: Bearer {{learnerAccessToken}}
+
+### Create learning path (admin)
+POST {{baseUrl}}/learning/paths
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "slug": "spanish-a2-core",
+  "title": "Spanish A2 Core Path",
+  "description": "Structured A2 journey for conversation, grammar, and listening.",
+  "language": "Spanish",
+  "cefrLevel": "A2",
+  "isActive": true
+}
+
+### Add learning step (admin)
+POST {{baseUrl}}/learning/paths/{{existingPathId}}/steps
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "stepOrder": 1,
+  "title": "Daily Situations Vocabulary",
+  "description": "Learn and apply vocabulary for travel and routines.",
+  "skill": "vocabulary"
+}
+
+### Enroll learner in path
+POST {{baseUrl}}/learning/paths/{{existingPathId}}/enroll
+Authorization: Bearer {{learnerAccessToken}}
+
+### Learner paths
+GET {{baseUrl}}/learning/paths/me
+Authorization: Bearer {{learnerAccessToken}}
+
+### Tutor upsert session note
+POST {{baseUrl}}/learning/session-notes
+Authorization: Bearer {{tutorAccessToken}}
+Content-Type: application/json
+
+{
+  "bookingId": "{{existingBookingId}}",
+  "summary": "Strong progress in dialogue flow and listening confidence.",
+  "strengths": "Pronunciation clarity and topic engagement",
+  "weaknesses": "Past tense consistency",
+  "nextSteps": "Practice 15 min daily with irregular verbs"
+}
+
+### Learner session notes
+GET {{baseUrl}}/learning/session-notes/me
+Authorization: Bearer {{learnerAccessToken}}
+
+### Tutor assign homework
+POST {{baseUrl}}/learning/homework
+Authorization: Bearer {{tutorAccessToken}}
+Content-Type: application/json
+
+{
+  "learnerId": "{{existingLearnerId}}",
+  "bookingId": "{{existingBookingId}}",
+  "title": "A2 Listening Drill",
+  "description": "Complete 2 listening clips and summarize each in 4-5 lines.",
+  "dueAt": "2026-06-10T18:00:00.000Z"
+}
+
+### Learner homework list
+GET {{baseUrl}}/learning/homework/me
+Authorization: Bearer {{learnerAccessToken}}
+
+### Learner submit homework
+PATCH {{baseUrl}}/learning/homework/{{existingHomeworkId}}/submit
+Authorization: Bearer {{learnerAccessToken}}
+Content-Type: application/json
+
+{
+  "submissionText": "Clip 1: The speaker discusses weekend routines... Clip 2: The speaker compares travel plans..."
+}
+
+### Tutor review homework
+PATCH {{baseUrl}}/learning/homework/{{existingHomeworkId}}/review
+Authorization: Bearer {{tutorAccessToken}}
+Content-Type: application/json
+
+{
+  "feedbackText": "Good comprehension. Focus on tense agreement in summary sentences."
+}
+
+### Recommendation endpoint (learner)
+GET {{baseUrl}}/tutors/recommendations/me?language=Spanish&limit=6
+Authorization: Bearer {{learnerAccessToken}}
+
+### Subscription plans (public)
+GET {{baseUrl}}/payments/subscriptions/plans
+
+### Subscribe to plan (learner)
+POST {{baseUrl}}/payments/subscriptions/subscribe
+Authorization: Bearer {{learnerAccessToken}}
+Content-Type: application/json
+
+{
+  "planId": "REPLACE_PLAN_UUID",
+  "paymentMethodId": "pm_card_visa"
+}
+
+### Current subscription (learner)
+GET {{baseUrl}}/payments/subscriptions/me
+Authorization: Bearer {{learnerAccessToken}}
+
+### Cancel subscription (learner)
+POST {{baseUrl}}/payments/subscriptions/cancel
+Authorization: Bearer {{learnerAccessToken}}
+Content-Type: application/json
+
+{
+  "reason": "Switching plan"
+}

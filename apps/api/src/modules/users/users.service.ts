@@ -25,4 +25,8 @@ export class UsersService {
   getMyBadges(userId: string) {
     return this.usersRepository.getBadges(userId);
   }
+
+  getMyLearningProgress(userId: string) {
+    return this.usersRepository.getLearningProgress(userId);
+  }
 }

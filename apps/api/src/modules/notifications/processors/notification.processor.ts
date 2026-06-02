@@ -6,7 +6,11 @@ import axios from 'axios';
 import { Resend } from 'resend';
 import Twilio from 'twilio';
 import { PrismaService } from '../../prisma/prisma.service';
-import { NOTIFICATION_QUEUE, NotificationJobData, NotificationsService } from '../notifications.service';
+import {
+  NOTIFICATION_QUEUE,
+  NotificationJobData,
+  NotificationsService,
+} from '../notifications.service';
 import { NotificationChannel } from '@prisma/client';
 
 @Processor(NOTIFICATION_QUEUE)
@@ -44,7 +48,9 @@ export class NotificationProcessor {
 
     if (channel === NotificationChannel.whatsapp) {
       if (this.config.get('NODE_ENV') !== 'production') {
-        this.logger.log(`Skipping WhatsApp notification for user ${userId} (non-production environment)`);
+        this.logger.log(
+          `Skipping WhatsApp notification for user ${userId} (non-production environment)`,
+        );
         return;
       }
       const phoneNumber = user.profile?.phoneNumber;
@@ -67,7 +73,9 @@ export class NotificationProcessor {
       const serverKey = this.config.get<string>('FCM_SERVER_KEY');
       const tokens = await this.notificationsService.getDeviceTokens(userId);
       if (!serverKey || tokens.length === 0) {
-        this.logger.warn(`Skipping push notification for user ${userId}: missing FCM key or device token`);
+        this.logger.warn(
+          `Skipping push notification for user ${userId}: missing FCM key or device token`,
+        );
         return;
       }
 

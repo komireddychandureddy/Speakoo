@@ -46,7 +46,9 @@ export class AdminService {
           isSuspended: true,
           createdAt: true,
           profile: { select: { displayName: true, bio: true, countryCode: true } },
-          tutorProfile: { select: { id: true, isApproved: true, languagesTaught: true, hourlyRateCents: true } },
+          tutorProfile: {
+            select: { id: true, isApproved: true, languagesTaught: true, hourlyRateCents: true },
+          },
         },
       }),
       this.prisma.user.count({ where }),

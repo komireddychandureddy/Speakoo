@@ -1,15 +1,28 @@
 import { Gem } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../../core/i18n/I18nContext';
 import { useLocale } from '../../core/locale/LocaleContext';
 import { CREDIT_PACKS, MOCK_CREDIT_BALANCE } from '../../data/mockData';
+import {
+  getWalletTransactions,
+  type WalletTransaction,
+} from '../../core/network/bookingsApi';
+import { getWalletBalance } from '../../core/network/paymentsApi';
 
-const MOCK_HISTORY = [
-  { id: 'h1', label: 'Session – Priya Sharma', date: '2026-05-28', amount: -199, balance: 350 },
-  { id: 'h2', label: 'Bought Starter Pack', date: '2026-05-20', amount: +500, balance: 549 },
-  { id: 'h3', label: 'Session – Rahul Verma', date: '2026-05-15', amount: -149, balance: 49 },
-  { id: 'h4', label: 'Referral Bonus', date: '2026-05-10', amount: +50, balance: 198 },
-  { id: 'h5', label: 'Session – Vikram Singh', date: '2026-05-05', amount: -199, balance: 148 },
-];
+function txLabel(tx: WalletTransaction): string {
+  switch (tx.type) {
+    case 'credit':
+      return 'Credit Granted';
+    case 'debit':
+      return 'Debit';
+    case 'refund':
+      return 'Refund';
+    case 'payout':
+      return 'Tutor Payout';
+    default:
+      return 'Transaction';
+  }
+}
 
 function PackCard({ pack }: { pack: (typeof CREDIT_PACKS)[0] }) {
   const { t } = useI18n();
@@ -55,7 +68,24 @@ function PackCard({ pack }: { pack: (typeof CREDIT_PACKS)[0] }) {
 export default function CreditsPage() {
   const { t } = useI18n();
   const { fmtCredits, symbol } = useLocale();
-  const balance = Number(localStorage.getItem('speakoo_credits') ?? MOCK_CREDIT_BALANCE);
+  const [balance, setBalance] = useState(Number(localStorage.getItem('speakoo_credits') ?? MOCK_CREDIT_BALANCE));
+  const [history, setHistory] = useState<WalletTransaction[]>([]);
+
+  useEffect(() => {
+    getWalletBalance()
+      .then((res) => {
+        setBalance(res.balanceCents);
+      })
+      .catch(() => {});
+
+    getWalletTransactions()
+      .then((res) => {
+        setHistory(res.items);
+      })
+      .catch(() => {});
+  }, []);
+
+  const rows = useMemo(() => history.slice(0, 30), [history]);
 
   return (
     <div className="space-y-6">
@@ -100,25 +130,34 @@ export default function CreditsPage() {
       <div>
         <h2 className="text-lg font-bold text-[#212121] mb-3">Transaction History</h2>
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          {MOCK_HISTORY.map((tx, idx) => (
+          {rows.map((tx, idx) => (
             <div
               key={tx.id}
               className={`flex items-center justify-between px-5 py-3.5 text-sm ${
-                idx < MOCK_HISTORY.length - 1 ? 'border-b border-gray-50' : ''
+                idx < rows.length - 1 ? 'border-b border-gray-50' : ''
               }`}
             >
               <div>
-                <div className="font-medium text-[#212121]">{tx.label}</div>
-                <div className="text-xs text-[#616161] mt-0.5">{tx.date}</div>
+                <div className="font-medium text-[#212121]">{txLabel(tx)}</div>
+                <div className="text-xs text-[#616161] mt-0.5">
+                  {new Date(tx.createdAt).toLocaleDateString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </div>
               </div>
               <div className="text-right">
-                <div className={`font-bold ${tx.amount > 0 ? 'text-[#43A047]' : 'text-red-500'}`}>
-                  {tx.amount > 0 ? '+' : ''}{tx.amount}
+                <div className={`font-bold ${tx.amountCents > 0 ? 'text-[#43A047]' : 'text-red-500'}`}>
+                  {tx.amountCents > 0 ? '+' : ''}{tx.amountCents}
                 </div>
-                <div className="text-xs text-[#616161]">Bal: {tx.balance}</div>
+                <div className="text-xs text-[#616161]">Bal: {tx.balanceAfter}</div>
               </div>
             </div>
           ))}
+          {rows.length === 0 && (
+            <div className="px-5 py-10 text-center text-[#616161] text-sm">No transactions found.</div>
+          )}
         </div>
       </div>
     </div>

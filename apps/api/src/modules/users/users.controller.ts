@@ -29,6 +29,11 @@ export class UsersController {
     return this.usersService.getMyBadges(user.id);
   }
 
+  @Get('me/progress')
+  getMyProgress(@CurrentUser() user: User) {
+    return this.usersService.getMyLearningProgress(user.id);
+  }
+
   @Public()
   @Get(':id')
   getPublicProfile(@Param('id', ParseUUIDPipe) id: string) {

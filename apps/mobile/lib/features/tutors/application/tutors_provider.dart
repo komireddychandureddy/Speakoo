@@ -91,6 +91,27 @@ class TutorsRepository {
     return TutorPublicProfile.fromJson(
         response.data as Map<String, dynamic>);
   }
+
+  Future<List<TutorPublicProfile>> getRecommendedTutors({
+    String? language,
+    int? maxCents,
+    int limit = 6,
+  }) async {
+    final response = await _dio.get<List<dynamic>>(
+      '/tutors/recommendations/me',
+      queryParameters: {
+        if (language != null) 'language': language,
+        if (maxCents != null) 'maxCents': maxCents,
+        'limit': limit,
+      },
+    );
+
+    final rows = response.data ?? <dynamic>[];
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .map(TutorPublicProfile.fromJson)
+        .toList();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -158,4 +179,12 @@ final tutorSearchProvider =
 final tutorPublicProfileProvider =
     FutureProvider.family<TutorPublicProfile, String>((ref, userId) async {
   return ref.read(tutorsRepositoryProvider).getTutorProfile(userId);
+});
+
+final recommendedTutorsProvider =
+    FutureProvider.family<List<TutorPublicProfile>, String?>((ref, language) async {
+  return ref.read(tutorsRepositoryProvider).getRecommendedTutors(
+        language: language,
+        limit: 6,
+      );
 });

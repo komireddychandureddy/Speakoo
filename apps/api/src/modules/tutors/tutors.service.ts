@@ -3,6 +3,10 @@ import { TutorsRepository } from './tutors.repository';
 import { CreateTutorProfileDto } from './dto/create-tutor-profile.dto';
 import { CreateAvailabilitySlotDto } from './dto/create-availability-slot.dto';
 import { SearchTutorsDto } from './dto/search-tutors.dto';
+import { SubmitKycDto } from './dto/submit-kyc.dto';
+import { ListKycDto } from './dto/list-kyc.dto';
+import { ReviewKycDto } from './dto/review-kyc.dto';
+import { RecommendTutorsDto } from './dto/recommend-tutors.dto';
 
 @Injectable()
 export class TutorsService {
@@ -67,5 +71,38 @@ export class TutorsService {
   async getPublicSlots(userId: string, timezone?: string) {
     const slots = await this.tutorsRepository.findPublicSlots(userId);
     return this.mapSlotsWithTimezone(slots, timezone);
+  }
+
+  submitKyc(userId: string, dto: SubmitKycDto) {
+    return this.tutorsRepository.submitKyc(userId, dto);
+  }
+
+  getMyKycSubmissions(userId: string) {
+    return this.tutorsRepository.listMyKycSubmissions(userId);
+  }
+
+  listKycForAdmin(query: ListKycDto) {
+    return this.tutorsRepository.listKycSubmissionsForAdmin({
+      status: query.status,
+      page: query.page ?? 1,
+      limit: Math.min(query.limit ?? 20, 100),
+    });
+  }
+
+  reviewKycSubmission(submissionId: string, reviewerId: string, dto: ReviewKycDto) {
+    return this.tutorsRepository.reviewKycSubmission(
+      submissionId,
+      reviewerId,
+      dto.status,
+      dto.note?.trim(),
+    );
+  }
+
+  getRecommendationsForLearner(learnerId: string, dto: RecommendTutorsDto) {
+    return this.tutorsRepository.findRecommendedTutors(learnerId, {
+      language: dto.language,
+      maxCents: dto.maxCents,
+      limit: Math.min(dto.limit ?? 10, 30),
+    });
   }
 }

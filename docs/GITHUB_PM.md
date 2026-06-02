@@ -241,6 +241,52 @@ Issues:
 - [ ] Trial sessions (15-min intro at reduced price)
 - [ ] Mobile push notifications (FCM)
 
+### M12 — Trust, Growth, and Retention (Current)
+
+#### M12.1 Trust & Safety (Week 1-3)
+- [x] Incident reporting backend (create + my reports)
+- [x] Admin incident triage backend (list/filter/get/triage)
+- [x] Admin incident queue UI
+- [x] Tutor KYC workflow (document upload + manual review)
+- [x] Fraud signals for wallet topups and payout anomalies
+
+#### M12.2 Discovery & Matching 2.0 (Week 4-6)
+- [x] Tutor ranking service (initial heuristic: rating + social proof + affordability + language match)
+- [x] Recommendation endpoint for learners
+- [x] Learner intent/preferences profile
+- [x] Web recommendation cards in discovery/dashboard
+
+#### M12.3 Subscriptions + Learning Outcomes (Week 7-9)
+- [x] Subscription plans and monthly credit grants
+
+### Latest Execution Update (Requested: Items 1, 2, 3)
+
+- [x] Item 1 — Learning outcomes backend delivered
+  - Added Prisma models + migration for learning paths, path steps, learner enrollments, session notes, and homework assignments.
+  - Added new NestJS Learning module with endpoints:
+    - `POST /learning/paths` (admin)
+    - `POST /learning/paths/:pathId/steps` (admin)
+    - `GET /learning/paths/me` (learner)
+    - `POST /learning/paths/:pathId/enroll` (learner)
+    - `POST /learning/session-notes` (tutor/admin)
+    - `GET /learning/session-notes/me` (learner)
+    - `POST /learning/homework` (tutor/admin)
+    - `GET /learning/homework/me` (learner)
+    - `PATCH /learning/homework/:homeworkId/submit` (learner)
+    - `PATCH /learning/homework/:homeworkId/review` (tutor/admin)
+- [x] Item 2 — Web progress and milestone UI wired to real APIs
+  - Replaced mock leaderboard page with API-backed learner progress dashboard using:
+    - `GET /users/me/progress`
+    - `GET /users/me/badges`
+  - Added timeline cards, CEFR history summary metrics, and milestone badge rendering.
+- [x] Item 3 — Mobile recommendations + subscription/preferences wiring
+  - Learner home now loads recommendations from `GET /tutors/recommendations/me`.
+  - Added mobile subscription data layer + screen for plans/current/cancel/subscribe flows.
+  - Added mobile learning preferences screen wired to `GET /users/me` + `PATCH /users/me/profile`.
+- [x] Subscription webhook handling and proration
+- [ ] Learning path/session notes/homework APIs
+- [x] Learner progress timeline API
+
 ---
 
 ## 4. GitHub Projects Board Setup

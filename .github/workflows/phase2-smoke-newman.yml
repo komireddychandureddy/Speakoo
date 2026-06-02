@@ -1,0 +1,63 @@
+name: phase2-smoke-newman
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Newman
+        run: npm install -g newman@6.1.2
+
+      - name: Run Phase 2 smoke suite
+        env:
+          BASE_URL: ${{ secrets['PHASE2_BASE_URL'] }}
+          ADMIN_TOKEN: ${{ secrets['PHASE2_ADMIN_ACCESS_TOKEN'] }}
+          TUTOR_TOKEN: ${{ secrets['PHASE2_TUTOR_ACCESS_TOKEN'] }}
+          LEARNER_TOKEN: ${{ secrets['PHASE2_LEARNER_ACCESS_TOKEN'] }}
+          BOOKING_ID: ${{ secrets['PHASE2_BOOKING_ID'] }}
+          LEARNER_ID: ${{ secrets['PHASE2_LEARNER_ID'] }}
+          PATH_ID: ${{ secrets['PHASE2_PATH_ID'] }}
+          HOMEWORK_ID: ${{ secrets['PHASE2_HOMEWORK_ID'] }}
+          PLAN_ID: ${{ secrets['PHASE2_PLAN_ID'] }}
+        run: |
+          test -n "$BASE_URL"
+          test -n "$ADMIN_TOKEN"
+          test -n "$TUTOR_TOKEN"
+          test -n "$LEARNER_TOKEN"
+          test -n "$BOOKING_ID"
+          test -n "$LEARNER_ID"
+          test -n "$PATH_ID"
+          test -n "$HOMEWORK_ID"
+          test -n "$PLAN_ID"
+
+          newman run docs/phase2-smoke-tests.postman_collection.json \
+            --environment docs/phase2-smoke-tests.postman_environment.json \
+            --env-var baseUrl="$BASE_URL" \
+            --env-var adminAccessToken="$ADMIN_TOKEN" \
+            --env-var tutorAccessToken="$TUTOR_TOKEN" \
+            --env-var learnerAccessToken="$LEARNER_TOKEN" \
+            --env-var existingBookingId="$BOOKING_ID" \
+            --env-var existingLearnerId="$LEARNER_ID" \
+            --env-var existingPathId="$PATH_ID" \
+            --env-var existingHomeworkId="$HOMEWORK_ID" \
+            --env-var existingPlanId="$PLAN_ID" \
+            --reporters cli,junit \
+            --reporter-junit-export newman-results.xml
+
+      - name: Upload Newman report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase2-smoke-newman-report
+          path: newman-results.xml

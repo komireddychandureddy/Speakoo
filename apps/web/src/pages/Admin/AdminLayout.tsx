@@ -1,10 +1,21 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, GraduationCap, LogOut, Shield, ClipboardList } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Users,
+  GraduationCap,
+  LogOut,
+  Shield,
+  ClipboardList,
+  ShieldAlert,
+  ShieldCheck,
+} from 'lucide-react';
 import { listAdminUsers } from '../../core/network/adminApi';
 
 const NAV_ITEMS = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/admin/risks', label: 'Risks', icon: ShieldCheck },
+  { to: '/admin/incidents', label: 'Incidents', icon: ShieldAlert },
   { to: '/admin/applications', label: 'Applications', icon: ClipboardList },
   { to: '/admin/tutors', label: 'Tutors', icon: GraduationCap },
   { to: '/admin/learners', label: 'Learners', icon: Users },

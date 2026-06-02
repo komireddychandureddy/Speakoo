@@ -35,6 +35,9 @@ class ProfileNotifier extends AsyncNotifier<UserProfileModel?> {
     String? countryCode,
     String? timezone,
     String? nativeLanguage,
+    String? targetLanguage,
+    String? learningGoals,
+    int? maxBudgetCents,
     String? phoneNumber,
   }) async {
     state = const AsyncLoading();
@@ -46,6 +49,9 @@ class ProfileNotifier extends AsyncNotifier<UserProfileModel?> {
             countryCode: countryCode,
             timezone: timezone,
             nativeLanguage: nativeLanguage,
+            targetLanguage: targetLanguage,
+            learningGoals: learningGoals,
+            maxBudgetCents: maxBudgetCents,
             phoneNumber: phoneNumber,
           ),
     );

@@ -9,6 +9,9 @@ class UserProfileModel {
   final String? countryCode;
   final String? timezone;
   final String? nativeLanguage;
+  final String? targetLanguage;
+  final String? learningGoals;
+  final int? maxBudgetCents;
   final String? phoneNumber;
 
   const UserProfileModel({
@@ -22,6 +25,9 @@ class UserProfileModel {
     this.countryCode,
     this.timezone,
     this.nativeLanguage,
+    this.targetLanguage,
+    this.learningGoals,
+    this.maxBudgetCents,
     this.phoneNumber,
   });
 
@@ -40,6 +46,9 @@ class UserProfileModel {
       countryCode: profile?['countryCode'] as String?,
       timezone: profile?['timezone'] as String?,
       nativeLanguage: profile?['nativeLanguage'] as String?,
+      targetLanguage: profile?['targetLanguage'] as String?,
+      learningGoals: profile?['learningGoals'] as String?,
+      maxBudgetCents: profile?['maxBudgetCents'] as int?,
       phoneNumber: json['phoneNumber'] as String?,
     );
   }
@@ -51,6 +60,9 @@ class UserProfileModel {
     String? countryCode,
     String? timezone,
     String? nativeLanguage,
+    String? targetLanguage,
+    String? learningGoals,
+    int? maxBudgetCents,
     String? phoneNumber,
   }) {
     return UserProfileModel(
@@ -64,6 +76,9 @@ class UserProfileModel {
       countryCode: countryCode ?? this.countryCode,
       timezone: timezone ?? this.timezone,
       nativeLanguage: nativeLanguage ?? this.nativeLanguage,
+      targetLanguage: targetLanguage ?? this.targetLanguage,
+      learningGoals: learningGoals ?? this.learningGoals,
+      maxBudgetCents: maxBudgetCents ?? this.maxBudgetCents,
       phoneNumber: phoneNumber ?? this.phoneNumber,
     );
   }

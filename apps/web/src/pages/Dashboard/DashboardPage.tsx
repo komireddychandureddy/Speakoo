@@ -1,6 +1,10 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyBookings, type Booking } from '../../core/network/bookingsApi';
+import {
+  getRecommendedTutors,
+  type RecommendedTutor,
+} from '../../core/network/tutorsApi';
 
 const QUICK_TILES = [
   { icon: '📅', label: 'My Sessions', to: '/mySession', color: '#E6D7FF' },
@@ -14,11 +18,18 @@ const QUICK_TILES = [
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [recommendedTutors, setRecommendedTutors] = useState<RecommendedTutor[]>([]);
 
   useEffect(() => {
     getMyBookings()
       .then(setBookings)
       .catch(() => {/* silently ignore — user may not be logged in */});
+
+    getRecommendedTutors({ limit: 4 })
+      .then(setRecommendedTutors)
+      .catch(() => {
+        setRecommendedTutors([]);
+      });
   }, []);
 
   const upcoming = bookings
@@ -111,6 +122,51 @@ export default function DashboardPage() {
             </button>
           ))}
         </div>
+      </section>
+
+      {/* Recommended Tutors */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-gray-900 text-base">Recommended Tutors</h3>
+          <button
+            onClick={() => navigate('/allTutors')}
+            className="text-sm text-[#43A047] font-medium hover:underline"
+          >
+            View all →
+          </button>
+        </div>
+
+        {recommendedTutors.length === 0 ? (
+          <div className="card p-6 text-center text-gray-400 text-sm">
+            Tutor recommendations will appear after your first few sessions.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {recommendedTutors.map((tutor) => {
+              const name = tutor.user.profile?.displayName ?? 'Tutor';
+              return (
+                <button
+                  key={tutor.id}
+                  onClick={() => navigate(`/TutorDetailsView/${tutor.userId}`)}
+                  className="card p-4 text-left hover:shadow-md transition-shadow"
+                >
+                  <p className="font-semibold text-gray-900 truncate">{name}</p>
+                  <p className="text-xs text-gray-500 mt-1 truncate">
+                    {tutor.languagesTaught.join(', ')}
+                  </p>
+                  <div className="flex items-center justify-between mt-3">
+                    <span className="text-sm font-semibold text-[#43A047]">
+                      ₹{Math.round(tutor.hourlyRateCents / 100)} / hr
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {tutor.rating.average.toFixed(1)}★ ({tutor.rating.count})
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {/* Progress Summary */}

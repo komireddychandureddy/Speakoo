@@ -20,6 +20,9 @@ class ProfileRepository {
     String? countryCode,
     String? timezone,
     String? nativeLanguage,
+    String? targetLanguage,
+    String? learningGoals,
+    int? maxBudgetCents,
     String? phoneNumber,
   }) async {
     final body = <String, dynamic>{
@@ -29,6 +32,9 @@ class ProfileRepository {
       if (countryCode != null) 'countryCode': countryCode,
       if (timezone != null) 'timezone': timezone,
       if (nativeLanguage != null) 'nativeLanguage': nativeLanguage,
+      if (targetLanguage != null) 'targetLanguage': targetLanguage,
+      if (learningGoals != null) 'learningGoals': learningGoals,
+      if (maxBudgetCents != null) 'maxBudgetCents': maxBudgetCents,
       if (phoneNumber != null) 'phoneNumber': phoneNumber,
     };
     final response =
