@@ -1,9 +1,9 @@
 ﻿import { useState } from 'react';
 import { X, Send } from 'lucide-react';
-import type { Session } from '../../data/mockData';
+import type { Booking } from '../../core/network/bookingsApi';
 
 interface Props {
-  session: Session;
+  booking: Booking;
   onClose: () => void;
 }
 
@@ -20,7 +20,7 @@ const INITIAL_MESSAGES: Message[] = [
   { id: 3, sender: 'tutor', text: 'Focus on the "th" sound. Listen to native speakers daily.', time: '10:04 AM' },
 ];
 
-export default function SessionChatModal({ session, onClose }: Props) {
+export default function SessionChatModal({ booking, onClose }: Props) {
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
 
@@ -46,11 +46,11 @@ export default function SessionChatModal({ session, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-[#EEEEEE]">
           <div className="w-9 h-9 rounded-full bg-[#43A047] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-            {session.tutorAvatar}
+            {booking.language.charAt(0)}
           </div>
           <div className="flex-1">
-            <p className="font-bold text-gray-900 text-sm">{session.tutorName}</p>
-            <p className="text-xs text-gray-400">Session #{session.sessionNumber} · {session.date}</p>
+            <p className="font-bold text-gray-900 text-sm">{booking.language} Session</p>
+            <p className="text-xs text-gray-400">{new Date(booking.slot.startTime).toLocaleDateString()}</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
             <X size={18} />

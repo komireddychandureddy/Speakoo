@@ -1,60 +1,65 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, FileText } from 'lucide-react';
-import { TUTOR_APPLICATIONS, TutorApplication, ApplicationStatus } from '../../data/mockData';
+import { listAdminUsers, approveTutor, type AdminUser } from '../../core/network/adminApi';
 
-const STORAGE_KEY = 'speakoo_applications';
+type FilterKey = 'all' | 'pending' | 'approved';
 
-function getApps(): TutorApplication[] {
-  return (JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') as TutorApplication[] | null) ?? TUTOR_APPLICATIONS;
-}
-
-const STATUS_META: Record<ApplicationStatus, { label: string; badge: string }> = {
+const STATUS_META: Record<'pending' | 'approved', { label: string; badge: string }> = {
   pending: { label: 'Pending', badge: 'bg-amber-100 text-amber-700' },
   approved: { label: 'Approved', badge: 'bg-[#E8F5E9] text-[#2E7D32]' },
-  amendment_requested: { label: 'Needs Changes', badge: 'bg-blue-100 text-blue-700' },
-  rejected: { label: 'Rejected', badge: 'bg-red-100 text-red-700' },
 };
 
-const FILTERS: Array<{ key: 'all' | ApplicationStatus; label: string }> = [
+const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'pending', label: 'Pending' },
   { key: 'approved', label: 'Approved' },
-  { key: 'amendment_requested', label: 'Needs Changes' },
-  { key: 'rejected', label: 'Rejected' },
 ];
 
 export default function AdminApplicationsPage() {
-  const apps = getApps();
+  const [tutors, setTutors] = useState<AdminUser[]>([]);
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | ApplicationStatus>('all');
+  const [filter, setFilter] = useState<FilterKey>('all');
 
-  const countFor = (s: ApplicationStatus) => apps.filter((a) => a.status === s).length;
+  const load = () => {
+    listAdminUsers(1, 100, 'tutor').then((res) => setTutors(res.data)).catch(() => {});
+  };
 
-  const filtered = apps.filter((a) => {
-    const name = `${a.firstName} ${a.lastName}`.toLowerCase();
-    const matchesQuery =
-      name.includes(query.toLowerCase()) || a.email.toLowerCase().includes(query.toLowerCase());
-    const matchesFilter = filter === 'all' || a.status === filter;
+  useEffect(() => { load(); }, []);
+
+  const countFor = (s: 'pending' | 'approved') =>
+    tutors.filter((u) => (s === 'pending' ? u.tutorProfile?.isApproved === false : u.tutorProfile?.isApproved === true)).length;
+
+  const filtered = tutors.filter((u) => {
+    const name = (u.profile?.displayName ?? u.email).toLowerCase();
+    const matchesQuery = name.includes(query.toLowerCase()) || u.email.toLowerCase().includes(query.toLowerCase());
+    const isApproved = u.tutorProfile?.isApproved === true;
+    const matchesFilter =
+      filter === 'all' ||
+      (filter === 'pending' && !isApproved) ||
+      (filter === 'approved' && isApproved);
     return matchesQuery && matchesFilter;
   });
+
+  const handleApprove = async (userId: string) => {
+    await approveTutor(userId);
+    load();
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[#212121]">Tutor Applications</h1>
         <p className="text-[#616161] text-sm mt-1">
-          {apps.length} total · {countFor('pending')} pending review
+          {tutors.length} total · {countFor('pending')} pending review
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {([
           { label: 'Pending', s: 'pending' as const, color: 'border-amber-400 bg-amber-50 text-amber-700' },
           { label: 'Approved', s: 'approved' as const, color: 'border-[#43A047] bg-[#E8F5E9] text-[#2E7D32]' },
-          { label: 'Needs Changes', s: 'amendment_requested' as const, color: 'border-blue-400 bg-blue-50 text-blue-700' },
-          { label: 'Rejected', s: 'rejected' as const, color: 'border-red-400 bg-red-50 text-red-700' },
         ]).map(({ label, s, color }) => (
           <div key={label} className={`card p-4 border-l-4 ${color}`}>
             <p className="text-2xl font-bold">{countFor(s)}</p>
@@ -86,7 +91,7 @@ export default function AdminApplicationsPage() {
           >
             {label}
             {key !== 'all' && (
-              <span className="ml-1.5 text-xs opacity-80">({countFor(key as ApplicationStatus)})</span>
+              <span className="ml-1.5 text-xs opacity-80">({countFor(key as 'pending' | 'approved')})</span>
             )}
           </button>
         ))}
@@ -97,7 +102,7 @@ export default function AdminApplicationsPage() {
         <table className="w-full text-sm">
           <thead className="bg-[#F8FBF0]">
             <tr>
-              {['Applicant', 'Languages', 'Country', 'Exp.', 'Submitted', 'Status', ''].map((h) => (
+              {['Applicant', 'Languages', 'Rate (₹/hr)', 'Joined', 'Status', ''].map((h) => (
                 <th
                   key={h}
                   className="text-left px-5 py-3 text-[#616161] font-medium text-xs uppercase tracking-wide"
@@ -108,47 +113,64 @@ export default function AdminApplicationsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {filtered.map((a) => (
-              <tr key={a.id} className="hover:bg-[#F8FBF0] transition-colors">
-                <td className="px-5 py-3">
-                  <div className="flex items-center gap-3">
-                    <span className="w-9 h-9 rounded-full bg-[#E8F5E9] text-[#2E7D32] flex items-center justify-center text-xs font-bold shrink-0">
-                      {a.firstName[0]}{a.lastName[0]}
-                    </span>
-                    <div>
-                      <p className="font-medium text-[#212121]">{a.firstName} {a.lastName}</p>
-                      <p className="text-xs text-[#616161]">{a.email}</p>
+            {filtered.map((u) => {
+              const isApproved = u.tutorProfile?.isApproved === true;
+              const status = isApproved ? 'approved' : 'pending';
+              const displayName = u.profile?.displayName ?? u.email;
+              const initials = displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+              return (
+                <tr key={u.id} className="hover:bg-[#F8FBF0] transition-colors">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="w-9 h-9 rounded-full bg-[#E8F5E9] text-[#2E7D32] flex items-center justify-center text-xs font-bold shrink-0">
+                        {initials}
+                      </span>
+                      <div>
+                        <p className="font-medium text-[#212121]">{displayName}</p>
+                        <p className="text-xs text-[#616161]">{u.email}</p>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td className="px-5 py-3 text-[#616161]">{a.languages.join(', ')}</td>
-                <td className="px-5 py-3 text-[#616161]">{a.country}</td>
-                <td className="px-5 py-3 text-[#616161]">{a.yearsExp} yrs</td>
-                <td className="px-5 py-3 text-[#616161]">
-                  {new Date(a.submittedAt).toLocaleDateString('en-IN', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                  })}
-                </td>
-                <td className="px-5 py-3">
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_META[a.status].badge}`}>
-                    {STATUS_META[a.status].label}
-                  </span>
-                </td>
-                <td className="px-5 py-3">
-                  <Link
-                    to={`/admin/applications/${a.id}`}
-                    className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium bg-[#E8F5E9] text-[#2E7D32] hover:bg-green-100 transition-colors"
-                  >
-                    <FileText size={13} /> Review
-                  </Link>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-5 py-3 text-[#616161]">{u.tutorProfile?.languagesTaught?.join(', ') ?? '—'}</td>
+                  <td className="px-5 py-3 text-[#616161]">
+                    {u.tutorProfile?.hourlyRateCents != null
+                      ? `₹${Math.round(u.tutorProfile.hourlyRateCents / 100)}`
+                      : '—'}
+                  </td>
+                  <td className="px-5 py-3 text-[#616161]">
+                    {new Date(u.createdAt).toLocaleDateString('en-IN', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_META[status].badge}`}>
+                      {STATUS_META[status].label}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 flex items-center gap-2">
+                    <Link
+                      to={`/admin/applications/${u.id}`}
+                      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium bg-[#E8F5E9] text-[#2E7D32] hover:bg-green-100 transition-colors"
+                    >
+                      <FileText size={13} /> View
+                    </Link>
+                    {!isApproved && (
+                      <button
+                        onClick={() => handleApprove(u.id)}
+                        className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium bg-[#43A047] text-white hover:bg-[#2E7D32] transition-colors"
+                      >
+                        Approve
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-10 text-center text-[#616161]">
+                <td colSpan={6} className="px-5 py-10 text-center text-[#616161]">
                   No applications found.
                 </td>
               </tr>
@@ -158,4 +180,5 @@ export default function AdminApplicationsPage() {
       </div>
     </div>
   );
+
 }

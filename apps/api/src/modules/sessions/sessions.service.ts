@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { AccessToken } from 'livekit-server-sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { BookingStatus } from '@prisma/client';
+import { PaymentsService } from '../payments/payments.service';
 
 @Injectable()
 export class SessionsService {
@@ -11,6 +12,7 @@ export class SessionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   async generateToken(bookingId: string, userId: string): Promise<string> {
@@ -85,9 +87,45 @@ export class SessionsService {
       data: { status: BookingStatus.completed },
     });
 
-    return this.prisma.session.update({
+    const updatedSession = await this.prisma.session.update({
       where: { bookingId },
       data: { endedAt, durationMinutes },
     });
+
+    await this.paymentsService.payoutToTutor(bookingId);
+
+    return updatedSession;
+  }
+
+  async startRecording(bookingId: string, userId: string) {
+    const booking = await this.prisma.booking.findUniqueOrThrow({ where: { id: bookingId } });
+    const isParticipant = booking.learnerId === userId || booking.tutorId === userId;
+    if (!isParticipant) throw new ForbiddenException('Not a participant of this session');
+
+    if (booking.status !== BookingStatus.in_session) {
+      throw new ConflictException('Recording can only start while session is in progress');
+    }
+
+    await this.prisma.session.upsert({
+      where: { bookingId },
+      create: { bookingId, startedAt: new Date() },
+      update: {},
+    });
+
+    return { recording: true };
+  }
+
+  async stopRecording(bookingId: string, userId: string, recordingUrl?: string) {
+    const booking = await this.prisma.booking.findUniqueOrThrow({ where: { id: bookingId } });
+    const isParticipant = booking.learnerId === userId || booking.tutorId === userId;
+    if (!isParticipant) throw new ForbiddenException('Not a participant of this session');
+
+    const session = await this.prisma.session.findUniqueOrThrow({ where: { bookingId } });
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: { recordingUrl: recordingUrl ?? session.recordingUrl ?? null },
+    });
+
+    return { recording: false, recordingUrl: recordingUrl ?? session.recordingUrl ?? null };
   }
 }

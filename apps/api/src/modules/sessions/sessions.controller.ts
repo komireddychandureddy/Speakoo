@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -23,5 +23,19 @@ export class SessionsController {
   @Post(':bookingId/end')
   endSession(@Param('bookingId') bookingId: string, @CurrentUser() user: User) {
     return this.sessionsService.endSession(bookingId, user.id);
+  }
+
+  @Post(':bookingId/recording/start')
+  startRecording(@Param('bookingId') bookingId: string, @CurrentUser() user: User) {
+    return this.sessionsService.startRecording(bookingId, user.id);
+  }
+
+  @Post(':bookingId/recording/stop')
+  stopRecording(
+    @Param('bookingId') bookingId: string,
+    @CurrentUser() user: User,
+    @Body() body: { recordingUrl?: string },
+  ) {
+    return this.sessionsService.stopRecording(bookingId, user.id, body.recordingUrl);
   }
 }

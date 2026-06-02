@@ -40,4 +40,16 @@ export class UsersRepository {
       update: dto,
     });
   }
+
+  getPoints(userId: string) {
+    return this.prisma.learnerPoints.findUnique({ where: { learnerId: userId } });
+  }
+
+  getBadges(userId: string) {
+    return this.prisma.learnerBadge.findMany({
+      where: { learnerId: userId },
+      include: { badge: true },
+      orderBy: { earnedAt: 'desc' },
+    });
+  }
 }

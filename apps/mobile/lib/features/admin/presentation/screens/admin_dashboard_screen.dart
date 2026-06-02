@@ -1,24 +1,27 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../application/admin_provider.dart';
 import 'tutor_approval_screen.dart';
 import 'user_management_screen.dart';
 
-class AdminDashboardScreen extends StatefulWidget {
+class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
 
   @override
-  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+  ConsumerState<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
-class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   int _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
+    final stats = ref.watch(adminStatsProvider).valueOrNull;
     final pages = [
-      const _DashboardTab(),
+      _DashboardTab(stats: stats),
       const UserManagementScreen(),
       const TutorApprovalScreen(),
     ];
@@ -50,7 +53,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 }
 
 class _DashboardTab extends StatelessWidget {
-  const _DashboardTab();
+  const _DashboardTab({this.stats});
+
+  final AdminStats? stats;
 
   // Mock monthly revenue data (Jan–Jun)
   static const List<FlSpot> _revenueSpots = [
@@ -120,30 +125,30 @@ class _DashboardTab extends StatelessWidget {
                     mainAxisSpacing: 12,
                     childAspectRatio: 1.6,
                     children: [
-                      const _KpiCard(
+                      _KpiCard(
                         label: 'Total Users',
-                        value: '3,842',
+                        value: '${stats?.totalUsers ?? 0}',
                         icon: Icons.people_rounded,
                         color: Color(0xFF1565C0),
                         trend: '+12%',
                       ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.2, end: 0),
-                      const _KpiCard(
+                      _KpiCard(
                         label: 'Active Tutors',
-                        value: '248',
+                        value: '${stats?.tutors ?? 0}',
                         icon: Icons.school_rounded,
                         color: AppColors.primaryGreen,
                         trend: '+5%',
                       ).animate(delay: 60.ms).fadeIn(duration: 300.ms).slideY(begin: 0.2, end: 0),
-                      const _KpiCard(
+                      _KpiCard(
                         label: 'Sessions Today',
-                        value: '134',
+                        value: '${stats?.totalBookings ?? 0}',
                         icon: Icons.video_call_rounded,
                         color: Color(0xFF6A1B9A),
                         trend: '+8%',
                       ).animate(delay: 120.ms).fadeIn(duration: 300.ms).slideY(begin: 0.2, end: 0),
-                      const _KpiCard(
+                      _KpiCard(
                         label: 'Revenue (Jun)',
-                        value: '\$6,100',
+                        value: '\$${(((stats?.totalRevenueCents ?? 0) / 100).toStringAsFixed(0))}',
                         icon: Icons.attach_money_rounded,
                         color: AppColors.accent,
                         trend: '+18%',

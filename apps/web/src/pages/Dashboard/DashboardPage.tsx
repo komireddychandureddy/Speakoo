@@ -1,5 +1,6 @@
-﻿import { useNavigate } from 'react-router-dom';
-import { SESSIONS, NOTIFICATIONS } from '../../data/mockData';
+﻿import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getMyBookings, type Booking } from '../../core/network/bookingsApi';
 
 const QUICK_TILES = [
   { icon: '📅', label: 'My Sessions', to: '/mySession', color: '#E6D7FF' },
@@ -12,8 +13,18 @@ const QUICK_TILES = [
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const upcoming = SESSIONS.filter((s) => s.status === 'upcoming').slice(0, 2);
-  const unread = NOTIFICATIONS.filter((n) => !n.isRead).length;
+  const [bookings, setBookings] = useState<Booking[]>([]);
+
+  useEffect(() => {
+    getMyBookings()
+      .then(setBookings)
+      .catch(() => {/* silently ignore — user may not be logged in */});
+  }, []);
+
+  const upcoming = bookings
+    .filter((b) => b.status === 'confirmed' || b.status === 'in_session')
+    .slice(0, 2);
+  const totalCompleted = bookings.filter((b) => b.status === 'completed').length;
 
   const storedUser = (() => {
     try { return JSON.parse(localStorage.getItem('speakoo_user') ?? '{}'); } catch { return {}; }
@@ -32,28 +43,14 @@ export default function DashboardPage() {
         <p className="text-purple-200 text-sm mt-1">Keep practising to improve your English skills!</p>
         <div className="flex items-center gap-6 mt-4">
           <div className="text-center">
-            <p className="text-2xl font-bold">142</p>
+            <p className="text-2xl font-bold">{totalCompleted}</p>
             <p className="text-xs text-purple-200">Sessions Done</p>
           </div>
           <div className="w-px h-8 bg-white/20" />
           <div className="text-center">
-            <p className="text-2xl font-bold">Bronze</p>
-            <p className="text-xs text-purple-200">Current League</p>
+            <p className="text-2xl font-bold">{bookings.length}</p>
+            <p className="text-xs text-purple-200">Total Bookings</p>
           </div>
-          <div className="w-px h-8 bg-white/20" />
-          <div className="text-center">
-            <p className="text-2xl font-bold">₹240</p>
-            <p className="text-xs text-purple-200">Wallet Balance</p>
-          </div>
-          {unread > 0 && (
-            <>
-              <div className="w-px h-8 bg-white/20" />
-              <div className="text-center">
-                <p className="text-2xl font-bold">{unread}</p>
-                <p className="text-xs text-purple-200">Notifications</p>
-              </div>
-            </>
-          )}
         </div>
       </div>
 
@@ -74,19 +71,26 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {upcoming.map((session) => (
-              <div key={session.id} className="card px-5 py-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-[#43A047] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                  {session.tutorAvatar}
+            {upcoming.map((booking) => {
+              const start = new Date(booking.slot.startTime);
+              return (
+                <div key={booking.id} className="card px-5 py-4 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-[#43A047] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                    {booking.language.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">{booking.language} Session</p>
+                    <p className="text-sm text-gray-500">
+                      {start.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <button className="btn-primary flex-shrink-0" onClick={() => navigate(`/session/${booking.id}`)}>Join</button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">Session #{session.sessionNumber}</p>
-                  <p className="text-sm text-gray-500">{session.tutorName} · {session.date}</p>
-                  <p className="text-xs text-gray-400">{session.timeSlot}</p>
-                </div>
-                <button className="btn-primary flex-shrink-0">Join</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -110,18 +114,14 @@ export default function DashboardPage() {
       </section>
 
       {/* Progress Summary */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="card p-4 text-center">
-          <p className="text-3xl font-extrabold text-[#43A047]">142</p>
-          <p className="text-xs text-gray-500 mt-1">Total Sessions</p>
+          <p className="text-3xl font-extrabold text-[#43A047]">{totalCompleted}</p>
+          <p className="text-xs text-gray-500 mt-1">Completed Sessions</p>
         </div>
         <div className="card p-4 text-center">
-          <p className="text-3xl font-extrabold text-[#14783D]">19/24</p>
-          <p className="text-xs text-gray-500 mt-1">Last Session Score</p>
-        </div>
-        <div className="card p-4 text-center">
-          <p className="text-3xl font-extrabold text-[#FAC847]">🥉 Bronze</p>
-          <p className="text-xs text-gray-500 mt-1">League Rank</p>
+          <p className="text-3xl font-extrabold text-[#14783D]">{bookings.length}</p>
+          <p className="text-xs text-gray-500 mt-1">Total Bookings</p>
         </div>
       </section>
     </div>

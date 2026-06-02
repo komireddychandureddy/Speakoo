@@ -6,14 +6,15 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 
 @Injectable()
 export class BookingsService {
-  private readonly stripe: Stripe;
   private readonly logger = new Logger(BookingsService.name);
 
   constructor(
     private readonly bookingsRepository: BookingsRepository,
     private readonly config: ConfigService,
-  ) {
-    this.stripe = new Stripe(this.config.getOrThrow('STRIPE_SECRET_KEY'), {
+  ) {}
+
+  private getStripe(): Stripe {
+    return new Stripe(this.config.getOrThrow('STRIPE_SECRET_KEY'), {
       apiVersion: '2024-04-10',
     });
   }
@@ -40,7 +41,7 @@ export class BookingsService {
 
     if (refundAmountCents > 0 && stripePaymentIntent) {
       try {
-        await this.stripe.refunds.create({
+        await this.getStripe().refunds.create({
           payment_intent: stripePaymentIntent,
           amount: refundAmountCents,
         });

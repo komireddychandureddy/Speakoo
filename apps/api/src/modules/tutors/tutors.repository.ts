@@ -116,4 +116,14 @@ export class TutorsRepository {
       },
     });
   }
+
+  async findPublicSlots(userId: string) {
+    const tutorProfile = await this.prisma.tutorProfile.findUnique({ where: { userId } });
+    if (!tutorProfile) throw new NotFoundException('Tutor profile not found');
+
+    return this.prisma.availabilitySlot.findMany({
+      where: { tutorId: tutorProfile.id, status: 'available', startTime: { gte: new Date() } },
+      orderBy: { startTime: 'asc' },
+    });
+  }
 }

@@ -37,6 +37,13 @@ import AdminTutorsPage from './pages/Admin/AdminTutorsPage';
 import AdminLearnersPage from './pages/Admin/AdminLearnersPage';
 import AdminApplicationsPage from './pages/Admin/AdminApplicationsPage';
 import AdminApplicationDetailPage from './pages/Admin/AdminApplicationDetailPage';
+import FavoritesPage from './pages/Favorites/FavoritesPage';
+import MessagesPage from './pages/Messages/MessagesPage';
+import SettingsPage from './pages/Settings/SettingsPage';
+import LanguageTestPage from './pages/LanguageTest/LanguageTestPage';
+import NotFoundPage from './pages/NotFound/NotFoundPage';
+import FeedbackPage from './pages/Sessions/FeedbackPage';
+import CheckoutPage from './pages/Checkout/CheckoutPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const user = localStorage.getItem('speakoo_user');
@@ -114,6 +121,12 @@ export default function App() {
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/community/:id" element={<CommunityThreadPage />} />
           <Route path="/session-room/:id" element={<SessionRoomPage />} />
+          <Route path="/feedback/:bookingId" element={<FeedbackPage />} />
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+          <Route path="/favorites" element={<FavoritesPage />} />
+          <Route path="/messages" element={<MessagesPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/language-test" element={<LanguageTestPage />} />
         </Route>
         <Route
           element={
@@ -128,6 +141,7 @@ export default function App() {
           <Route path="/admin/applications" element={<AdminApplicationsPage />} />
           <Route path="/admin/applications/:id" element={<AdminApplicationDetailPage />} />
         </Route>
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
         </BrowserRouter>
       </LocaleProvider>

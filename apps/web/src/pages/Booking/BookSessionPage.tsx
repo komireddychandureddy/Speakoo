@@ -1,7 +1,9 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { TUTORS, FILTER_CHIPS } from '../../data/mockData';
+import { searchTutors, type TutorProfile } from '../../core/network/tutorsApi';
 import ViewScheduleModal from './ViewScheduleModal';
+
+const FILTER_CHIPS = ['All', 'Beginner', 'Intermediate', 'Advanced', 'Business', 'Conversation'];
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -21,8 +23,13 @@ export default function BookSessionPage() {
   const [timeFilter, setTimeFilter] = useState('All');
   const [activeChip, setActiveChip] = useState('All');
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
+  const [tutors, setTutors] = useState<TutorProfile[]>([]);
   const [scheduleModal, setScheduleModal] = useState<{ tutorName: string; tutorId: string } | null>(null);
   const [confirmedBooking, setConfirmedBooking] = useState<{ tutor: string; slot: string; date: string } | null>(null);
+
+  useEffect(() => {
+    searchTutors({}).then((res) => setTutors(res.items)).catch(() => {});
+  }, []);
 
   const TIME_OPTIONS = ['All', 'Morning (6AM–12PM)', 'Afternoon (12PM–5PM)', 'Evening (5PM–9PM)'];
 
@@ -114,43 +121,40 @@ export default function BookSessionPage() {
         </div>
       )}
 
-      {/* Tutor Cards */}
       <div className="space-y-4">
-        {TUTORS.map((tutor) => (
+        {tutors.map((tutor) => {
+          const displayName = tutor.user.profile?.displayName ?? 'Tutor';
+          return (
           <div key={tutor.id} className="card px-5 py-4 flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-[#43A047] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-              {tutor.avatar}
+              {displayName.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-gray-900">{tutor.name}</p>
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className="text-yellow-400 text-sm">★</span>
-                <span className="text-sm text-gray-600">{tutor.rating}</span>
-                <span className="text-gray-400 text-xs ml-2">{tutor.sessionCount} sessions</span>
-              </div>
+              <p className="font-bold text-gray-900">{displayName}</p>
               <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {tutor.specialties.slice(0, 3).map((s) => (
+                {tutor.languagesTaught.slice(0, 3).map((s) => (
                   <span key={s} className="text-[11px] px-2 py-0.5 bg-[#E8F5E9] text-[#43A047] rounded-full font-medium">
                     {s}
                   </span>
                 ))}
               </div>
+              <p className="text-xs text-gray-500 mt-1">₹{(tutor.hourlyRateCents / 100).toFixed(0)}/hr</p>
             </div>
             <button
-              onClick={() => setScheduleModal({ tutorName: tutor.name, tutorId: tutor.id })}
+              onClick={() => setScheduleModal({ tutorName: displayName, tutorId: tutor.userId })}
               className="btn-primary flex-shrink-0"
             >
               View Schedule
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {scheduleModal && (
         <ViewScheduleModal
           tutorName={scheduleModal.tutorName}
           selectedDate={weekDates[selectedDayIdx].full}
-          tutorTz={TUTORS.find((t) => t.id === scheduleModal.tutorId)?.timezone}
           onClose={() => setScheduleModal(null)}
           onBook={handleBook}
         />

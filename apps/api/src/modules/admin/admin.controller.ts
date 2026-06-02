@@ -16,12 +16,18 @@ import { Roles } from '../auth/decorators/roles.decorator';
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
+  @Get('stats')
+  getStats() {
+    return this.adminService.getStats();
+  }
+
   @Get('users')
   listUsers(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('role') role?: string,
   ) {
-    return this.adminService.listUsers(page, limit);
+    return this.adminService.listUsers(page, limit, role);
   }
 
   @Patch('tutors/:id/approve')

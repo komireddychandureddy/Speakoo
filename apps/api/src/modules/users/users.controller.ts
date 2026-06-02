@@ -19,6 +19,16 @@ export class UsersController {
     return this.usersService.updateProfile(user.id, dto);
   }
 
+  @Get('me/points')
+  getMyPoints(@CurrentUser() user: User) {
+    return this.usersService.getMyPoints(user.id);
+  }
+
+  @Get('me/badges')
+  getMyBadges(@CurrentUser() user: User) {
+    return this.usersService.getMyBadges(user.id);
+  }
+
   @Public()
   @Get(':id')
   getPublicProfile(@Param('id', ParseUUIDPipe) id: string) {

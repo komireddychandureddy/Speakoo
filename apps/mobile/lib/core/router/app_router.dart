@@ -56,6 +56,19 @@ GoRouter appRouter(AppRouterRef ref) {
         if (role == UserRole.admin) return '/admin';
         return '/home';
       }
+
+      final role = authState.user?.role;
+      final isTutorArea = state.matchedLocation.startsWith('/tutor-home');
+      final isAdminArea = state.matchedLocation.startsWith('/admin');
+
+      if (isTutorArea && role != UserRole.tutor && role != UserRole.admin) {
+        return '/home';
+      }
+
+      if (isAdminArea && role != UserRole.admin) {
+        return role == UserRole.tutor ? '/tutor-home' : '/home';
+      }
+
       return null;
     },
     routes: [

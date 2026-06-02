@@ -1,61 +1,93 @@
-import { DollarSign, TrendingUp, Clock, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { DollarSign, TrendingUp, Clock } from 'lucide-react';
+import { getWalletTransactions, WalletTransaction } from '../../core/network/bookingsApi';
 
-const SUMMARY_CARDS = [
-  { label: 'This Month', value: '$840', sub: '28 sessions', trend: '+12%', up: true },
-  { label: 'Last Month', value: '$750', sub: '25 sessions', trend: '', up: false },
-  { label: 'Total Paid Out', value: '$5,230', sub: 'Since joining', trend: '', up: false },
-  { label: 'Pending Payout', value: '$840', sub: 'Paid on 10th', trend: '', up: false },
-];
+function formatCurrency(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
 
-const TRANSACTIONS = [
-  { id: 'T001', date: 'Jun 24, 2025', student: 'Aryan K.', duration: '60 min', gross: 30, fee: 1.5, net: 28.5 },
-  { id: 'T002', date: 'Jun 23, 2025', student: 'Fatima A.', duration: '45 min', gross: 22, fee: 1.1, net: 20.9 },
-  { id: 'T003', date: 'Jun 23, 2025', student: 'Liam P.', duration: '60 min', gross: 30, fee: 1.5, net: 28.5 },
-  { id: 'T004', date: 'Jun 22, 2025', student: 'Mei L.', duration: '30 min', gross: 15, fee: 0.75, net: 14.25 },
-  { id: 'T005', date: 'Jun 21, 2025', student: 'Omar S.', duration: '60 min', gross: 30, fee: 1.5, net: 28.5 },
-  { id: 'T006', date: 'Jun 20, 2025', student: 'Priyanka M.', duration: '90 min', gross: 45, fee: 2.25, net: 42.75 },
-  { id: 'T007', date: 'Jun 19, 2025', student: 'David B.', duration: '60 min', gross: 30, fee: 1.5, net: 28.5 },
-];
-
-const MONTHLY = [
-  { month: 'Jan', amount: 420 },
-  { month: 'Feb', amount: 560 },
-  { month: 'Mar', amount: 490 },
-  { month: 'Apr', amount: 610 },
-  { month: 'May', amount: 750 },
-  { month: 'Jun', amount: 840 },
-];
+function formatDate(input: string): string {
+  return new Date(input).toLocaleString();
+}
 
 export default function TutorEarningsPage() {
-  const maxAmount = Math.max(...MONTHLY.map((m) => m.amount));
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+
+  useEffect(() => {
+    getWalletTransactions()
+      .then((res) => setTransactions(res.items))
+      .catch(() => setError('Could not load earnings right now.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const stats = useMemo(() => {
+    const payouts = transactions.filter((t) => t.type === 'payout');
+    const totalPaidOut = payouts.reduce((sum, t) => sum + t.amountCents, 0);
+
+    const now = new Date();
+    const thisMonthPayouts = payouts.filter((t) => {
+      const d = new Date(t.createdAt);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    });
+    const thisMonth = thisMonthPayouts.reduce((sum, t) => sum + t.amountCents, 0);
+    const latestBalance = transactions[0]?.balanceAfter ?? 0;
+
+    return {
+      thisMonth,
+      totalPaidOut,
+      pendingPayout: latestBalance,
+      payoutCount: payouts.length,
+    };
+  }, [transactions]);
+
+  if (loading) {
+    return (
+      <div className="space-y-6 max-w-4xl">
+        <p className="text-gray-500">Loading earnings...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6 max-w-4xl">
+        <p className="text-red-500">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-4xl">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-extrabold text-gray-900">Earnings</h1>
-        <p className="text-gray-500 text-sm mt-1">Your revenue overview and payout history</p>
+        <p className="text-gray-500 text-sm mt-1">Live payout and wallet transaction history</p>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {SUMMARY_CARDS.map((c) => (
-          <div key={c.label} className="card px-5 py-4">
-            <p className="text-xs text-gray-500 font-medium mb-1">{c.label}</p>
-            <p className="text-2xl font-extrabold text-gray-900">{c.value}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-gray-500">{c.sub}</span>
-              {c.trend && (
-                <span className={`text-xs font-semibold ${c.up ? 'text-[#43A047]' : 'text-gray-400'}`}>
-                  {c.trend}
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
+        <div className="card px-5 py-4">
+          <p className="text-xs text-gray-500 font-medium mb-1">This Month</p>
+          <p className="text-2xl font-extrabold text-gray-900">{formatCurrency(stats.thisMonth)}</p>
+          <span className="text-xs text-gray-500">Payout transactions this month</span>
+        </div>
+        <div className="card px-5 py-4">
+          <p className="text-xs text-gray-500 font-medium mb-1">Total Paid Out</p>
+          <p className="text-2xl font-extrabold text-gray-900">{formatCurrency(stats.totalPaidOut)}</p>
+          <span className="text-xs text-gray-500">Since joining</span>
+        </div>
+        <div className="card px-5 py-4">
+          <p className="text-xs text-gray-500 font-medium mb-1">Wallet Balance</p>
+          <p className="text-2xl font-extrabold text-gray-900">{formatCurrency(stats.pendingPayout)}</p>
+          <span className="text-xs text-gray-500">Latest balance after transaction</span>
+        </div>
+        <div className="card px-5 py-4">
+          <p className="text-xs text-gray-500 font-medium mb-1">Payout Count</p>
+          <p className="text-2xl font-extrabold text-gray-900">{stats.payoutCount}</p>
+          <span className="text-xs text-gray-500">Completed payout entries</span>
+        </div>
       </div>
 
-      {/* Payout Info Banner */}
       <div className="bg-[#E8F5E9] border border-[#A5D6A7] rounded-xl px-5 py-4 flex flex-wrap items-center gap-6">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-[#43A047] rounded-lg flex items-center justify-center">
@@ -86,87 +118,35 @@ export default function TutorEarningsPage() {
         </div>
       </div>
 
-      {/* Monthly Bar Chart */}
-      <div className="card px-6 py-5">
-        <h3 className="font-bold text-gray-900 mb-5">Monthly Earnings (2025)</h3>
-        <div className="flex items-end gap-3 h-36">
-          {MONTHLY.map((m) => {
-            const height = Math.round((m.amount / maxAmount) * 120);
-            const isCurrent = m.month === 'Jun';
-            return (
-              <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
-                <span className="text-xs text-gray-600 font-medium">${m.amount}</span>
-                <div
-                  className="w-full rounded-t-lg transition-all"
-                  style={{
-                    height: `${height}px`,
-                    backgroundColor: isCurrent ? '#43A047' : '#A5D6A7',
-                  }}
-                />
-                <span className={`text-xs font-medium ${isCurrent ? 'text-[#2E7D32]' : 'text-gray-500'}`}>
-                  {m.month}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Transaction History */}
       <div className="card px-5 py-5">
-        <h3 className="font-bold text-gray-900 mb-4">Transaction History</h3>
+        <h3 className="font-bold text-gray-900 mb-4">Wallet Transactions</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left">
                 <th className="pb-3 text-xs text-gray-500 font-semibold pr-4">Date</th>
-                <th className="pb-3 text-xs text-gray-500 font-semibold pr-4">Student</th>
-                <th className="pb-3 text-xs text-gray-500 font-semibold pr-4">Duration</th>
-                <th className="pb-3 text-xs text-gray-500 font-semibold text-right pr-4">Gross</th>
-                <th className="pb-3 text-xs text-gray-500 font-semibold text-right pr-4">Fee (5%)</th>
-                <th className="pb-3 text-xs text-gray-500 font-semibold text-right">You Earn</th>
+                <th className="pb-3 text-xs text-gray-500 font-semibold pr-4">Type</th>
+                <th className="pb-3 text-xs text-gray-500 font-semibold pr-4">Reference</th>
+                <th className="pb-3 text-xs text-gray-500 font-semibold text-right pr-4">Amount</th>
+                <th className="pb-3 text-xs text-gray-500 font-semibold text-right">Balance After</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {TRANSACTIONS.map((t) => (
-                <tr key={t.id} className="group hover:bg-[#F8FBF0] transition-colors">
-                  <td className="py-3 text-gray-500 pr-4 whitespace-nowrap">{t.date}</td>
-                  <td className="py-3 pr-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-[#E8F5E9] text-[#2E7D32] font-bold text-xs flex items-center justify-center flex-shrink-0">
-                        {t.student.charAt(0)}
-                      </div>
-                      <span className="text-gray-900 font-medium">{t.student}</span>
-                    </div>
+              {transactions.map((tx) => (
+                <tr key={tx.id} className="group hover:bg-[#F8FBF0] transition-colors">
+                  <td className="py-3 text-gray-500 pr-4 whitespace-nowrap">{formatDate(tx.createdAt)}</td>
+                  <td className="py-3 pr-4 capitalize text-gray-700">{tx.type}</td>
+                  <td className="py-3 pr-4 text-gray-500">{tx.referenceId ?? '-'}</td>
+                  <td className="py-3 text-right pr-4 font-medium">
+                    {tx.amountCents < 0 ? '-' : ''}
+                    {formatCurrency(Math.abs(tx.amountCents))}
                   </td>
-                  <td className="py-3 text-gray-500 pr-4">{t.duration}</td>
-                  <td className="py-3 text-gray-700 text-right pr-4">${t.gross.toFixed(2)}</td>
-                  <td className="py-3 text-red-400 text-right pr-4">−${t.fee.toFixed(2)}</td>
-                  <td className="py-3 font-bold text-[#2E7D32] text-right">${t.net.toFixed(2)}</td>
+                  <td className="py-3 text-right font-bold text-[#2E7D32]">{formatCurrency(tx.balanceAfter)}</td>
                 </tr>
               ))}
             </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-gray-200">
-                <td colSpan={3} className="pt-3 text-xs text-gray-500 font-semibold uppercase tracking-wide">
-                  Showing 7 transactions
-                </td>
-                <td className="pt-3 text-right font-bold text-gray-700 pr-4">
-                  ${TRANSACTIONS.reduce((s, t) => s + t.gross, 0).toFixed(2)}
-                </td>
-                <td className="pt-3 text-right font-bold text-red-400 pr-4">
-                  −${TRANSACTIONS.reduce((s, t) => s + t.fee, 0).toFixed(2)}
-                </td>
-                <td className="pt-3 text-right font-bold text-[#2E7D32]">
-                  ${TRANSACTIONS.reduce((s, t) => s + t.net, 0).toFixed(2)}
-                </td>
-              </tr>
-            </tfoot>
           </table>
         </div>
-        <button className="mt-4 w-full text-center text-sm text-[#43A047] font-semibold py-2 border border-[#A5D6A7] rounded-xl hover:bg-[#E8F5E9] transition-colors flex items-center justify-center gap-1">
-          Load More <ChevronRight size={14} />
-        </button>
       </div>
     </div>
   );

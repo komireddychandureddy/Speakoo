@@ -1,13 +1,18 @@
 ﻿import { useState } from 'react';
 import { X } from 'lucide-react';
-import { TIME_SLOTS } from '../../data/mockData';
 import { useLocale } from '../../core/locale/LocaleContext';
-import { slotToUserTime, tzAbbr } from '../../core/utils/timezone';
+import { tzAbbr } from '../../core/utils/timezone';
+
+// Static time slots — tutor availability fetched separately when needed
+const TIME_SLOTS = [
+  '6:00 AM','7:00 AM','8:00 AM','9:00 AM','10:00 AM','11:00 AM',
+  '12:00 PM','1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM',
+  '6:00 PM','7:00 PM','8:00 PM','9:00 PM',
+];
 
 interface Props {
   tutorName: string;
   selectedDate: string;
-  tutorTz?: string;
   onClose: () => void;
   onBook: (timeSlot: string) => void;
 }
@@ -15,10 +20,9 @@ interface Props {
 // Simulate some slots as reserved
 const RESERVED_SLOTS = ['8:00 AM', '9:00 AM', '11:00 AM', '2:00 PM', '4:00 PM', '6:00 PM'];
 
-export default function ViewScheduleModal({ tutorName, selectedDate, tutorTz, onClose, onBook }: Props) {
+export default function ViewScheduleModal({ tutorName, selectedDate, onClose, onBook }: Props) {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const { userTz } = useLocale();
-  const showTz = !!tutorTz && tutorTz !== userTz;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">

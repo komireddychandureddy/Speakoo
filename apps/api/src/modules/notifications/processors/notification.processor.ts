@@ -2,10 +2,11 @@ import { Processor, Process } from '@nestjs/bull';
 import { Job } from 'bull';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 import { Resend } from 'resend';
 import Twilio from 'twilio';
 import { PrismaService } from '../../prisma/prisma.service';
-import { NOTIFICATION_QUEUE, NotificationJobData } from '../notifications.service';
+import { NOTIFICATION_QUEUE, NotificationJobData, NotificationsService } from '../notifications.service';
 import { NotificationChannel } from '@prisma/client';
 
 @Processor(NOTIFICATION_QUEUE)
@@ -15,6 +16,7 @@ export class NotificationProcessor {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @Process()
@@ -59,6 +61,41 @@ export class NotificationProcessor {
         to: `whatsapp:${phoneNumber}`,
         body: this.getBody(type, user.profile?.displayName ?? 'there'),
       });
+    }
+
+    if (channel === NotificationChannel.push) {
+      const serverKey = this.config.get<string>('FCM_SERVER_KEY');
+      const tokens = await this.notificationsService.getDeviceTokens(userId);
+      if (!serverKey || tokens.length === 0) {
+        this.logger.warn(`Skipping push notification for user ${userId}: missing FCM key or device token`);
+        return;
+      }
+
+      const title = this.getSubject(type);
+      const body = this.getBody(type, user.profile?.displayName ?? 'there');
+
+      await Promise.all(
+        tokens.map(async (token) => {
+          try {
+            await axios.post(
+              'https://fcm.googleapis.com/fcm/send',
+              {
+                to: token,
+                notification: { title, body },
+                data: { bookingId, type },
+              },
+              {
+                headers: {
+                  Authorization: `key=${serverKey}`,
+                  'Content-Type': 'application/json',
+                },
+              },
+            );
+          } catch (error) {
+            this.logger.warn(`Push send failed for user ${userId}: ${String(error)}`);
+          }
+        }),
+      );
     }
 
     await this.prisma.notificationLog.create({

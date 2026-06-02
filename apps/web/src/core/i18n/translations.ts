@@ -12,7 +12,7 @@ export type TKey =
   | 'nav_dashboard' | 'nav_sessions' | 'nav_book' | 'nav_tutors'
   | 'nav_resources' | 'nav_curriculum' | 'nav_credits' | 'nav_profile'
   | 'nav_refer' | 'nav_leaderboard' | 'nav_faq'
-  | 'nav_practice' | 'nav_community'
+  | 'nav_practice' | 'nav_community' | 'nav_favorites' | 'nav_messages' | 'nav_language_test' | 'nav_settings'
   | 'header_credits' | 'lang_select'
   | 'book_select_date' | 'book_times_in' | 'book_tutor_time'
   | 'cred_balance' | 'cred_buy' | 'cred_bonus' | 'cred_buy_now' | 'cred_how'
@@ -27,6 +27,7 @@ export const TRANSLATIONS: Record<LangCode, Record<TKey, string>> = {
     nav_credits: 'My Credits', nav_profile: 'My Profile', nav_refer: 'Refer & Earn',
     nav_leaderboard: 'My Level', nav_faq: 'FAQs',
     nav_practice: 'Practice', nav_community: 'Community',
+    nav_favorites: 'Saved Tutors', nav_messages: 'Messages', nav_language_test: 'Language Test', nav_settings: 'Settings',
     header_credits: 'Credits', lang_select: 'Language',
     book_select_date: 'Select Date', book_times_in: 'Times in', book_tutor_time: "Tutor's time",
     cred_balance: 'Credit Balance', cred_buy: 'Buy Credits',
@@ -44,6 +45,7 @@ export const TRANSLATIONS: Record<LangCode, Record<TKey, string>> = {
     nav_credits: 'मेरे क्रेडिट', nav_profile: 'मेरी प्रोफ़ाइल', nav_refer: 'रेफर करें',
     nav_leaderboard: 'मेरा स्तर', nav_faq: 'सामान्य प्रश्न',
     nav_practice: 'अभ्यास', nav_community: 'समुदाय',
+    nav_favorites: 'पसंदीदा', nav_messages: 'संदेश', nav_language_test: 'भाषा परीक्षा', nav_settings: 'सेटिंग्स',
     header_credits: 'क्रेडिट', lang_select: 'भाषा',
     book_select_date: 'तिथि चुनें', book_times_in: 'समय दिखाया', book_tutor_time: 'ट्यूटर समय',
     cred_balance: 'क्रेडिट बैलेंस', cred_buy: 'क्रेडिट खरीदें',
@@ -61,6 +63,7 @@ export const TRANSLATIONS: Record<LangCode, Record<TKey, string>> = {
     nav_credits: 'Mis créditos', nav_profile: 'Mi perfil', nav_refer: 'Referir',
     nav_leaderboard: 'Mi nivel', nav_faq: 'Preguntas',
     nav_practice: 'Práctica', nav_community: 'Comunidad',
+    nav_favorites: 'Guardados', nav_messages: 'Mensajes', nav_language_test: 'Test de idioma', nav_settings: 'Ajustes',
     header_credits: 'Créditos', lang_select: 'Idioma',
     book_select_date: 'Seleccionar fecha', book_times_in: 'Horas en', book_tutor_time: 'Hora tutor',
     cred_balance: 'Saldo de créditos', cred_buy: 'Comprar créditos',
@@ -78,6 +81,7 @@ export const TRANSLATIONS: Record<LangCode, Record<TKey, string>> = {
     nav_credits: 'Mes crédits', nav_profile: 'Mon profil', nav_refer: 'Parrainer',
     nav_leaderboard: 'Mon niveau', nav_faq: 'FAQ',
     nav_practice: 'Pratique', nav_community: 'Communauté',
+    nav_favorites: 'Sauvegardés', nav_messages: 'Messages', nav_language_test: 'Test de langue', nav_settings: 'Paramètres',
     header_credits: 'Crédits', lang_select: 'Langue',
     book_select_date: 'Sélectionner', book_times_in: 'Heures en', book_tutor_time: 'Heure tuteur',
     cred_balance: 'Solde de crédits', cred_buy: 'Acheter des crédits',
@@ -95,6 +99,7 @@ export const TRANSLATIONS: Record<LangCode, Record<TKey, string>> = {
     nav_credits: 'رصيدي', nav_profile: 'ملفي', nav_refer: 'أحل واربح',
     nav_leaderboard: 'مستواي', nav_faq: 'الأسئلة',
     nav_practice: 'تدريب', nav_community: 'مجتمع',
+    nav_favorites: 'المحفوظات', nav_messages: 'الرسائل', nav_language_test: 'اختبار اللغة', nav_settings: 'الإعدادات',
     header_credits: 'رصيد', lang_select: 'اللغة',
     book_select_date: 'اختر التاريخ', book_times_in: 'المواعيد', book_tutor_time: 'وقت المعلم',
     cred_balance: 'رصيد الاعتمادات', cred_buy: 'شراء رصيد',

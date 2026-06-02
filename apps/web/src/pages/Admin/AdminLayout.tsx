@@ -1,12 +1,7 @@
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Users, GraduationCap, LogOut, Shield, ClipboardList } from 'lucide-react';
-import { TUTOR_APPLICATIONS, TutorApplication } from '../../data/mockData';
-
-function getPendingCount(): number {
-  const stored = JSON.parse(localStorage.getItem('speakoo_applications') || 'null') as TutorApplication[] | null;
-  const apps = stored ?? TUTOR_APPLICATIONS;
-  return apps.filter((a) => a.status === 'pending').length;
-}
+import { listAdminUsers } from '../../core/network/adminApi';
 
 const NAV_ITEMS = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -17,6 +12,16 @@ const NAV_ITEMS = [
 
 export default function AdminLayout() {
   const navigate = useNavigate();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    listAdminUsers(1, 200, 'tutor')
+      .then((res) => {
+        const count = res.data.filter((u) => !u.tutorProfile?.isApproved).length;
+        setPendingCount(count);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSignOut = () => {
     localStorage.removeItem('speakoo_user');
@@ -37,7 +42,7 @@ export default function AdminLayout() {
 
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
-            const pendingCount = label === 'Applications' ? getPendingCount() : 0;
+            const count = label === 'Applications' ? pendingCount : 0;
             return (
               <NavLink
                 key={to}
@@ -53,9 +58,9 @@ export default function AdminLayout() {
               >
                 <Icon size={17} />
                 <span className="flex-1">{label}</span>
-                {pendingCount > 0 && (
+                {count > 0 && (
                   <span className="text-xs bg-amber-400 text-white font-bold px-1.5 py-0.5 rounded-full leading-none">
-                    {pendingCount}
+                    {count}
                   </span>
                 )}
               </NavLink>

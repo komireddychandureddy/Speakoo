@@ -17,6 +17,10 @@ const PAGE_TITLES: Record<string, string> = {
   '/faq': 'FAQs',
   '/tutor-pricing': 'My Pricing',
   '/tutor-payout': 'Payout Settings',
+  '/favorites': 'Saved Tutors',
+  '/messages': 'Messages',
+  '/settings': 'Settings',
+  '/language-test': 'Language Test',
 };
 
 export default function AppLayout() {

@@ -1,10 +1,12 @@
-import { Controller, Post, Get, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
 import { GroupSessionsService, GroupSessionSummary } from './group-sessions.service';
 import { CreateGroupSessionDto } from './dto/create-group-session.dto';
 import { GlobalJwtAuthGuard } from '../auth/guards/global-jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Public } from '../auth/decorators/public.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { User } from '@prisma/client';
 
 @Controller('group-sessions')
 export class GroupSessionsController {
@@ -27,9 +29,9 @@ export class GroupSessionsController {
   @Roles('tutor')
   @Post()
   createGroupSession(
-    @Request() req: { user: { userId: string } },
+    @CurrentUser() user: User,
     @Body() dto: CreateGroupSessionDto,
   ): Promise<GroupSessionSummary> {
-    return this.groupSessionsService.createGroupSession(req.user.userId, dto);
+    return this.groupSessionsService.createGroupSession(user.id, dto);
   }
 }

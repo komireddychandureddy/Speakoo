@@ -17,4 +17,12 @@ export class UsersService {
   getPublicProfile(userId: string) {
     return this.usersRepository.findPublicProfile(userId);
   }
+
+  getMyPoints(userId: string) {
+    return this.usersRepository.getPoints(userId);
+  }
+
+  getMyBadges(userId: string) {
+    return this.usersRepository.getBadges(userId);
+  }
 }

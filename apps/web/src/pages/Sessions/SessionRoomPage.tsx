@@ -4,7 +4,7 @@ import {
   Mic, MicOff, Video, VideoOff, PhoneOff, MessageSquare,
   Monitor, Hand, Users, MoreVertical, Copy, Check,
 } from 'lucide-react';
-import { SESSIONS } from '../../data/mockData';
+import { getSessionToken } from '../../core/network/sessionsApi';
 
 interface ChatMessage {
   id: string;
@@ -23,16 +23,16 @@ export default function SessionRoomPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const session = SESSIONS.find((s) => s.id === id) ?? {
+  const session = {
     id: id ?? 'demo',
-    sessionNumber: 142,
+    sessionNumber: 1,
     topic: "Live Session",
-    tutorName: 'Priya Sharma',
-    tutorAvatar: 'PS',
+    tutorName: 'Tutor',
+    tutorAvatar: 'T',
     date: new Date().toISOString().slice(0, 10),
     timeSlot: 'Now',
     duration: 25,
-    status: 'upcoming' as const,
+    status: 'in_session' as const,
   };
 
   const [micOn, setMicOn] = useState(true);
@@ -44,7 +44,17 @@ export default function SessionRoomPage() {
   const [elapsed, setElapsed] = useState(0);
   const [copied, setCopied] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [livekitToken, setLivekitToken] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Fetch LiveKit token on mount
+  useEffect(() => {
+    if (!id) return;
+    getSessionToken(id)
+      .then(setLivekitToken)
+      .catch(() => setTokenError('Failed to connect to session. The session may not be active yet.'));
+  }, [id]);
 
   // Session timer
   useEffect(() => {
@@ -116,6 +126,17 @@ export default function SessionRoomPage() {
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
+        {tokenError && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-red-600 text-white text-sm px-4 py-2 rounded-lg shadow-lg">
+            {tokenError}
+          </div>
+        )}
+        {!livekitToken && !tokenError && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-gray-700 text-gray-300 text-sm px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full border-2 border-gray-400 border-t-white animate-spin" />
+            Connecting to session…
+          </div>
+        )}
         {/* Video Area */}
         <div className="flex-1 flex flex-col gap-3 p-4 overflow-hidden">
           {/* Tutor Video (main) */}

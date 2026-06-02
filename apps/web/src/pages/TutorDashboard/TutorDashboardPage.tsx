@@ -1,18 +1,7 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, Calendar, DollarSign, Users, Clock, TrendingUp, ArrowRight } from 'lucide-react';
-
-const UPCOMING_SESSIONS = [
-  { id: '1', student: 'Aryan K.', lang: 'English', time: 'Today, 10:00 AM', duration: '60 min', status: 'confirmed' },
-  { id: '2', student: 'Fatima A.', lang: 'English', time: 'Today, 2:00 PM', duration: '45 min', status: 'confirmed' },
-  { id: '3', student: 'Liam P.', lang: 'English', time: 'Tomorrow, 9:00 AM', duration: '60 min', status: 'pending' },
-];
-
-const STATS = [
-  { icon: Calendar, label: "Today's Sessions", value: '3', sub: '+1 pending', color: '#E8F5E9', iconColor: '#43A047' },
-  { icon: DollarSign, label: 'This Month', value: '$840', sub: '↑ 12% vs last month', color: '#E8F5E9', iconColor: '#2E7D32' },
-  { icon: Star, label: 'Avg Rating', value: '4.9', sub: 'From 128 reviews', color: '#FFF8E1', iconColor: '#FF8F00' },
-  { icon: Users, label: 'Total Students', value: '47', sub: '8 active this week', color: '#E8F5E9', iconColor: '#43A047' },
-];
+import { getMyBookings, type Booking } from '../../core/network/bookingsApi';
 
 const QUICK_ACTIONS = [
   { label: 'Manage Schedule', to: '/tutor-schedule', icon: Calendar },
@@ -22,14 +11,63 @@ const QUICK_ACTIONS = [
 
 export default function TutorDashboardPage() {
   const navigate = useNavigate();
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getMyBookings()
+      .then(setBookings)
+      .catch(() => setBookings([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const now = new Date();
+  const upcoming = bookings
+    .filter((b) => b.status === 'confirmed' || b.status === 'pending')
+    .sort((a, b) => new Date(a.slot.startTime).getTime() - new Date(b.slot.startTime).getTime())
+    .slice(0, 5);
+
+  const todaySessions = bookings.filter((b) => {
+    const d = new Date(b.slot.startTime);
+    return d.toDateString() === now.toDateString() && b.status !== 'cancelled';
+  }).length;
+
+  const monthEarnings = bookings
+    .filter((b) => {
+      const d = new Date(b.slot.startTime);
+      return b.status === 'completed' && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    })
+    .reduce((sum, b) => sum + b.priceCents - b.platformFeeCents, 0);
+
+  const completedCount = bookings.filter((b) => b.status === 'completed').length;
+
+  const stats = [
+    { icon: Calendar, label: "Today's Sessions", value: String(todaySessions), sub: 'Scheduled', color: '#E8F5E9', iconColor: '#43A047' },
+    { icon: DollarSign, label: 'This Month', value: `$${(monthEarnings / 100).toFixed(0)}`, sub: 'Net earnings', color: '#E8F5E9', iconColor: '#2E7D32' },
+    { icon: Star, label: 'Avg Rating', value: '–', sub: 'See feedback page', color: '#FFF8E1', iconColor: '#FF8F00' },
+    { icon: Users, label: 'Sessions Done', value: String(completedCount), sub: 'Total completed', color: '#E8F5E9', iconColor: '#43A047' },
+  ];
+
+  const formatSlotTime = (iso: string) => {
+    const d = new Date(iso);
+    const today = d.toDateString() === now.toDateString();
+    const tomorrow = d.toDateString() === new Date(now.getTime() + 86400000).toDateString();
+    const prefix = today ? 'Today' : tomorrow ? 'Tomorrow' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${prefix}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+  };
+
+  const durationMin = (b: Booking) => {
+    const ms = new Date(b.slot.endTime).getTime() - new Date(b.slot.startTime).getTime();
+    return `${Math.round(ms / 60000)} min`;
+  };
 
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Welcome Banner */}
       <div className="rounded-2xl bg-gradient-to-r from-[#2E7D32] to-[#43A047] text-white px-6 py-6">
         <p className="text-green-200 text-sm font-medium mb-1">Good morning 👋</p>
-        <h2 className="text-2xl font-extrabold">Welcome back, Priya!</h2>
-        <p className="text-green-100 text-sm mt-1">You have 3 sessions scheduled today. Keep it up!</p>
+        <h2 className="text-2xl font-extrabold">Welcome back!</h2>
+        <p className="text-green-100 text-sm mt-1">You have {todaySessions} session{todaySessions !== 1 ? 's' : ''} scheduled today.</p>
         <div className="flex items-center gap-3 mt-4">
           <button
             onClick={() => navigate('/tutor-schedule')}
@@ -48,7 +86,7 @@ export default function TutorDashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {STATS.map((stat) => (
+        {stats.map((stat) => (
           <div key={stat.label} className="card px-4 py-4">
             <div
               className="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
@@ -75,41 +113,47 @@ export default function TutorDashboardPage() {
               View all <ArrowRight size={12} />
             </button>
           </div>
-          <div className="space-y-3">
-            {UPCOMING_SESSIONS.map((s) => (
-              <div key={s.id} className="flex items-center justify-between p-3 bg-[#F8FBF0] rounded-xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#43A047] text-white font-bold text-sm flex items-center justify-center flex-shrink-0">
-                    {s.student.charAt(0)}
+          {loading ? (
+            <p className="text-sm text-gray-400 text-center py-6">Loading…</p>
+          ) : upcoming.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">No upcoming sessions.</p>
+          ) : (
+            <div className="space-y-3">
+              {upcoming.map((b) => (
+                <div key={b.id} className="flex items-center justify-between p-3 bg-[#F8FBF0] rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-[#43A047] text-white font-bold text-sm flex items-center justify-center flex-shrink-0">
+                      {b.language.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{b.language}</p>
+                      <p className="text-xs text-gray-500">{durationMin(b)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{s.student}</p>
-                    <p className="text-xs text-gray-500">{s.lang} · {s.duration}</p>
-                  </div>
-                </div>
-                <div className="text-right flex flex-col items-end gap-1">
-                  <p className="text-xs text-gray-600 font-medium">{s.time}</p>
-                  <span
-                    className={`text-xs font-semibold px-2 py-0.5 rounded-full inline-block ${
-                      s.status === 'confirmed'
-                        ? 'bg-[#BBF7D0] text-[#14783D]'
-                        : 'bg-yellow-100 text-yellow-700'
-                    }`}
-                  >
-                    {s.status}
-                  </span>
-                  {s.status === 'confirmed' && (
-                    <button
-                      onClick={() => navigate('/session-room/' + s.id)}
-                      className="text-xs bg-[#43A047] text-white px-3 py-1 rounded-lg font-semibold hover:bg-[#2E7D32] transition-colors"
+                  <div className="text-right flex flex-col items-end gap-1">
+                    <p className="text-xs text-gray-600 font-medium">{formatSlotTime(b.slot.startTime)}</p>
+                    <span
+                      className={`text-xs font-semibold px-2 py-0.5 rounded-full inline-block ${
+                        b.status === 'confirmed'
+                          ? 'bg-[#BBF7D0] text-[#14783D]'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}
                     >
-                      Join
-                    </button>
-                  )}
+                      {b.status}
+                    </span>
+                    {b.status === 'confirmed' && (
+                      <button
+                        onClick={() => navigate('/session-room/' + b.id)}
+                        className="text-xs bg-[#43A047] text-white px-3 py-1 rounded-lg font-semibold hover:bg-[#2E7D32] transition-colors"
+                      >
+                        Join
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Quick Actions + Tip */}
@@ -139,40 +183,6 @@ export default function TutorDashboardPage() {
               Tutors who respond to booking requests within 2 hours get 40% more repeat students.
             </p>
           </div>
-        </div>
-      </div>
-
-      {/* Earnings Summary */}
-      <div className="card px-5 py-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-gray-900">Earnings This Week</h3>
-          <button
-            onClick={() => navigate('/tutor-earnings')}
-            className="text-xs text-[#43A047] font-semibold hover:underline flex items-center gap-1"
-          >
-            Full report <ArrowRight size={12} />
-          </button>
-        </div>
-        <div className="grid grid-cols-5 sm:grid-cols-7 gap-1 items-end h-24">
-          {[
-            { day: 'Mon', amount: 60, sessions: 2 },
-            { day: 'Tue', amount: 90, sessions: 3 },
-            { day: 'Wed', amount: 30, sessions: 1 },
-            { day: 'Thu', amount: 120, sessions: 4 },
-            { day: 'Fri', amount: 60, sessions: 2 },
-            { day: 'Sat', amount: 150, sessions: 5 },
-            { day: 'Sun', amount: 0, sessions: 0 },
-          ].map((d) => (
-            <div key={d.day} className="flex flex-col items-center gap-1">
-              <span className="text-xs text-gray-500 font-medium">${d.amount}</span>
-              <div
-                className="w-full rounded-t-md bg-[#43A047] transition-all"
-                style={{ height: `${(d.amount / 150) * 64}px`, minHeight: d.amount ? '4px' : '0' }}
-                title={`${d.sessions} sessions`}
-              />
-              <span className="text-xs text-gray-500">{d.day}</span>
-            </div>
-          ))}
         </div>
       </div>
     </div>

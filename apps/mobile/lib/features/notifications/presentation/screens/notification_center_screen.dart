@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../application/notifications_provider.dart';
 
 enum _NotifType { booking, reminder, payment, system }
 
@@ -21,15 +23,15 @@ class _NotifItem {
   });
 }
 
-class NotificationCenterScreen extends StatefulWidget {
+class NotificationCenterScreen extends ConsumerStatefulWidget {
   const NotificationCenterScreen({super.key});
 
   @override
-  State<NotificationCenterScreen> createState() =>
+  ConsumerState<NotificationCenterScreen> createState() =>
       _NotificationCenterScreenState();
 }
 
-class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
+class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScreen> {
   // Stub notifications — real data would come from a provider
   final List<_NotifItem> _items = [
     _NotifItem(
@@ -116,6 +118,26 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final notificationsAsync = ref.watch(notificationsProvider);
+
+    if (notificationsAsync.hasValue && _items.length <= 5) {
+      final fromApi = notificationsAsync.value ?? [];
+      if (fromApi.isNotEmpty) {
+        _items
+          ..clear()
+          ..addAll(
+            fromApi.map(
+              (n) => _NotifItem(
+                title: n.type.replaceAll('_', ' ').toUpperCase(),
+                body: 'Channel: ${n.channel}',
+                time: n.sentAt,
+                type: _NotifType.system,
+              ),
+            ),
+          );
+      }
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(

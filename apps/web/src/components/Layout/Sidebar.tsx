@@ -17,6 +17,10 @@ const NAV_ITEMS = [
   { icon: '❓', key: 'nav_faq', to: '/faq' },
   { icon: '🎙️', key: 'nav_practice', to: '/practice' },
   { icon: '🌐', key: 'nav_community', to: '/community' },
+  { icon: '❤️', key: 'nav_favorites', to: '/favorites' },
+  { icon: '💬', key: 'nav_messages', to: '/messages' },
+  { icon: '🧪', key: 'nav_language_test', to: '/language-test' },
+  { icon: '⚙️', key: 'nav_settings', to: '/settings' },
 ] as const;
 
 const TUTOR_ITEMS = [

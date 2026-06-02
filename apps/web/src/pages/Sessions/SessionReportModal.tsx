@@ -1,9 +1,9 @@
 ﻿import { useState } from 'react';
 import { X } from 'lucide-react';
-import type { Session } from '../../data/mockData';
+import type { Booking } from '../../core/network/bookingsApi';
 
 interface Props {
-  session: Session;
+  booking: Booking;
   onClose: () => void;
 }
 
@@ -18,7 +18,7 @@ const FEEDBACK_CATEGORIES = [
   { key: 'pronunciation', label: 'Pronunciation', max: 3 },
 ];
 
-export default function SessionReportModal({ session, onClose }: Props) {
+export default function SessionReportModal({ booking, onClose }: Props) {
   const [scores, setScores] = useState<Record<string, number>>(
     Object.fromEntries(FEEDBACK_CATEGORIES.map((c) => [c.key, 0]))
   );
@@ -41,7 +41,7 @@ export default function SessionReportModal({ session, onClose }: Props) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#EEEEEE]">
           <div>
             <h2 className="font-bold text-gray-900">Session Report</h2>
-            <p className="text-xs text-gray-500">Session #{session.sessionNumber} · {session.tutorName}</p>
+            <p className="text-xs text-gray-500">{booking.language} Session · {new Date(booking.slot.startTime).toLocaleDateString()}</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
             <X size={18} />

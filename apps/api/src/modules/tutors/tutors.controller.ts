@@ -3,6 +3,7 @@ import { TutorsService } from './tutors.service';
 import { CreateTutorProfileDto } from './dto/create-tutor-profile.dto';
 import { CreateAvailabilitySlotDto } from './dto/create-availability-slot.dto';
 import { SearchTutorsDto } from './dto/search-tutors.dto';
+import { SlotsQueryDto } from './dto/slots-query.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -38,8 +39,14 @@ export class TutorsController {
 
   @Roles('tutor')
   @Get('slots')
-  getMySlots(@CurrentUser() user: User) {
-    return this.tutorsService.getMySlots(user.id);
+  getMySlots(@CurrentUser() user: User, @Query() query: SlotsQueryDto) {
+    return this.tutorsService.getMySlots(user.id, query.timezone);
+  }
+
+  @Public()
+  @Get(':id/slots')
+  getPublicSlots(@Param('id', ParseUUIDPipe) id: string, @Query() query: SlotsQueryDto) {
+    return this.tutorsService.getPublicSlots(id, query.timezone);
   }
 
   @Public()
