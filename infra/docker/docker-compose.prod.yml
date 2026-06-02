@@ -28,6 +28,8 @@ services:
   api:
     image: ghcr.io/${GHCR_OWNER}/speakoo-api:${IMAGE_TAG}
     restart: unless-stopped
+    # Compatibility fallback: some builds emit dist/main, others dist/src/main.
+    command: ["/bin/sh", "-c", "node dist/main || node dist/src/main"]
     environment:
       NODE_ENV: production
     # Bind to all interfaces — Oracle Cloud security groups restrict external access

@@ -93,6 +93,26 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 echo "✓ Services started"
 
 echo ""
+echo "[7/7] Testing API health..."
+API_HEALTH_OK=0
+for i in {1..12}; do
+    if curl -fsS http://localhost:3000/api/v1/health >/dev/null 2>&1; then
+        API_HEALTH_OK=1
+        break
+    fi
+    sleep 5
+done
+
+if [ "$API_HEALTH_OK" -eq 1 ]; then
+    echo "✓ API is healthy!"
+else
+    echo "✗ API health check failed after 60s"
+    echo "Recent API logs:"
+    docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=80 api || true
+    exit 1
+fi
+
+echo ""
 echo "======================================"
 echo "✓ Update complete!"
 echo "======================================"
