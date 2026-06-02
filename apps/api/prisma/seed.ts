@@ -1,3 +1,4 @@
+﻿/* eslint-disable no-console */
 import { PrismaClient, UserRole, SlotStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -5,29 +6,42 @@ const prisma = new PrismaClient();
 const BCRYPT_ROUNDS = 12;
 
 async function main() {
-  console.log('Seeding database…');
+  console.log('Seeding databaseâ€¦');
 
-  // ── 1. Admin ──────────────────────────────────────────────────────────
-  const adminPw = await bcrypt.hash('Admin@speakoo1', BCRYPT_ROUNDS);
+  // â”€â”€ 1. Admins â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const adminPw = await bcrypt.hash('Admin@123!', BCRYPT_ROUNDS);
   const admin = await prisma.user.upsert({
     where: { email: 'admin@speakoo.com' },
-    update: {},
+    update: { passwordHash: adminPw },
     create: {
       email: 'admin@speakoo.com',
       passwordHash: adminPw,
       role: UserRole.admin,
       isVerified: true,
-      profile: { create: { displayName: 'Admin', timezone: 'UTC' } },
+      profile: { create: { displayName: 'Speakoo Admin', timezone: 'UTC' } },
     },
   });
 
-  // ── 2. Tutors ─────────────────────────────────────────────────────────
-  const tutor1Pw = await bcrypt.hash('Tutor1@speakoo', BCRYPT_ROUNDS);
-  const tutor1 = await prisma.user.upsert({
-    where: { email: 'priya.sharma@speakoo.com' },
-    update: {},
+  const opsPw = await bcrypt.hash('Admin@123!', BCRYPT_ROUNDS);
+  const ops = await prisma.user.upsert({
+    where: { email: 'ops@speakoo.com' },
+    update: { passwordHash: opsPw },
     create: {
-      email: 'priya.sharma@speakoo.com',
+      email: 'ops@speakoo.com',
+      passwordHash: opsPw,
+      role: UserRole.admin,
+      isVerified: true,
+      profile: { create: { displayName: 'Ops Admin', timezone: 'UTC' } },
+    },
+  });
+
+  // â”€â”€ 2. Tutors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const tutor1Pw = await bcrypt.hash('Tutor@123!', BCRYPT_ROUNDS);
+  const tutor1 = await prisma.user.upsert({
+    where: { email: 'priya@speakoo.com' },
+    update: { passwordHash: tutor1Pw },
+    create: {
+      email: 'priya@speakoo.com',
       passwordHash: tutor1Pw,
       role: UserRole.tutor,
       isVerified: true,
@@ -52,28 +66,28 @@ async function main() {
     include: { tutorProfile: true },
   });
 
-  const tutor2Pw = await bcrypt.hash('Tutor2@speakoo', BCRYPT_ROUNDS);
+  const tutor2Pw = await bcrypt.hash('Tutor@123!', BCRYPT_ROUNDS);
   const tutor2 = await prisma.user.upsert({
-    where: { email: 'marc.dupont@speakoo.com' },
-    update: {},
+    where: { email: 'rahul@speakoo.com' },
+    update: { passwordHash: tutor2Pw },
     create: {
-      email: 'marc.dupont@speakoo.com',
+      email: 'rahul@speakoo.com',
       passwordHash: tutor2Pw,
       role: UserRole.tutor,
       isVerified: true,
       profile: {
         create: {
-          displayName: 'Marc Dupont',
-          bio: 'Native French speaker from Paris. Business French and DELF exam prep.',
-          nativeLanguage: 'French',
-          countryCode: 'FR',
-          timezone: 'Europe/Paris',
+          displayName: 'Rahul Verma',
+          bio: 'Native Hindi speaker from Delhi. Business English and IELTS exam prep.',
+          nativeLanguage: 'Hindi',
+          countryCode: 'IN',
+          timezone: 'Asia/Kolkata',
         },
       },
       tutorProfile: {
         create: {
-          languagesTaught: ['French'],
-          hourlyRateCents: 55_00,
+          languagesTaught: ['English', 'Hindi'],
+          hourlyRateCents: 50_00,
           cefrSpecialties: ['A1', 'A2', 'B1', 'B2', 'C1'],
           isApproved: true,
         },
@@ -82,11 +96,11 @@ async function main() {
     include: { tutorProfile: true },
   });
 
-  // Pending (not yet approved) tutor — triggers the admin approval flow
+  // Pending (not yet approved) tutor â€” triggers the admin approval flow
   const tutor3Pw = await bcrypt.hash('Tutor3@speakoo', BCRYPT_ROUNDS);
   const tutor3 = await prisma.user.upsert({
     where: { email: 'ana.garcia@speakoo.com' },
-    update: {},
+    update: { passwordHash: tutor3Pw },
     create: {
       email: 'ana.garcia@speakoo.com',
       passwordHash: tutor3Pw,
@@ -94,7 +108,7 @@ async function main() {
       isVerified: true,
       profile: {
         create: {
-          displayName: 'Ana García',
+          displayName: 'Ana GarcÃ­a',
           bio: 'Spanish and Portuguese tutor from Madrid. 5 years teaching DELE prep.',
           nativeLanguage: 'Spanish',
           countryCode: 'ES',
@@ -113,19 +127,19 @@ async function main() {
     include: { tutorProfile: true },
   });
 
-  // ── 3. Learners ───────────────────────────────────────────────────────
-  const learner1Pw = await bcrypt.hash('Learner1@speakoo', BCRYPT_ROUNDS);
+  // â”€â”€ 3. Learners â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const learner1Pw = await bcrypt.hash('Learn@123!', BCRYPT_ROUNDS);
   const learner1 = await prisma.user.upsert({
-    where: { email: 'alex.johnson@example.com' },
-    update: {},
+    where: { email: 'alice@speakoo.com' },
+    update: { passwordHash: learner1Pw },
     create: {
-      email: 'alex.johnson@example.com',
+      email: 'alice@speakoo.com',
       passwordHash: learner1Pw,
       role: UserRole.learner,
       isVerified: true,
       profile: {
         create: {
-          displayName: 'Alex Johnson',
+          displayName: 'Alice Chen',
           nativeLanguage: 'English',
           countryCode: 'US',
           timezone: 'America/New_York',
@@ -134,27 +148,27 @@ async function main() {
     },
   });
 
-  const learner2Pw = await bcrypt.hash('Learner2@speakoo', BCRYPT_ROUNDS);
+  const learner2Pw = await bcrypt.hash('Learn@123!', BCRYPT_ROUNDS);
   const learner2 = await prisma.user.upsert({
-    where: { email: 'yuki.tanaka@example.com' },
-    update: {},
+    where: { email: 'bob@speakoo.com' },
+    update: { passwordHash: learner2Pw },
     create: {
-      email: 'yuki.tanaka@example.com',
+      email: 'bob@speakoo.com',
       passwordHash: learner2Pw,
       role: UserRole.learner,
       isVerified: true,
       profile: {
         create: {
-          displayName: 'Yuki Tanaka',
-          nativeLanguage: 'Japanese',
-          countryCode: 'JP',
-          timezone: 'Asia/Tokyo',
+          displayName: 'Bob MÃ¼ller',
+          nativeLanguage: 'German',
+          countryCode: 'DE',
+          timezone: 'Europe/Berlin',
         },
       },
     },
   });
 
-  // ── 4. Availability Slots for approved tutors ─────────────────────────
+  // â”€â”€ 4. Availability Slots for approved tutors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const tutor1Profile = await prisma.tutorProfile.findUniqueOrThrow({
     where: { userId: tutor1.id },
   });
@@ -165,7 +179,7 @@ async function main() {
   const now = new Date();
   now.setMinutes(0, 0, 0);
 
-  // Generate 7 days × 3 slots per tutor
+  // Generate 7 days Ã— 3 slots per tutor
   const slotOffsets = [
     { dayOffset: 1, hour: 9 },
     { dayOffset: 1, hour: 14 },
@@ -188,7 +202,12 @@ async function main() {
     });
     if (!existing1) {
       await prisma.availabilitySlot.create({
-        data: { tutorId: tutor1Profile.id, startTime: start, endTime: end, status: SlotStatus.available },
+        data: {
+          tutorId: tutor1Profile.id,
+          startTime: start,
+          endTime: end,
+          status: SlotStatus.available,
+        },
       });
     }
 
@@ -202,16 +221,21 @@ async function main() {
     });
     if (!existing2) {
       await prisma.availabilitySlot.create({
-        data: { tutorId: tutor2Profile.id, startTime: start2, endTime: end2, status: SlotStatus.available },
+        data: {
+          tutorId: tutor2Profile.id,
+          startTime: start2,
+          endTime: end2,
+          status: SlotStatus.available,
+        },
       });
     }
   }
 
-  // ── 5. Credit Bundles ──────────────────────────────────────────────────
+  // â”€â”€ 5. Credit Bundles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const bundles = [
-    { name: 'Starter – 5 credits', credits: 5, priceCents: 1999 },
-    { name: 'Growth – 10 credits', credits: 10, priceCents: 3499 },
-    { name: 'Pro – 25 credits', credits: 25, priceCents: 7999 },
+    { name: 'Starter â€“ 5 credits', credits: 5, priceCents: 1999 },
+    { name: 'Growth â€“ 10 credits', credits: 10, priceCents: 3499 },
+    { name: 'Pro â€“ 25 credits', credits: 25, priceCents: 7999 },
   ];
 
   for (const b of bundles) {
@@ -222,7 +246,7 @@ async function main() {
   }
 
   console.log('Seed complete:', {
-    admin: admin.email,
+    admins: [admin.email, ops.email],
     tutors: [tutor1.email, tutor2.email, tutor3.email],
     learners: [learner1.email, learner2.email],
   });
