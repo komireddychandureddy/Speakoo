@@ -1,7 +1,6 @@
 ﻿import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useLocale } from '../../core/locale/LocaleContext';
-import { tzAbbr } from '../../core/utils/timezone';
 
 // Static time slots — tutor availability fetched separately when needed
 const TIME_SLOTS = [
@@ -39,11 +38,9 @@ export default function ViewScheduleModal({ tutorName, selectedDate, onClose, on
         </div>
 
         {/* Timezone info banner */}
-        {showTz && (
-          <div className="px-6 py-2.5 bg-[#E8F5E9] border-b border-[#C8E6C9] text-xs text-[#2E7D32]">
-            🕒 Times in your timezone ({tzAbbr(userTz)}). Tutor is in ({tzAbbr(tutorTz!)}).
-          </div>
-        )}
+        <div className="px-6 py-2.5 bg-[#E8F5E9] border-b border-[#C8E6C9] text-xs text-[#2E7D32]">
+          🕒 Times shown in your timezone ({userTz}).
+        </div>
 
         {/* Legend */}
         <div className="flex gap-4 px-6 py-3 border-b border-[#EEEEEE] text-xs">
@@ -67,7 +64,7 @@ export default function ViewScheduleModal({ tutorName, selectedDate, onClose, on
             {TIME_SLOTS.map((slot) => {
               const reserved = RESERVED_SLOTS.includes(slot);
               const selected = selectedSlot === slot;
-              const displayTime = showTz ? slotToUserTime(slot, tutorTz!, userTz) : slot;
+              const displayTime = slot;
               return (
                 <button
                   key={slot}
@@ -82,9 +79,6 @@ export default function ViewScheduleModal({ tutorName, selectedDate, onClose, on
                   }`}
                 >
                   <span>{displayTime}</span>
-                  {showTz && displayTime !== slot && (
-                    <span className="text-[10px] opacity-60">{slot}</span>
-                  )}
                 </button>
               );
             })}
@@ -98,7 +92,7 @@ export default function ViewScheduleModal({ tutorName, selectedDate, onClose, on
             className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {selectedSlot
-              ? `Book ${showTz ? slotToUserTime(selectedSlot, tutorTz!, userTz) : selectedSlot}`
+              ? `Book ${selectedSlot}`
               : 'Select a time slot'}
           </button>
         </div>
