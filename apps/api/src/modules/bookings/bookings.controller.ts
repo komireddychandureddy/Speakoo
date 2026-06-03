@@ -1,5 +1,5 @@
 import { Controller, Post, Get, Delete, Body, Param, ParseUUIDPipe } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -12,6 +12,7 @@ export class BookingsController {
 
   @Roles('learner')
   @Post()
+  @Throttle({ default: { ttl: 60_000, limit: 180 } })
   create(@CurrentUser() user: User, @Body() dto: CreateBookingDto) {
     return this.bookingsService.createBooking(user.id, dto);
   }

@@ -8,7 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { TutorsService } from './tutors.service';
 import { CreateTutorProfileDto } from './dto/create-tutor-profile.dto';
 import { CreateAvailabilitySlotDto } from './dto/create-availability-slot.dto';
@@ -62,6 +62,7 @@ export class TutorsController {
 
   @Roles('tutor')
   @Post('slots')
+  @Throttle({ default: { ttl: 60_000, limit: 240 } })
   createSlot(@CurrentUser() user: User, @Body() dto: CreateAvailabilitySlotDto) {
     return this.tutorsService.createSlot(user.id, dto);
   }
@@ -74,6 +75,7 @@ export class TutorsController {
 
   @Roles('tutor')
   @Post('slots/bulk')
+  @Throttle({ default: { ttl: 60_000, limit: 120 } })
   createBulkSlots(@CurrentUser() user: User, @Body() dto: CreateBulkSlotsDto) {
     return this.tutorsService.createBulkSlots(user.id, dto);
   }

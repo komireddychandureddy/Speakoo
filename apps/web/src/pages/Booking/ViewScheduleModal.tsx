@@ -7,11 +7,19 @@ interface Props {
   tutorName: string;
   selectedDate: string;
   slots: AvailabilitySlot[];
+  bookingInProgress?: boolean;
   onClose: () => void;
   onBook: (slot: AvailabilitySlot) => void;
 }
 
-export default function ViewScheduleModal({ tutorName, selectedDate, slots, onClose, onBook }: Props) {
+export default function ViewScheduleModal({
+  tutorName,
+  selectedDate,
+  slots,
+  bookingInProgress = false,
+  onClose,
+  onBook,
+}: Props) {
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const { userTz } = useLocale();
 
@@ -88,13 +96,11 @@ export default function ViewScheduleModal({ tutorName, selectedDate, slots, onCl
 
         <div className="px-6 py-4 border-t border-[#EEEEEE]">
           <button
-            disabled={!selectedSlot}
+            disabled={!selectedSlot || bookingInProgress}
             onClick={() => selectedSlot && onBook(selectedSlot)}
             className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {selectedSlot
-              ? 'Book Selected Slot'
-              : 'Select a time slot'}
+            {bookingInProgress ? 'Booking…' : selectedSlot ? 'Book Selected Slot' : 'Select a time slot'}
           </button>
         </div>
       </div>

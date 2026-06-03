@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { isAxiosError } from 'axios';
 import { getMyBookings, type Booking } from '../../core/network/bookingsApi';
 import {
   createSlot,
@@ -38,6 +39,7 @@ export default function TutorSchedulePage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [weekOffset, setWeekOffset] = useState(0);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const lastClickRef = useRef<string | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -48,6 +50,24 @@ export default function TutorSchedulePage() {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     getMySlots(timezone).then(setSlots).catch(() => {});
     getMyBookings().then(setBookings).catch(() => {});
+  };
+
+  const refreshSlots = useCallback(() => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return getMySlots(timezone).then(setSlots).catch(() => {});
+  }, []);
+
+  const toApiErrorMessage = (err: unknown): string => {
+    if (!isAxiosError(err)) return 'Something went wrong. Please try again.';
+
+    const status = err.response?.status;
+    if (status === 409) {
+      return 'This slot already exists or overlaps with another slot. The schedule was refreshed.';
+    }
+    if (status === 429) {
+      return 'Too many requests. Please wait a moment and try again.';
+    }
+    return 'Unable to update schedule right now. Please try again.';
   };
 
   useEffect(() => {
@@ -74,6 +94,7 @@ export default function TutorSchedulePage() {
   const createAt = async (date: Date, halfHourIndex: number) => {
     const key = `${date.toDateString()}-${halfHourIndex}`;
     if (busyKey) return;
+    setErrorMessage(null);
     setBusyKey(key);
     const start = new Date(date);
     start.setHours(Math.floor(halfHourIndex / 2), halfHourIndex % 2 === 0 ? 0 : 30, 0, 0);
@@ -82,7 +103,10 @@ export default function TutorSchedulePage() {
 
     try {
       await createSlot({ startTime: start.toISOString(), endTime: end.toISOString() });
-      load();
+      await refreshSlots();
+    } catch (err) {
+      setErrorMessage(toApiErrorMessage(err));
+      await refreshSlots();
     } finally {
       setBusyKey(null);
     }
@@ -90,10 +114,14 @@ export default function TutorSchedulePage() {
 
   const removeSlot = async (slotId: string) => {
     if (busyKey) return;
+    setErrorMessage(null);
     setBusyKey(slotId);
     try {
       await deleteMySlot(slotId);
-      load();
+      await refreshSlots();
+    } catch (err) {
+      setErrorMessage(toApiErrorMessage(err));
+      await refreshSlots();
     } finally {
       setBusyKey(null);
     }
@@ -157,6 +185,7 @@ export default function TutorSchedulePage() {
 
   const createSelectedSlots = useCallback(async () => {
     if (selectedSlots.size === 0 || busyKey) return;
+    setErrorMessage(null);
     setBusyKey('bulk-creating');
 
     try {
@@ -178,7 +207,10 @@ export default function TutorSchedulePage() {
           await createBulkSlots(slotsToCreate);
           setSelectedSlots(new Set());
           lastClickRef.current = null;
-          load();
+          await refreshSlots();
+        } catch (err) {
+          setErrorMessage(toApiErrorMessage(err));
+          await refreshSlots();
         } finally {
           setBusyKey(null);
         }
@@ -186,7 +218,7 @@ export default function TutorSchedulePage() {
     } catch {
       setBusyKey(null);
     }
-  }, [selectedSlots, busyKey]);
+  }, [selectedSlots, busyKey, refreshSlots]);
 
   return (
     <div className="space-y-5 max-w-6xl">
@@ -233,6 +265,12 @@ export default function TutorSchedulePage() {
             <ChevronRight size={18} />
           </button>
         </div>
+
+        {errorMessage && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {errorMessage}
+          </div>
+        )}
 
         {selectedSlots.size > 0 && (
           <div className="mb-4 p-3 bg-blue-50 rounded-lg flex items-center justify-between">

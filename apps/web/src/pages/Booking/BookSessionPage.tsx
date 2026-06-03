@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { isAxiosError } from 'axios';
 import {
   getTutorSlots,
   searchTutors,
@@ -58,6 +59,7 @@ export default function BookSessionPage() {
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [confirmedBooking, setConfirmedBooking] = useState<{ tutor: string; slot: string; date: string } | null>(null);
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingInProgress, setBookingInProgress] = useState(false);
 
   const monthGrid = buildMonthGrid(currentMonth);
 
@@ -74,8 +76,9 @@ export default function BookSessionPage() {
   const TIME_OPTIONS = ['All', 'Morning (6AM–12PM)', 'Afternoon (12PM–5PM)', 'Evening (5PM–9PM)'];
 
   const handleBook = async (slot: AvailabilitySlot) => {
-    if (!scheduleModal) return;
+    if (!scheduleModal || bookingInProgress) return;
     setBookingError(null);
+    setBookingInProgress(true);
     try {
       const created = await createBooking({
         slotId: slot.id,
@@ -93,8 +96,23 @@ export default function BookSessionPage() {
       if (created.status === 'pending') {
         navigate(`/checkout/${created.id}`);
       }
-    } catch {
-      setBookingError('Unable to create booking for this slot. Please try another slot.');
+    } catch (err) {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (isAxiosError(err) && err.response?.status === 409) {
+        setBookingError('This slot was just booked by someone else. Please pick another available slot.');
+        try {
+          const refreshed = await getTutorSlots(scheduleModal.tutorId, timezone);
+          setSlots(refreshed.filter((nextSlot) => isSameDay(new Date(nextSlot.startTime), selectedDate)));
+        } catch {
+          setSlots([]);
+        }
+      } else if (isAxiosError(err) && err.response?.status === 429) {
+        setBookingError('Too many requests. Please wait a few seconds and try again.');
+      } else {
+        setBookingError('Unable to create booking for this slot. Please try another slot.');
+      }
+    } finally {
+      setBookingInProgress(false);
     }
   };
 
@@ -272,6 +290,7 @@ export default function BookSessionPage() {
           tutorName={scheduleModal.tutorName}
           selectedDate={toDisplayDate(selectedDate)}
           slots={slots}
+          bookingInProgress={bookingInProgress}
           onClose={() => setScheduleModal(null)}
           onBook={handleBook}
         />
