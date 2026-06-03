@@ -18,6 +18,7 @@ import { ListKycDto } from './dto/list-kyc.dto';
 import { ReviewKycDto } from './dto/review-kyc.dto';
 import { RecommendTutorsDto } from './dto/recommend-tutors.dto';
 import { CreatePublicTutorApplicationDto } from './dto/create-public-tutor-application.dto';
+import { CreateBulkSlotsDto } from './dto/create-bulk-slots.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -67,6 +68,12 @@ export class TutorsController {
   @Delete('slots/:id')
   deleteSlot(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
     return this.tutorsService.deleteSlot(user.id, id);
+  }
+
+  @Roles('tutor')
+  @Post('slots/bulk')
+  createBulkSlots(@CurrentUser() user: User, @Body() dto: CreateBulkSlotsDto) {
+    return this.tutorsService.createBulkSlots(user.id, dto);
   }
 
   @Roles('tutor')

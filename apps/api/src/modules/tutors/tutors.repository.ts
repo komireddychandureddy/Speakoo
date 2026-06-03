@@ -13,6 +13,7 @@ import { CreateAvailabilitySlotDto } from './dto/create-availability-slot.dto';
 import { SearchTutorsDto } from './dto/search-tutors.dto';
 import { SubmitKycDto } from './dto/submit-kyc.dto';
 import { CreatePublicTutorApplicationDto } from './dto/create-public-tutor-application.dto';
+import { CreateBulkSlotsDto } from './dto/create-bulk-slots.dto';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -128,6 +129,26 @@ export class TutorsRepository {
 
     await this.prisma.availabilitySlot.delete({ where: { id: slotId } });
     return { deleted: true };
+  }
+
+  async createBulkSlots(userId: string, dto: CreateBulkSlotsDto) {
+    const tutorProfile = await this.prisma.tutorProfile.findUnique({ where: { userId } });
+    if (!tutorProfile) throw new NotFoundException('Tutor profile not found');
+
+    const slots = await Promise.all(
+      dto.slots.map((slot: { startTime: string; endTime: string }) =>
+        this.prisma.availabilitySlot.create({
+          data: {
+            tutorId: tutorProfile.id,
+            startTime: new Date(slot.startTime),
+            endTime: new Date(slot.endTime),
+            status: 'available',
+          },
+        }),
+      ),
+    );
+
+    return slots;
   }
 
   async searchTutors(dto: SearchTutorsDto) {

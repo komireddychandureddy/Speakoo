@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TutorsRepository } from './tutors.repository';
+import { CreateBulkSlotsDto } from './dto/create-bulk-slots.dto';
 import { CreateTutorProfileDto } from './dto/create-tutor-profile.dto';
 import { CreateAvailabilitySlotDto } from './dto/create-availability-slot.dto';
 import { SearchTutorsDto } from './dto/search-tutors.dto';
@@ -58,6 +59,10 @@ export class TutorsService {
 
   deleteSlot(userId: string, slotId: string) {
     return this.tutorsRepository.deleteSlot(userId, slotId);
+  }
+
+  createBulkSlots(userId: string, dto: CreateBulkSlotsDto) {
+    return this.tutorsRepository.createBulkSlots(userId, dto);
   }
 
   async getMySlots(userId: string, timezone?: string) {

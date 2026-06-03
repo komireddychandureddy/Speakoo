@@ -122,6 +122,13 @@ export async function createSlot(
   return data;
 }
 
+export async function createBulkSlots(
+  slots: Array<Pick<AvailabilitySlot, 'startTime' | 'endTime'>>,
+): Promise<AvailabilitySlot[]> {
+  const { data } = await apiClient.post<AvailabilitySlot[]>('tutors/slots/bulk', { slots });
+  return data;
+}
+
 export async function getMySlots(timezone?: string): Promise<AvailabilitySlot[]> {
   const { data } = await apiClient.get<AvailabilitySlot[]>('tutors/slots', {
     params: { ...(timezone ? { timezone } : {}) },

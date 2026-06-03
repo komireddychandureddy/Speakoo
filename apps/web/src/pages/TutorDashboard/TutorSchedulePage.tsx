@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { getMyBookings, type Booking } from '../../core/network/bookingsApi';
 import {
   createSlot,
+  createBulkSlots,
   deleteMySlot,
   getMySlots,
   type AvailabilitySlot,
@@ -37,6 +38,9 @@ export default function TutorSchedulePage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [weekOffset, setWeekOffset] = useState(0);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
+  const lastClickRef = useRef<string | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
 
@@ -48,6 +52,9 @@ export default function TutorSchedulePage() {
 
   useEffect(() => {
     load();
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
   }, []);
 
   const slotMap = useMemo(() => {
@@ -92,13 +99,102 @@ export default function TutorSchedulePage() {
     }
   };
 
+  const handleCellClick = useCallback(
+    (date: Date, halfHourIndex: number, event: React.MouseEvent) => {
+      const selectKey = `${date.toDateString()}-${halfHourIndex}`;
+      const dayIndex = (date.getDay() + 6) % 7;
+      const slotKey = `${date.toDateString()}-${dayIndex}-${halfHourIndex}`;
+      const existingSlot = slotMap.get(slotKey);
+
+      if (existingSlot || (!event.shiftKey && selectedSlots.size === 0)) {
+        setSelectedSlots(new Set());
+        lastClickRef.current = null;
+        if (!existingSlot) {
+          void createAt(date, halfHourIndex);
+        }
+        return;
+      }
+
+      if (event.shiftKey && lastClickRef.current) {
+        const [lastDateStr, lastHourStr] = lastClickRef.current.split('-').slice(0, 2);
+        const lastDate = new Date(lastDateStr);
+        const lastHour = parseInt(lastHourStr, 10);
+
+        const newSelected = new Set(selectedSlots);
+        const current = new Date(date);
+        current.setHours(Math.floor(halfHourIndex / 2), halfHourIndex % 2 === 0 ? 0 : 30, 0, 0);
+        const last = new Date(lastDate);
+        last.setHours(Math.floor(lastHour / 2), lastHour % 2 === 0 ? 0 : 30, 0, 0);
+
+        const [startTime, endTime] = current <= last ? [current, last] : [last, current];
+
+        const tempTime = new Date(startTime);
+        while (tempTime <= endTime) {
+          const rangeSelectKey = `${tempTime.toDateString()}-${tempTime.getHours() * 2 + (tempTime.getMinutes() >= 30 ? 1 : 0)}`;
+          const rangeDayIndex = (tempTime.getDay() + 6) % 7;
+          const rangeSlotKey = `${tempTime.toDateString()}-${rangeDayIndex}-${tempTime.getHours() * 2 + (tempTime.getMinutes() >= 30 ? 1 : 0)}`;
+          if (!slotMap.get(rangeSlotKey)) {
+            newSelected.add(rangeSelectKey);
+          }
+          tempTime.setMinutes(tempTime.getMinutes() + 30);
+        }
+
+        setSelectedSlots(newSelected);
+      } else {
+        setSelectedSlots(
+          new Set(
+            selectedSlots.has(selectKey)
+              ? [...selectedSlots].filter((s) => s !== selectKey)
+              : [...selectedSlots, selectKey],
+          ),
+        );
+      }
+
+      lastClickRef.current = selectKey;
+    },
+    [slotMap, selectedSlots],
+  );
+
+  const createSelectedSlots = useCallback(async () => {
+    if (selectedSlots.size === 0 || busyKey) return;
+    setBusyKey('bulk-creating');
+
+    try {
+      const slotsToCreate = Array.from(selectedSlots).map((selectKey) => {
+        const [dateStr, halfHourStr] = selectKey.split('-');
+        const date = new Date(dateStr);
+        const halfHourIndex = parseInt(halfHourStr, 10);
+        const start = new Date(date);
+        start.setHours(Math.floor(halfHourIndex / 2), halfHourIndex % 2 === 0 ? 0 : 30, 0, 0);
+        const end = new Date(start);
+        end.setMinutes(end.getMinutes() + 30);
+        return { startTime: start.toISOString(), endTime: end.toISOString() };
+      });
+
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
+      debounceTimerRef.current = setTimeout(async () => {
+        try {
+          await createBulkSlots(slotsToCreate);
+          setSelectedSlots(new Set());
+          lastClickRef.current = null;
+          load();
+        } finally {
+          setBusyKey(null);
+        }
+      }, 300);
+    } catch {
+      setBusyKey(null);
+    }
+  }, [selectedSlots, busyKey]);
+
   return (
     <div className="space-y-5 max-w-6xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">Schedule & Availability</h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            30-minute slots across 24 hours. Click an empty cell to publish a slot.
+            30-minute slots across 24 hours. Shift+Click to select multiple, or Click for single.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -138,6 +234,31 @@ export default function TutorSchedulePage() {
           </button>
         </div>
 
+        {selectedSlots.size > 0 && (
+          <div className="mb-4 p-3 bg-blue-50 rounded-lg flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-900">{selectedSlots.size} slots selected</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setSelectedSlots(new Set());
+                  lastClickRef.current = null;
+                }}
+                className="px-3 py-1.5 text-sm rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Clear
+              </button>
+              <button
+                disabled={busyKey === 'bulk-creating'}
+                onClick={() => void createSelectedSlots()}
+                className="px-3 py-1.5 text-sm rounded-lg bg-[#43A047] text-white font-medium hover:bg-[#2E7D32] disabled:opacity-50 transition-colors flex items-center gap-1"
+              >
+                <Plus size={14} />
+                Create All
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <div className="min-w-[760px]">
             <div className="grid grid-cols-8 gap-1 mb-1">
@@ -157,8 +278,10 @@ export default function TutorSchedulePage() {
                     {formatHalfHour(halfHourIndex)}
                   </div>
                   {weekDates.map((date, dayIndex) => {
+                    const selectKey = `${date.toDateString()}-${halfHourIndex}`;
                     const slotKey = `${date.toDateString()}-${dayIndex}-${halfHourIndex}`;
                     const slot = slotMap.get(slotKey);
+                    const isSelected = selectedSlots.has(selectKey);
                     const start = new Date(date);
                     start.setHours(Math.floor(halfHourIndex / 2), halfHourIndex % 2 === 0 ? 0 : 30, 0, 0);
                     const isPast = start.getTime() <= Date.now();
@@ -166,19 +289,17 @@ export default function TutorSchedulePage() {
                     return (
                       <div
                         key={`${dayIndex}-${halfHourIndex}`}
-                        onClick={() => {
-                          if (!slot && !isPast) {
-                            void createAt(date, halfHourIndex);
-                          }
-                        }}
-                        className={`h-7 rounded-md text-xs flex items-center justify-center transition-all select-none ${
+                        onClick={(e) => handleCellClick(date, halfHourIndex, e)}
+                        className={`h-7 rounded-md text-xs flex items-center justify-center transition-all select-none cursor-pointer ${
                           slot?.status === 'booked'
-                            ? 'bg-[#1565C0] text-white font-semibold cursor-default'
+                            ? 'bg-[#1565C0] text-white font-semibold'
                             : slot?.status === 'available'
-                              ? 'bg-[#43A047] text-white font-semibold cursor-pointer group relative'
+                              ? 'bg-[#43A047] text-white font-semibold group relative'
                               : isPast
-                                ? 'bg-gray-100 cursor-not-allowed'
-                                : 'bg-white border border-dashed border-gray-300 cursor-pointer hover:border-[#43A047] hover:bg-[#F0FDF4]'
+                                ? 'bg-gray-100'
+                                : isSelected
+                                  ? 'bg-blue-100 border-2 border-blue-400'
+                                  : 'bg-white border border-dashed border-gray-300 hover:border-[#43A047] hover:bg-[#F0FDF4]'
                         }`}
                       >
                         {slot?.status === 'available' && (
