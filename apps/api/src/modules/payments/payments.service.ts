@@ -8,11 +8,14 @@ import {
   NotificationChannel,
   NotificationType,
   PaymentStatus,
+  SlotStatus,
   SubscriptionInterval,
   UserSubscriptionStatus,
   WalletTransactionType,
 } from '@prisma/client';
 import { UpsertSubscriptionPlanDto } from './dto/upsert-subscription-plan.dto';
+
+const PENDING_HOLD_MINUTES = 5;
 
 @Injectable()
 export class PaymentsService {
@@ -106,10 +109,36 @@ export class PaymentsService {
   }
 
   async createPaymentIntent(bookingId: string, learnerId: string) {
-    const booking = await this.prisma.booking.findUniqueOrThrow({ where: { id: bookingId } });
+    const booking = await this.prisma.booking.findUniqueOrThrow({
+      where: { id: bookingId },
+      include: { slot: true },
+    });
 
     if (booking.learnerId !== learnerId) {
       throw new BadRequestException('Booking does not belong to this learner');
+    }
+
+    if (booking.status !== BookingStatus.pending) {
+      throw new BadRequestException('Payment intent can only be created for pending bookings');
+    }
+
+    const holdExpiresAt = new Date(booking.createdAt.getTime() + PENDING_HOLD_MINUTES * 60_000);
+    if (Date.now() > holdExpiresAt.getTime()) {
+      await this.prisma.$transaction([
+        this.prisma.booking.update({
+          where: { id: bookingId },
+          data: { status: BookingStatus.cancelled },
+        }),
+        this.prisma.availabilitySlot.update({
+          where: { id: booking.slotId },
+          data: { status: SlotStatus.available },
+        }),
+        this.prisma.payment.updateMany({
+          where: { bookingId, status: PaymentStatus.pending },
+          data: { status: PaymentStatus.failed },
+        }),
+      ]);
+      throw new BadRequestException('Payment window expired. Please book the slot again.');
     }
 
     const intent = await this.getStripe().paymentIntents.create({
@@ -315,6 +344,14 @@ export class PaymentsService {
     const bookingId = intent.metadata['bookingId'];
     if (!bookingId) return;
 
+    const existingBooking = await this.prisma.booking.findUnique({ where: { id: bookingId } });
+    if (!existingBooking || existingBooking.status !== BookingStatus.pending) {
+      this.logger.warn(
+        `Ignoring payment success for booking ${bookingId}: booking missing or no longer pending`,
+      );
+      return;
+    }
+
     await this.prisma.$transaction([
       this.prisma.payment.update({
         where: { bookingId },
@@ -326,12 +363,12 @@ export class PaymentsService {
       }),
     ]);
 
-    const booking = await this.prisma.booking.findUniqueOrThrow({
+    const bookingWithSlot = await this.prisma.booking.findUniqueOrThrow({
       where: { id: bookingId },
       include: { slot: true },
     });
 
-    await this.notificationsService.scheduleBookingNotifications(bookingId, booking.slot.startTime);
+    await this.notificationsService.scheduleBookingNotifications(bookingId, bookingWithSlot.slot.startTime);
 
     this.logger.log(`Payment succeeded for booking ${bookingId}`);
   }

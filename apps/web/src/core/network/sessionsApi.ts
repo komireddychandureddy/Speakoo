@@ -4,6 +4,7 @@ import apiClient from './apiClient';
 
 export interface SessionToken {
   token: string;
+  wsUrl: string;
 }
 
 export interface Session {
@@ -31,8 +32,8 @@ export interface Feedback {
 
 // ─── API calls ────────────────────────────────────────────────────────────────
 
-export async function getSessionToken(bookingId: string): Promise<string> {
-  const { data } = await apiClient.get<string>(`sessions/${bookingId}/token`);
+export async function getSessionToken(bookingId: string): Promise<SessionToken> {
+  const { data } = await apiClient.get<SessionToken>(`sessions/${bookingId}/token`);
   return data;
 }
 

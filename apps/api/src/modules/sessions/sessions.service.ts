@@ -15,7 +15,7 @@ export class SessionsService {
     private readonly paymentsService: PaymentsService,
   ) {}
 
-  async generateToken(bookingId: string, userId: string): Promise<string> {
+  async generateToken(bookingId: string, userId: string): Promise<{ token: string; wsUrl: string }> {
     const booking = await this.prisma.booking.findUniqueOrThrow({
       where: { id: bookingId },
     });
@@ -44,8 +44,9 @@ export class SessionsService {
     });
 
     const jwt = await token.toJwt();
+    const wsUrl = this.config.getOrThrow<string>('LIVEKIT_WS_URL');
     this.logger.log(`Token generated for user ${userId} in room ${booking.livekitRoom}`);
-    return jwt;
+    return { token: jwt, wsUrl };
   }
 
   async startSession(bookingId: string, userId: string) {

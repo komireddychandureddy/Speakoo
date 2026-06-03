@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CreditCard } from 'lucide-react';
-import { createPaymentIntent } from '../../core/network/bookingsApi';
+import { createPaymentIntent, getBookingById } from '../../core/network/bookingsApi';
 import { purchaseCredits } from '../../core/network/paymentsApi';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -16,6 +16,18 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
  */
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+const HOLD_WINDOW_MS = 5 * 60 * 1000;
+
+function formatCountdown(ms: number): string {
+  const clamped = Math.max(0, ms);
+  const minutes = Math.floor(clamped / 60_000)
+    .toString()
+    .padStart(2, '0');
+  const seconds = Math.floor((clamped % 60_000) / 1000)
+    .toString()
+    .padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
 
 function CheckoutForm({
   clientSecret,
@@ -93,6 +105,50 @@ export default function CheckoutPage() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [holdExpiresAt, setHoldExpiresAt] = useState<number | null>(null);
+  const [holdMsLeft, setHoldMsLeft] = useState<number | null>(null);
+  const [holdExpired, setHoldExpired] = useState(false);
+
+  useEffect(() => {
+    if (!bookingId) return;
+    getBookingById(bookingId)
+      .then((booking) => {
+        if (booking.status !== 'pending') {
+          setHoldExpiresAt(null);
+          setHoldMsLeft(null);
+          setHoldExpired(false);
+          return;
+        }
+        const expiresAt = new Date(booking.createdAt).getTime() + HOLD_WINDOW_MS;
+        const left = Math.max(0, expiresAt - Date.now());
+        setHoldExpiresAt(expiresAt);
+        setHoldMsLeft(left);
+        setHoldExpired(left <= 0);
+      })
+      .catch(() => {
+        // keep checkout resilient even if booking details can't be fetched
+      });
+  }, [bookingId]);
+
+  useEffect(() => {
+    if (!bookingId || holdExpiresAt === null) return;
+
+    const update = () => {
+      const left = holdExpiresAt - Date.now();
+      if (left <= 0) {
+        setHoldMsLeft(0);
+        setHoldExpired(true);
+        setClientSecret(null);
+        setError('Payment window expired. Please book the slot again.');
+        return;
+      }
+      setHoldMsLeft(left);
+    };
+
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [bookingId, holdExpiresAt]);
 
   useEffect(() => {
     if (bookingId) {
@@ -160,13 +216,36 @@ export default function CheckoutPage() {
             </p>
           </div>
         </div>
+        {bookingId && holdMsLeft !== null && !holdExpired && (
+          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Slot reserved</p>
+            <p className="text-sm text-amber-800 mt-1">
+              Complete payment within <span className="font-bold">{formatCountdown(holdMsLeft)}</span> to confirm this booking.
+            </p>
+          </div>
+        )}
+        {bookingId && holdExpired && (
+          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            <p className="text-sm font-semibold text-red-700">Your 5-minute payment hold has expired.</p>
+            <p className="text-xs text-red-600 mt-1">Please return and book the slot again.</p>
+          </div>
+        )}
         {clientSecret ? (
-          <Elements stripe={stripePromise} options={{ clientSecret }}>
-            <CheckoutForm
-              clientSecret={clientSecret}
-              successPath={bookingId ? '/mySession' : '/my-credits'}
-            />
-          </Elements>
+          holdExpired ? (
+            <button
+              onClick={() => window.history.back()}
+              className="w-full border border-gray-200 rounded-xl py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Back to booking
+            </button>
+          ) : (
+            <Elements stripe={stripePromise} options={{ clientSecret }}>
+              <CheckoutForm
+                clientSecret={clientSecret}
+                successPath={bookingId ? '/mySession' : '/my-credits'}
+              />
+            </Elements>
+          )
         ) : (
           <div className="text-center text-gray-400">Unable to load payment form.</div>
         )}

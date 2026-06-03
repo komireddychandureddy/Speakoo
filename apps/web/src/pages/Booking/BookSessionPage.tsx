@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   getTutorSlots,
   searchTutors,
@@ -10,22 +11,41 @@ import { createBooking } from '../../core/network/bookingsApi';
 import ViewScheduleModal from './ViewScheduleModal';
 
 const FILTER_CHIPS = ['All', 'Beginner', 'Intermediate', 'Advanced', 'Business', 'Conversation'];
+const CALENDAR_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
 
-function getWeekDates() {
-  const today = new Date();
-  return DAYS_OF_WEEK.map((day, i) => {
-    const d = new Date(today);
-    const diff = i - today.getDay() + 1;
-    d.setDate(today.getDate() + diff);
-    return { day, date: d.getDate(), full: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) };
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function toDisplayDate(date: Date): string {
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function buildMonthGrid(monthDate: Date): Date[] {
+  const first = startOfMonth(monthDate);
+  const start = new Date(first);
+  start.setDate(first.getDate() - first.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(start);
+    day.setDate(start.getDate() + index);
+    return day;
   });
 }
 
 export default function BookSessionPage() {
-  const weekDates = getWeekDates();
-  const [selectedDayIdx, setSelectedDayIdx] = useState(0);
+  const navigate = useNavigate();
+  const today = new Date();
+  const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState(today);
   const [timeFilter, setTimeFilter] = useState('All');
   const [activeChip, setActiveChip] = useState('All');
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
@@ -38,6 +58,14 @@ export default function BookSessionPage() {
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [confirmedBooking, setConfirmedBooking] = useState<{ tutor: string; slot: string; date: string } | null>(null);
   const [bookingError, setBookingError] = useState<string | null>(null);
+
+  const monthGrid = buildMonthGrid(currentMonth);
+
+  useEffect(() => {
+    if (scheduleModal) {
+      void loadSlots(scheduleModal.tutorId);
+    }
+  }, [selectedDate]);
 
   useEffect(() => {
     searchTutors({}).then((res) => setTutors(res.items)).catch(() => {});
@@ -58,10 +86,13 @@ export default function BookSessionPage() {
       setConfirmedBooking({
         tutor: scheduleModal.tutorName,
         slot: start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-        date: weekDates[selectedDayIdx].full,
+        date: toDisplayDate(selectedDate),
       });
       setScheduleModal(null);
       setSlots([]);
+      if (created.status === 'pending') {
+        navigate(`/checkout/${created.id}`);
+      }
     } catch {
       setBookingError('Unable to create booking for this slot. Please try another slot.');
     }
@@ -71,15 +102,9 @@ export default function BookSessionPage() {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     try {
       const all = await getTutorSlots(tutorId, timezone);
-      const selectedDate = weekDates[selectedDayIdx].full;
       const filtered = all.filter((slot) => {
         const date = new Date(slot.startTime);
-        const full = date.toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        });
-        return full === selectedDate;
+        return isSameDay(date, selectedDate);
       });
       setSlots(filtered);
     } catch {
@@ -87,35 +112,63 @@ export default function BookSessionPage() {
     }
   };
 
-  useEffect(() => {
-    if (scheduleModal) {
-      void loadSlots(scheduleModal.tutorId);
-    }
-  }, [selectedDayIdx]);
-
   return (
     <div className="max-w-4xl space-y-5">
       {/* Date Picker Row */}
-      <div className="card px-4 py-3">
-        <p className="text-xs text-gray-400 font-medium mb-3 uppercase tracking-wide">Select Date</p>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {weekDates.map((d, i) => (
+      <div className="card px-4 py-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Select Date</p>
+          <div className="flex items-center gap-2">
             <button
-              key={i}
-              onClick={() => setSelectedDayIdx(i)}
-              className={`flex flex-col items-center px-4 py-2.5 rounded-xl text-sm min-w-fit border-2 transition-all ${
-                selectedDayIdx === i
-                  ? 'bg-[#43A047] border-[#43A047] text-white'
-                  : 'bg-white border-[#EEEEEE] text-gray-700 hover:border-[#43A047]'
-              }`}
+              onClick={() => setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600"
             >
-              <span className="font-medium">{d.day}</span>
-              <span className={`text-lg font-extrabold ${selectedDayIdx === i ? 'text-white' : 'text-gray-900'}`}>
-                {d.date}
-              </span>
+              <ChevronLeft size={16} />
             </button>
+            <p className="text-sm font-bold text-gray-800 min-w-[130px] text-center">
+              {currentMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+            </p>
+            <button
+              onClick={() => setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {CALENDAR_DAYS.map((day) => (
+            <div key={day} className="text-[11px] text-gray-400 text-center font-semibold py-1">
+              {day}
+            </div>
           ))}
         </div>
+        <div className="grid grid-cols-7 gap-1">
+          {monthGrid.map((day) => {
+            const inMonth = day.getMonth() === currentMonth.getMonth();
+            const selected = isSameDay(day, selectedDate);
+            const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+            const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+            const inPast = dayStart < todayStart;
+            return (
+              <button
+                key={day.toISOString()}
+                disabled={inPast}
+                onClick={() => setSelectedDate(new Date(day.getFullYear(), day.getMonth(), day.getDate()))}
+                className={`h-10 rounded-lg text-sm font-medium transition-colors ${
+                  selected
+                    ? 'bg-[#43A047] text-white'
+                    : inMonth
+                      ? 'text-gray-700 hover:bg-[#E8F5E9]'
+                      : 'text-gray-300 hover:bg-gray-50'
+                } ${inPast ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {day.getDate()}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-gray-500 mt-3">Selected: {toDisplayDate(selectedDate)}</p>
       </div>
 
       {/* Filters Row */}
@@ -217,7 +270,7 @@ export default function BookSessionPage() {
       {scheduleModal && (
         <ViewScheduleModal
           tutorName={scheduleModal.tutorName}
-          selectedDate={weekDates[selectedDayIdx].full}
+          selectedDate={toDisplayDate(selectedDate)}
           slots={slots}
           onClose={() => setScheduleModal(null)}
           onBook={handleBook}

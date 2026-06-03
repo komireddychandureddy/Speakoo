@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { BookingsRepository } from './bookings.repository';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { BookingStatus } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class BookingsService {
@@ -11,6 +13,7 @@ export class BookingsService {
   constructor(
     private readonly bookingsRepository: BookingsRepository,
     private readonly config: ConfigService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private getStripe(): Stripe {
@@ -19,8 +22,15 @@ export class BookingsService {
     });
   }
 
-  createBooking(learnerId: string, dto: CreateBookingDto) {
-    return this.bookingsRepository.createBooking(learnerId, dto);
+  async createBooking(learnerId: string, dto: CreateBookingDto) {
+    const booking = await this.bookingsRepository.createBooking(learnerId, dto);
+
+    // Wallet-paid bookings are confirmed immediately and need reminder scheduling.
+    if (booking.status === BookingStatus.confirmed) {
+      await this.notificationsService.scheduleBookingNotifications(booking.id, booking.slot.startTime);
+    }
+
+    return booking;
   }
 
   getMyBookings(userId: string, role: 'learner' | 'tutor') {

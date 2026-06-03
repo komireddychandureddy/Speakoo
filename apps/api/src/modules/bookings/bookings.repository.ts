@@ -7,16 +7,62 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
-import { BookingStatus, SlotStatus } from '@prisma/client';
+import {
+  BookingStatus,
+  PaymentStatus,
+  Prisma,
+  SlotStatus,
+  WalletTransactionType,
+} from '@prisma/client';
 
 const PLATFORM_FEE_PERCENT = Number(process.env['PLATFORM_FEE_PERCENT'] ?? 5);
+const PENDING_HOLD_MINUTES = 5;
 
 @Injectable()
 export class BookingsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  private getPendingHoldCutoff(): Date {
+    return new Date(Date.now() - PENDING_HOLD_MINUTES * 60_000);
+  }
+
+  private async releaseExpiredPendingBookings(
+    tx: Prisma.TransactionClient,
+    slotId?: string,
+  ): Promise<void> {
+    const cutoff = this.getPendingHoldCutoff();
+    const expired = await tx.booking.findMany({
+      where: {
+        status: BookingStatus.pending,
+        createdAt: { lte: cutoff },
+        ...(slotId ? { slotId } : {}),
+      },
+      select: { id: true, slotId: true },
+      take: 100,
+    });
+
+    for (const booking of expired) {
+      await tx.booking.update({
+        where: { id: booking.id },
+        data: { status: BookingStatus.cancelled },
+      });
+
+      await tx.availabilitySlot.update({
+        where: { id: booking.slotId },
+        data: { status: SlotStatus.available },
+      });
+
+      await tx.payment.updateMany({
+        where: { bookingId: booking.id, status: PaymentStatus.pending },
+        data: { status: PaymentStatus.failed },
+      });
+    }
+  }
+
   async createBooking(learnerId: string, dto: CreateBookingDto) {
     return this.prisma.$transaction(async (tx) => {
+      await this.releaseExpiredPendingBookings(tx, dto.slotId);
+
       const slot = await tx.availabilitySlot.findUnique({ where: { id: dto.slotId } });
 
       if (!slot) throw new NotFoundException('Slot not found');
@@ -33,13 +79,20 @@ export class BookingsRepository {
         throw new BadRequestException('Slot does not belong to the specified tutor');
       }
 
+      const priceCents = tutorProfile.hourlyRateCents;
+      const platformFeeCents = Math.round((priceCents * PLATFORM_FEE_PERCENT) / 100);
+
+      const learnerBalance = await tx.walletTransaction.aggregate({
+        where: { userId: learnerId },
+        _sum: { amountCents: true },
+      });
+      const balanceCents = learnerBalance._sum.amountCents ?? 0;
+      const canPayFromWallet = balanceCents >= priceCents;
+
       await tx.availabilitySlot.update({
         where: { id: dto.slotId },
         data: { status: SlotStatus.booked },
       });
-
-      const priceCents = tutorProfile.hourlyRateCents;
-      const platformFeeCents = Math.round((priceCents * PLATFORM_FEE_PERCENT) / 100);
 
       const booking = await tx.booking.create({
         data: {
@@ -50,7 +103,7 @@ export class BookingsRepository {
           priceCents,
           platformFeeCents,
           livekitRoom: `session-pending`,
-          status: BookingStatus.pending,
+          status: canPayFromWallet ? BookingStatus.confirmed : BookingStatus.pending,
         },
       });
 
@@ -58,6 +111,26 @@ export class BookingsRepository {
         where: { id: booking.id },
         data: { livekitRoom: `session-${booking.id}` },
       });
+
+      if (canPayFromWallet) {
+        await tx.walletTransaction.create({
+          data: {
+            userId: learnerId,
+            type: WalletTransactionType.debit,
+            amountCents: -priceCents,
+            balanceAfter: balanceCents - priceCents,
+            referenceId: `booking:${booking.id}`,
+          },
+        });
+
+        await tx.payment.create({
+          data: {
+            bookingId: booking.id,
+            amountCents: priceCents,
+            status: PaymentStatus.succeeded,
+          },
+        });
+      }
 
       return tx.booking.findUniqueOrThrow({
         where: { id: booking.id },
@@ -67,31 +140,40 @@ export class BookingsRepository {
   }
 
   findByLearner(learnerId: string) {
-    return this.prisma.booking.findMany({
-      where: { learnerId },
-      include: { slot: true, tutor: { include: { profile: true } } },
-      orderBy: { createdAt: 'desc' },
+    return this.prisma.$transaction(async (tx) => {
+      await this.releaseExpiredPendingBookings(tx);
+      return tx.booking.findMany({
+        where: { learnerId },
+        include: { slot: true, tutor: { include: { profile: true } } },
+        orderBy: { createdAt: 'desc' },
+      });
     });
   }
 
   findByTutor(tutorId: string) {
-    return this.prisma.booking.findMany({
-      where: { tutorId },
-      include: { slot: true, learner: { include: { profile: true } } },
-      orderBy: { createdAt: 'desc' },
+    return this.prisma.$transaction(async (tx) => {
+      await this.releaseExpiredPendingBookings(tx);
+      return tx.booking.findMany({
+        where: { tutorId },
+        include: { slot: true, learner: { include: { profile: true } } },
+        orderBy: { createdAt: 'desc' },
+      });
     });
   }
 
   findById(id: string) {
-    return this.prisma.booking.findUniqueOrThrow({
-      where: { id },
-      include: {
-        slot: true,
-        learner: { include: { profile: true } },
-        tutor: { include: { profile: true } },
-        session: true,
-        payment: true,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      await this.releaseExpiredPendingBookings(tx);
+      return tx.booking.findUniqueOrThrow({
+        where: { id },
+        include: {
+          slot: true,
+          learner: { include: { profile: true } },
+          tutor: { include: { profile: true } },
+          session: true,
+          payment: true,
+        },
+      });
     });
   }
 
@@ -100,6 +182,8 @@ export class BookingsRepository {
     userId: string,
   ): Promise<{ refundAmountCents: number; stripePaymentIntent: string | null }> {
     return this.prisma.$transaction(async (tx) => {
+      await this.releaseExpiredPendingBookings(tx);
+
       const booking = await tx.booking.findUniqueOrThrow({
         where: { id },
         include: { slot: true, payment: true },

@@ -4,6 +4,19 @@ import { getMyBookings, type Booking, type BookingStatus } from '../../core/netw
 import SessionReportModal from './SessionReportModal';
 import SessionChatModal from './SessionChatModal';
 
+const HOLD_WINDOW_MS = 5 * 60 * 1000;
+
+function formatCountdown(ms: number): string {
+  const clamped = Math.max(0, ms);
+  const minutes = Math.floor(clamped / 60_000)
+    .toString()
+    .padStart(2, '0');
+  const seconds = Math.floor((clamped % 60_000) / 1000)
+    .toString()
+    .padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
 type TabStatus = 'confirmed' | 'completed' | 'cancelled' | 'pending' | 'in_session';
 const TABS: { key: TabStatus; label: string }[] = [
   { key: 'confirmed', label: 'Upcoming' },
@@ -35,12 +48,32 @@ export default function MySessionsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [reportBooking, setReportBooking] = useState<Booking | null>(null);
   const [chatBooking, setChatBooking] = useState<Booking | null>(null);
+  const [nowMs, setNowMs] = useState(Date.now());
+
+  const loadBookings = () => {
+    getMyBookings().then(setBookings).catch(() => {});
+  };
 
   useEffect(() => {
-    getMyBookings().then(setBookings).catch(() => {});
+    loadBookings();
+
+    // Keep booking statuses in sync (e.g., pending hold expiry) without manual reload.
+    const refreshTimer = window.setInterval(loadBookings, 20_000);
+    return () => window.clearInterval(refreshTimer);
   }, []);
 
-  const filtered = bookings.filter((b) => b.status === activeTab);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const filtered = bookings.filter((booking) => {
+    if (activeTab === 'confirmed') {
+      // Treat unpaid/pending bookings as upcoming so users can still find them quickly.
+      return booking.status === 'confirmed' || booking.status === 'pending';
+    }
+    return booking.status === activeTab;
+  });
 
   const handleDownloadNotes = (booking: Booking) => {
     const start = new Date(booking.slot.startTime);
@@ -84,6 +117,10 @@ export default function MySessionsPage() {
           {filtered.map((booking) => {
             const start = new Date(booking.slot.startTime);
             const end = new Date(booking.slot.endTime);
+            const holdExpiresAt = new Date(booking.createdAt).getTime() + HOLD_WINDOW_MS;
+            const holdMsLeft = holdExpiresAt - nowMs;
+            const holdActive = booking.status === 'pending' && holdMsLeft > 0;
+            const holdExpired = booking.status === 'pending' && holdMsLeft <= 0;
             return (
               <div key={booking.id} className="card px-5 py-4">
                 <div className="flex items-start gap-4">
@@ -101,6 +138,16 @@ export default function MySessionsPage() {
                       {start.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })} · {start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}–{end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">₹{(booking.priceCents / 100).toFixed(0)}</p>
+                    {holdActive && (
+                      <p className="text-xs text-amber-700 mt-1 font-semibold">
+                        Payment hold: {formatCountdown(holdMsLeft)} remaining
+                      </p>
+                    )}
+                    {holdExpired && (
+                      <p className="text-xs text-red-600 mt-1 font-semibold">
+                        Payment window expired. Rebook this slot.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -117,7 +164,14 @@ export default function MySessionsPage() {
                     </>
                   )}
                   {(booking.status === 'pending' || booking.status === 'cancelled') && (
-                    <button className="btn-outline">Contact Support</button>
+                    <>
+                      {booking.status === 'pending' && holdActive && (
+                        <button className="btn-primary" onClick={() => navigate('/checkout/' + booking.id)}>
+                          Complete Payment
+                        </button>
+                      )}
+                      <button className="btn-outline">Contact Support</button>
+                    </>
                   )}
                 </div>
               </div>

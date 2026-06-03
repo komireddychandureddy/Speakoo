@@ -1,18 +1,59 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search } from 'lucide-react';
 import { listAdminUsers, suspendUser, unsuspendUser, type AdminUser } from '../../core/network/adminApi';
 
 export default function AdminLearnersPage() {
   const [learners, setLearners] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const [secondsSinceUpdate, setSecondsSinceUpdate] = useState(0);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'suspended'>('all');
+  const refreshInFlight = useRef(false);
+
+  const loadLearners = async (isBackground = false) => {
+    if (refreshInFlight.current) return;
+
+    refreshInFlight.current = true;
+    if (isBackground) {
+      setRefreshing(true);
+    }
+
+    try {
+      const res = await listAdminUsers(1, 100, 'learner');
+      setLearners(res.data);
+      const now = Date.now();
+      setLastUpdatedAt(now);
+      setSecondsSinceUpdate(0);
+    } finally {
+      refreshInFlight.current = false;
+      setLoading(false);
+      if (isBackground) {
+        setRefreshing(false);
+      }
+    }
+  };
 
   useEffect(() => {
-    listAdminUsers(1, 100, 'learner')
-      .then((res) => setLearners(res.data))
-      .finally(() => setLoading(false));
+    void loadLearners();
+
+    // Keep learner list live without manual refresh.
+    const refreshTimer = window.setInterval(() => {
+      void loadLearners(true);
+    }, 20_000);
+    return () => window.clearInterval(refreshTimer);
   }, []);
+
+  useEffect(() => {
+    if (!lastUpdatedAt) return;
+
+    const timer = window.setInterval(() => {
+      setSecondsSinceUpdate(Math.floor((Date.now() - lastUpdatedAt) / 1000));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [lastUpdatedAt]);
 
   const handleToggle = async (user: AdminUser) => {
     try {
@@ -46,7 +87,11 @@ export default function AdminLearnersPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[#212121]">Manage Learners</h1>
-        <p className="text-[#616161] text-sm mt-1">{learners.length} learners registered on the platform</p>
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-[#616161] text-sm">{learners.length} learners registered on the platform</p>
+          {refreshing && <span className="text-xs text-[#616161]">Refreshing…</span>}
+          {!refreshing && lastUpdatedAt && <span className="text-xs text-[#616161]">Last updated {secondsSinceUpdate}s ago</span>}
+        </div>
       </div>
 
       <div className="flex gap-3 flex-wrap">
