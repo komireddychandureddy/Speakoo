@@ -1,6 +1,7 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
+import { BookingStatus } from '@prisma/client';
 
 const POINTS_PER_SESSION = 10;
 const BADGE_SLUGS = {
@@ -19,19 +20,40 @@ export class FeedbackRepository {
       include: { session: true },
     });
 
-    if (booking.learnerId !== reviewerId) {
+    const isLearnerReviewer = booking.learnerId === reviewerId;
+    const isTutorReviewer = booking.tutorId === reviewerId;
+
+    if (!isLearnerReviewer && !isTutorReviewer) {
       throw new BadRequestException('You can only submit feedback for your own bookings');
+    }
+
+    if (booking.status !== BookingStatus.completed) {
+      throw new BadRequestException('Feedback can only be submitted for completed sessions');
     }
 
     if (!booking.session) {
       throw new BadRequestException('No session found for this booking');
     }
 
+    const existing = await this.prisma.sessionFeedback.findFirst({
+      where: {
+        sessionId: booking.session.id,
+        reviewerId,
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new ConflictException('You have already submitted feedback for this session');
+    }
+
+    const revieweeId = isLearnerReviewer ? booking.tutorId : booking.learnerId;
+
     return this.prisma.sessionFeedback.create({
       data: {
         sessionId: booking.session.id,
         reviewerId,
-        revieweeId: booking.tutorId,
+        revieweeId,
         rating: dto.rating,
         comment: dto.comment,
       },

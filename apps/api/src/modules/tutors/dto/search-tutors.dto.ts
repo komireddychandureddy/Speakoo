@@ -28,7 +28,7 @@ export class SearchTutorsDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(50)
+  @Max(100)
   @Type(() => Number)
   limit?: number = 10;
 }

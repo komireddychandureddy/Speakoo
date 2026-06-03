@@ -73,13 +73,22 @@ describe('BookingsService', () => {
   });
 
   describe('getBookingById', () => {
-    it('delegates to repository', async () => {
-      const booking = { id: 'b1' };
+    it('returns booking for learner participant', async () => {
+      const booking = { id: 'b1', learnerId: 'l1', tutorId: 't1' };
       mockRepo.findById.mockResolvedValue(booking);
 
-      const result = await service.getBookingById('b1');
+      const result = await service.getBookingById('b1', 'l1', 'learner');
 
       expect(mockRepo.findById).toHaveBeenCalledWith('b1');
+      expect(result).toBe(booking);
+    });
+
+    it('returns booking for admin', async () => {
+      const booking = { id: 'b1', learnerId: 'l1', tutorId: 't1' };
+      mockRepo.findById.mockResolvedValue(booking);
+
+      const result = await service.getBookingById('b1', 'admin-1', 'admin');
+
       expect(result).toBe(booking);
     });
   });

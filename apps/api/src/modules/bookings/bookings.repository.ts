@@ -144,7 +144,7 @@ export class BookingsRepository {
       await this.releaseExpiredPendingBookings(tx);
       return tx.booking.findMany({
         where: { learnerId },
-        include: { slot: true, tutor: { include: { profile: true } } },
+        include: { slot: true, session: true, tutor: { include: { profile: true } } },
         orderBy: { createdAt: 'desc' },
       });
     });
@@ -155,7 +155,7 @@ export class BookingsRepository {
       await this.releaseExpiredPendingBookings(tx);
       return tx.booking.findMany({
         where: { tutorId },
-        include: { slot: true, learner: { include: { profile: true } } },
+        include: { slot: true, session: true, learner: { include: { profile: true } } },
         orderBy: { createdAt: 'desc' },
       });
     });

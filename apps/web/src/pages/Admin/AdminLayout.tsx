@@ -10,6 +10,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   CalendarClock,
+  Wallet,
 } from 'lucide-react';
 import { listAdminKycSubmissions } from '../../core/network/adminApi';
 
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { to: '/admin/risks', label: 'Risks', icon: ShieldCheck },
   { to: '/admin/incidents', label: 'Incidents', icon: ShieldAlert },
   { to: '/admin/sessions', label: 'Sessions', icon: CalendarClock },
+  { to: '/admin/withdrawals', label: 'Withdrawals', icon: Wallet },
   { to: '/admin/applications', label: 'Applications', icon: ClipboardList },
   { to: '/admin/tutors', label: 'Tutors', icon: GraduationCap },
   { to: '/admin/learners', label: 'Learners', icon: Users },

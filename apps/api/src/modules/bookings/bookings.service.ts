@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import { BookingsRepository } from './bookings.repository';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingStatus } from '@prisma/client';
+import { ForbiddenException } from '@nestjs/common';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -39,8 +40,18 @@ export class BookingsService {
       : this.bookingsRepository.findByLearner(userId);
   }
 
-  getBookingById(id: string) {
-    return this.bookingsRepository.findById(id);
+  async getBookingById(id: string, userId: string, role: 'learner' | 'tutor' | 'admin') {
+    const booking = await this.bookingsRepository.findById(id);
+    if (role === 'admin') {
+      return booking;
+    }
+
+    const isParticipant = booking.learnerId === userId || booking.tutorId === userId;
+    if (!isParticipant) {
+      throw new ForbiddenException('You can only access your own booking details');
+    }
+
+    return booking;
   }
 
   async cancelBooking(id: string, userId: string) {

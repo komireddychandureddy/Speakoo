@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CreditCard } from 'lucide-react';
 import { createPaymentIntent, getBookingById } from '../../core/network/bookingsApi';
-import { purchaseCredits } from '../../core/network/paymentsApi';
+import { confirmMockPayment, purchaseCredits } from '../../core/network/paymentsApi';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
@@ -15,7 +15,8 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
  * For now this page shows the intent creation status and a placeholder UI.
  */
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 const HOLD_WINDOW_MS = 5 * 60 * 1000;
 
 function formatCountdown(ms: number): string {
@@ -108,6 +109,8 @@ export default function CheckoutPage() {
   const [holdExpiresAt, setHoldExpiresAt] = useState<number | null>(null);
   const [holdMsLeft, setHoldMsLeft] = useState<number | null>(null);
   const [holdExpired, setHoldExpired] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<'stripe' | 'mock'>('stripe');
+  const [mockSubmitting, setMockSubmitting] = useState(false);
 
   useEffect(() => {
     if (!bookingId) return;
@@ -153,7 +156,10 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (bookingId) {
       createPaymentIntent(bookingId)
-        .then((res) => setClientSecret(res.clientSecret))
+        .then((res) => {
+          setClientSecret(res.clientSecret);
+          setPaymentMode(res.paymentMode ?? (stripePromise ? 'stripe' : 'mock'));
+        })
         .catch(() => setError('Could not initialise payment. Please try again.'))
         .finally(() => setLoading(false));
       return;
@@ -161,7 +167,10 @@ export default function CheckoutPage() {
 
     if (bundleId) {
       purchaseCredits(bundleId)
-        .then((res) => setClientSecret(res.clientSecret))
+        .then((res) => {
+          setClientSecret(res.clientSecret);
+          setPaymentMode(res.paymentMode ?? (stripePromise ? 'stripe' : 'mock'));
+        })
         .catch(() => setError('Could not initialise credit purchase. Please try again.'))
         .finally(() => setLoading(false));
       return;
@@ -197,6 +206,24 @@ export default function CheckoutPage() {
       </div>
     );
   }
+
+  const handleMockPayNow = async () => {
+    try {
+      setMockSubmitting(true);
+      if (bookingId) {
+        await confirmMockPayment({ kind: 'booking', bookingId });
+      } else if (bundleId) {
+        await confirmMockPayment({ kind: 'credit_purchase', bundleId });
+      } else {
+        throw new Error('Invalid checkout request');
+      }
+      window.location.assign(bookingId ? '/mySession' : '/my-credits');
+    } catch {
+      setError('Mock payment failed. Please try again.');
+    } finally {
+      setMockSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -238,6 +265,28 @@ export default function CheckoutPage() {
             >
               Back to booking
             </button>
+          ) : paymentMode === 'mock' || !stripePromise ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Test payment mode</p>
+                <p className="text-sm text-blue-800 mt-1">This checkout is running in mock mode and will update booking/wallet data in the database.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleMockPayNow()}
+                disabled={mockSubmitting}
+                className="w-full bg-[#43A047] text-white rounded-xl py-3 text-sm font-semibold hover:bg-[#388E3C] transition-colors disabled:opacity-60"
+              >
+                {mockSubmitting ? 'Processing…' : 'Pay Now'}
+              </button>
+              <button
+                type="button"
+                onClick={() => window.history.back()}
+                className="w-full border border-gray-200 rounded-xl py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           ) : (
             <Elements stripe={stripePromise} options={{ clientSecret }}>
               <CheckoutForm

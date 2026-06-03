@@ -1,4 +1,5 @@
 import { Controller, Post, Get, Delete, Body, Param, ParseUUIDPipe } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -16,14 +17,16 @@ export class BookingsController {
   }
 
   @Get()
+  @SkipThrottle()
   getMyBookings(@CurrentUser() user: User) {
     const role = user.role === 'tutor' ? 'tutor' : 'learner';
     return this.bookingsService.getMyBookings(user.id, role);
   }
 
   @Get(':id')
-  getById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.bookingsService.getBookingById(id);
+  @SkipThrottle()
+  getById(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+    return this.bookingsService.getBookingById(id, user.id, user.role);
   }
 
   @Roles('learner')

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyBookings, type Booking, type BookingStatus } from '../../core/network/bookingsApi';
+import { getSessionRecordingDownload } from '../../core/network/sessionsApi';
 import SessionReportModal from './SessionReportModal';
 import SessionChatModal from './SessionChatModal';
 
@@ -49,6 +50,7 @@ export default function MySessionsPage() {
   const [reportBooking, setReportBooking] = useState<Booking | null>(null);
   const [chatBooking, setChatBooking] = useState<Booking | null>(null);
   const [nowMs, setNowMs] = useState(Date.now());
+  const [downloadLoadingId, setDownloadLoadingId] = useState<string | null>(null);
 
   const loadBookings = () => {
     getMyBookings().then(setBookings).catch(() => {});
@@ -85,6 +87,18 @@ export default function MySessionsPage() {
     a.download = `session-${booking.id.slice(0, 8)}-notes.txt`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadRecording = async (booking: Booking) => {
+    try {
+      setDownloadLoadingId(booking.id);
+      const { recordingUrl } = await getSessionRecordingDownload(booking.id);
+      window.open(recordingUrl, '_blank', 'noopener,noreferrer');
+    } catch {
+      // keep UX resilient if recording is not yet available
+    } finally {
+      setDownloadLoadingId(null);
+    }
   };
 
   return (
@@ -159,6 +173,15 @@ export default function MySessionsPage() {
                   {booking.status === 'completed' && (
                     <>
                       <button onClick={() => setReportBooking(booking)} className="btn-primary">Give Feedback</button>
+                      {booking.session?.recordingUrl && (
+                        <button
+                          onClick={() => void handleDownloadRecording(booking)}
+                          className="btn-outline"
+                          disabled={downloadLoadingId === booking.id}
+                        >
+                          {downloadLoadingId === booking.id ? 'Preparing recording…' : '🎥 Download Recording'}
+                        </button>
+                      )}
                       <button onClick={() => handleDownloadNotes(booking)} className="btn-outline">📄 Session Notes</button>
                       <button onClick={() => setChatBooking(booking)} className="btn-outline">💬 Session Chat</button>
                     </>

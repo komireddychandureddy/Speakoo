@@ -38,4 +38,9 @@ export class SessionsController {
   ) {
     return this.sessionsService.stopRecording(bookingId, user.id, body.recordingUrl);
   }
+
+  @Get(':bookingId/recording')
+  getRecordingDownload(@Param('bookingId') bookingId: string, @CurrentUser() user: User) {
+    return this.sessionsService.getRecordingDownload(bookingId, user.id);
+  }
 }

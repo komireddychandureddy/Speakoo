@@ -12,9 +12,10 @@ async function bootstrap() {
     rawBody: true,
   });
 
-  // Use real client IP from X-Forwarded-For when running behind Nginx.
-  // Without this, rate limiting can bucket all users under the proxy IP.
-  app.set('trust proxy', 1);
+  // Use real client IP from X-Forwarded-For when running behind reverse proxies.
+  // In production this may include multiple hops (e.g. Cloudflare -> Nginx -> API).
+  // Without this, rate limiting can bucket many users under the same proxy IP.
+  app.set('trust proxy', true);
 
   // Security
   app.use(helmet());

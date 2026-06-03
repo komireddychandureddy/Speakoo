@@ -201,6 +201,21 @@ export interface TransactionRiskResponse {
   risks: TransactionRiskItem[];
 }
 
+export interface AdminWithdrawalRequest {
+  id: string;
+  tutorUserId: string;
+  amountCents: number;
+  status: 'pending' | 'approved' | 'rejected' | 'paid';
+  adminNote: string | null;
+  reviewedById: string | null;
+  externalTransferId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt: string | null;
+  tutorEmail?: string;
+  tutorName?: string | null;
+}
+
 // ─── API calls ────────────────────────────────────────────────────────────────
 
 export async function getAdminStats(): Promise<AdminStats> {
@@ -316,5 +331,25 @@ export async function getTransactionRisks(days = 7): Promise<TransactionRiskResp
   const { data } = await apiClient.get<TransactionRiskResponse>('payments/risks/transactions', {
     params: { days },
   });
+  return data;
+}
+
+export async function listAdminWithdrawals(params?: {
+  status?: 'pending' | 'approved' | 'rejected' | 'paid';
+}): Promise<AdminWithdrawalRequest[]> {
+  const { data } = await apiClient.get<AdminWithdrawalRequest[]>('payments/admin/withdrawals', {
+    params,
+  });
+  return data;
+}
+
+export async function reviewAdminWithdrawal(
+  withdrawalId: string,
+  payload: { action: 'approve' | 'reject'; note?: string },
+): Promise<{ reviewed: boolean; status: 'rejected' | 'paid'; transferId?: string; amountCents?: number }> {
+  const { data } = await apiClient.post<{ reviewed: boolean; status: 'rejected' | 'paid'; transferId?: string; amountCents?: number }>(
+    `payments/admin/withdrawals/${withdrawalId}/review`,
+    payload,
+  );
   return data;
 }

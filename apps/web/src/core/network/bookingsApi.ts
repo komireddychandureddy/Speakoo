@@ -24,6 +24,13 @@ export interface Booking {
     startTime: string;
     endTime: string;
   };
+  session?: {
+    id: string;
+    recordingUrl: string | null;
+    startedAt: string | null;
+    endedAt: string | null;
+    durationMinutes: number | null;
+  } | null;
 }
 
 export interface CreateBookingPayload {
@@ -34,7 +41,8 @@ export interface CreateBookingPayload {
 
 export interface CreatePaymentIntentResponse {
   clientSecret: string;
-  bookingId: string;
+  paymentMode?: 'stripe' | 'mock';
+  mockReference?: string;
 }
 
 export type WalletTransactionType = 'credit' | 'debit' | 'refund' | 'payout';

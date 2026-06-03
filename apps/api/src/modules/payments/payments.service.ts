@@ -1,4 +1,10 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,10 +18,44 @@ import {
   SubscriptionInterval,
   UserSubscriptionStatus,
   WalletTransactionType,
+  Prisma,
 } from '@prisma/client';
 import { UpsertSubscriptionPlanDto } from './dto/upsert-subscription-plan.dto';
+import { ConfirmMockPaymentDto } from './dto/confirm-mock-payment.dto';
+import { UpsertPayoutAccountDto } from './dto/upsert-payout-account.dto';
 
 const PENDING_HOLD_MINUTES = 5;
+const MIN_WITHDRAWAL_CENTS = 5000;
+
+type WithdrawalStatus = 'pending' | 'approved' | 'rejected' | 'paid';
+
+interface PayoutAccountRow {
+  id: string;
+  tutor_user_id: string;
+  account_holder_name: string;
+  account_number_last4: string;
+  bank_name: string;
+  routing_code: string;
+  currency: string;
+  country_code: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface WithdrawalRow {
+  id: string;
+  tutor_user_id: string;
+  amount_cents: number;
+  status: WithdrawalStatus;
+  admin_note: string | null;
+  reviewed_by_id: string | null;
+  external_transfer_id: string | null;
+  created_at: Date;
+  updated_at: Date;
+  reviewed_at: Date | null;
+  tutor_email?: string;
+  tutor_name?: string | null;
+}
 
 @Injectable()
 export class PaymentsService {
@@ -26,6 +66,90 @@ export class PaymentsService {
     private readonly config: ConfigService,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  private isMockPaymentsEnabled(): boolean {
+    return this.config.get<string>('PAYMENT_MOCK_ENABLED') === 'true';
+  }
+
+  private async creditWallet(
+    userId: string,
+    amountCents: number,
+    type: WalletTransactionType,
+    referenceId: string,
+  ) {
+    const balanceAgg = await this.prisma.walletTransaction.aggregate({
+      where: { userId },
+      _sum: { amountCents: true },
+    });
+    const prevBalance = balanceAgg._sum.amountCents ?? 0;
+
+    await this.prisma.walletTransaction.create({
+      data: {
+        userId,
+        type,
+        amountCents,
+        balanceAfter: prevBalance + amountCents,
+        referenceId,
+      },
+    });
+  }
+
+  private async confirmBookingPayment(bookingId: string, learnerId: string): Promise<void> {
+    const booking = await this.prisma.booking.findUniqueOrThrow({
+      where: { id: bookingId },
+      include: { slot: true },
+    });
+
+    if (booking.learnerId !== learnerId) {
+      throw new BadRequestException('Booking does not belong to this learner');
+    }
+
+    if (booking.status !== BookingStatus.pending) {
+      return;
+    }
+
+    const holdExpiresAt = new Date(booking.createdAt.getTime() + PENDING_HOLD_MINUTES * 60_000);
+    if (Date.now() > holdExpiresAt.getTime()) {
+      await this.prisma.$transaction([
+        this.prisma.booking.update({
+          where: { id: bookingId },
+          data: { status: BookingStatus.cancelled },
+        }),
+        this.prisma.availabilitySlot.update({
+          where: { id: booking.slotId },
+          data: { status: SlotStatus.available },
+        }),
+        this.prisma.payment.updateMany({
+          where: { bookingId, status: PaymentStatus.pending },
+          data: { status: PaymentStatus.failed },
+        }),
+      ]);
+      throw new BadRequestException('Payment window expired. Please book the slot again.');
+    }
+
+    const mockIntentId = `mock_pi_${bookingId}_${Date.now()}`;
+    await this.prisma.$transaction([
+      this.prisma.payment.upsert({
+        where: { bookingId },
+        create: {
+          bookingId,
+          stripePaymentIntent: mockIntentId,
+          amountCents: booking.priceCents,
+          status: PaymentStatus.succeeded,
+        },
+        update: {
+          stripePaymentIntent: mockIntentId,
+          status: PaymentStatus.succeeded,
+        },
+      }),
+      this.prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: BookingStatus.confirmed },
+      }),
+    ]);
+
+    await this.notificationsService.scheduleBookingNotifications(bookingId, booking.slot.startTime);
+  }
 
   private getStripe(): Stripe {
     return new Stripe(this.config.getOrThrow('STRIPE_SECRET_KEY'), {
@@ -141,6 +265,26 @@ export class PaymentsService {
       throw new BadRequestException('Payment window expired. Please book the slot again.');
     }
 
+    if (this.isMockPaymentsEnabled()) {
+      const mockIntentId = `mock_pi_${bookingId}_${Date.now()}`;
+      await this.prisma.payment.upsert({
+        where: { bookingId },
+        create: {
+          bookingId,
+          stripePaymentIntent: mockIntentId,
+          amountCents: booking.priceCents,
+          status: PaymentStatus.pending,
+        },
+        update: { stripePaymentIntent: mockIntentId, status: PaymentStatus.pending },
+      });
+
+      return {
+        clientSecret: `mock_secret_${mockIntentId}`,
+        paymentMode: 'mock' as const,
+        mockReference: bookingId,
+      };
+    }
+
     const intent = await this.getStripe().paymentIntents.create({
       amount: booking.priceCents,
       currency: 'usd',
@@ -158,7 +302,7 @@ export class PaymentsService {
       update: { stripePaymentIntent: intent.id, status: PaymentStatus.pending },
     });
 
-    return { clientSecret: intent.client_secret };
+    return { clientSecret: intent.client_secret, paymentMode: 'stripe' as const };
   }
 
   async listCreditBundles() {
@@ -392,6 +536,18 @@ export class PaymentsService {
   async purchaseCredits(userId: string, bundleId: string): Promise<{ clientSecret: string }> {
     const bundle = await this.prisma.creditBundle.findUniqueOrThrow({ where: { id: bundleId } });
 
+    if (this.isMockPaymentsEnabled()) {
+      return {
+        clientSecret: `mock_secret_credit_${bundleId}_${Date.now()}`,
+        paymentMode: 'mock' as const,
+        mockReference: bundleId,
+      } as {
+        clientSecret: string;
+        paymentMode: 'mock' | 'stripe';
+        mockReference?: string;
+      };
+    }
+
     const intent = await this.getStripe().paymentIntents.create({
       amount: bundle.priceCents,
       currency: 'usd',
@@ -399,7 +555,11 @@ export class PaymentsService {
     });
 
     this.logger.log(`Credit purchase intent created for user ${userId}, bundle ${bundleId}`);
-    return { clientSecret: intent.client_secret as string };
+    return { clientSecret: intent.client_secret as string, paymentMode: 'stripe' as const } as {
+      clientSecret: string;
+      paymentMode: 'mock' | 'stripe';
+      mockReference?: string;
+    };
   }
 
   async getWalletTransactions(userId: string) {
@@ -416,13 +576,68 @@ export class PaymentsService {
   }
 
   async topupWallet(userId: string, amountCents: number): Promise<{ clientSecret: string }> {
+    if (this.isMockPaymentsEnabled()) {
+      return {
+        clientSecret: `mock_secret_topup_${userId}_${Date.now()}`,
+        paymentMode: 'mock' as const,
+      } as {
+        clientSecret: string;
+        paymentMode: 'mock' | 'stripe';
+      };
+    }
+
     const intent = await this.getStripe().paymentIntents.create({
       amount: amountCents,
       currency: 'usd',
       metadata: { userId, type: 'wallet_topup' },
     });
 
-    return { clientSecret: intent.client_secret as string };
+    return { clientSecret: intent.client_secret as string, paymentMode: 'stripe' as const } as {
+      clientSecret: string;
+      paymentMode: 'mock' | 'stripe';
+    };
+  }
+
+  async confirmMockPayment(userId: string, dto: ConfirmMockPaymentDto) {
+    if (!this.isMockPaymentsEnabled()) {
+      throw new BadRequestException('Mock payment mode is disabled');
+    }
+
+    if (dto.kind === 'booking') {
+      if (!dto.bookingId) {
+        throw new BadRequestException('bookingId is required for booking mock confirmation');
+      }
+      await this.confirmBookingPayment(dto.bookingId, userId);
+      return { confirmed: true, kind: dto.kind, bookingId: dto.bookingId };
+    }
+
+    if (dto.kind === 'credit_purchase') {
+      if (!dto.bundleId) {
+        throw new BadRequestException('bundleId is required for credit purchase mock confirmation');
+      }
+
+      const bundle = await this.prisma.creditBundle.findUniqueOrThrow({ where: { id: dto.bundleId } });
+      await this.creditWallet(
+        userId,
+        bundle.credits,
+        WalletTransactionType.credit,
+        `mock_credit_purchase:${dto.bundleId}:${Date.now()}`,
+      );
+
+      return { confirmed: true, kind: dto.kind, bundleId: dto.bundleId };
+    }
+
+    if (!dto.amountCents) {
+      throw new BadRequestException('amountCents is required for wallet topup mock confirmation');
+    }
+
+    await this.creditWallet(
+      userId,
+      dto.amountCents,
+      WalletTransactionType.credit,
+      `mock_wallet_topup:${Date.now()}`,
+    );
+    return { confirmed: true, kind: dto.kind, amountCents: dto.amountCents };
   }
 
   async createConnectOnboarding(
@@ -882,5 +1097,316 @@ export class PaymentsService {
 
     this.logger.log(`Payout transfer completed for booking ${bookingId}: ${amountCents} cents`);
     return { transferred: true, amountCents };
+  }
+
+  private mapPayoutAccount(row: PayoutAccountRow) {
+    return {
+      id: row.id,
+      tutorUserId: row.tutor_user_id,
+      accountHolderName: row.account_holder_name,
+      accountNumberLast4: row.account_number_last4,
+      bankName: row.bank_name,
+      routingCode: row.routing_code,
+      currency: row.currency,
+      countryCode: row.country_code,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private mapWithdrawal(row: WithdrawalRow) {
+    return {
+      id: row.id,
+      tutorUserId: row.tutor_user_id,
+      amountCents: Number(row.amount_cents),
+      status: row.status,
+      adminNote: row.admin_note,
+      reviewedById: row.reviewed_by_id,
+      externalTransferId: row.external_transfer_id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      reviewedAt: row.reviewed_at,
+      tutorEmail: row.tutor_email,
+      tutorName: row.tutor_name,
+    };
+  }
+
+  private async getPendingWithdrawalCents(tutorUserId: string): Promise<number> {
+    const rows = await this.prisma.$queryRaw<Array<{ total_cents: number | null }>>(Prisma.sql`
+      SELECT COALESCE(SUM(amount_cents), 0)::int AS total_cents
+      FROM withdrawal_requests
+      WHERE tutor_user_id = ${tutorUserId}::uuid
+        AND status IN ('pending', 'approved')
+    `);
+    return Number(rows[0]?.total_cents ?? 0);
+  }
+
+  async getTutorPayoutAccount(tutorUserId: string) {
+    const rows = await this.prisma.$queryRaw<PayoutAccountRow[]>(Prisma.sql`
+      SELECT id, tutor_user_id, account_holder_name, account_number_last4, bank_name,
+             routing_code, currency, country_code, created_at, updated_at
+      FROM tutor_payout_accounts
+      WHERE tutor_user_id = ${tutorUserId}::uuid
+      LIMIT 1
+    `);
+
+    if (!rows[0]) return null;
+    return this.mapPayoutAccount(rows[0]);
+  }
+
+  async upsertTutorPayoutAccount(tutorUserId: string, dto: UpsertPayoutAccountDto) {
+    const normalizedAccount = dto.accountNumber.replace(/\s+/g, '');
+    const accountLast4 = normalizedAccount.slice(-4);
+
+    if (accountLast4.length < 4) {
+      throw new BadRequestException('accountNumber must contain at least 4 digits');
+    }
+
+    await this.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO tutor_payout_accounts (
+        tutor_user_id,
+        account_holder_name,
+        account_number_last4,
+        bank_name,
+        routing_code,
+        currency,
+        country_code
+      ) VALUES (
+        ${tutorUserId}::uuid,
+        ${dto.accountHolderName.trim()},
+        ${accountLast4},
+        ${dto.bankName.trim()},
+        ${dto.routingCode.trim()},
+        ${dto.currency?.toLowerCase() ?? 'usd'},
+        ${dto.countryCode?.toUpperCase() ?? null}
+      )
+      ON CONFLICT (tutor_user_id)
+      DO UPDATE SET
+        account_holder_name = EXCLUDED.account_holder_name,
+        account_number_last4 = EXCLUDED.account_number_last4,
+        bank_name = EXCLUDED.bank_name,
+        routing_code = EXCLUDED.routing_code,
+        currency = EXCLUDED.currency,
+        country_code = EXCLUDED.country_code,
+        updated_at = CURRENT_TIMESTAMP
+    `);
+
+    return this.getTutorPayoutAccount(tutorUserId);
+  }
+
+  async getTutorPayoutSummary(tutorUserId: string) {
+    const [balanceAgg, payoutAgg, pendingWithdrawalCents, account] = await Promise.all([
+      this.prisma.walletTransaction.aggregate({
+        where: { userId: tutorUserId },
+        _sum: { amountCents: true },
+      }),
+      this.prisma.walletTransaction.aggregate({
+        where: { userId: tutorUserId, type: WalletTransactionType.payout },
+        _sum: { amountCents: true },
+      }),
+      this.getPendingWithdrawalCents(tutorUserId),
+      this.getTutorPayoutAccount(tutorUserId),
+    ]);
+
+    const currentBalanceCents = balanceAgg._sum.amountCents ?? 0;
+    const lifetimePayoutCents = payoutAgg._sum.amountCents ?? 0;
+    const availableToWithdrawCents = Math.max(0, currentBalanceCents - pendingWithdrawalCents);
+
+    return {
+      currentBalanceCents,
+      pendingWithdrawalCents,
+      availableToWithdrawCents,
+      lifetimePayoutCents,
+      minimumWithdrawalCents: MIN_WITHDRAWAL_CENTS,
+      hasPayoutAccount: Boolean(account),
+    };
+  }
+
+  async createTutorWithdrawalRequest(tutorUserId: string, amountCents: number) {
+    if (amountCents < MIN_WITHDRAWAL_CENTS) {
+      throw new BadRequestException('Amount is below the minimum withdrawal threshold');
+    }
+
+    const account = await this.getTutorPayoutAccount(tutorUserId);
+    if (!account) {
+      throw new BadRequestException('Please add payout account details before requesting withdrawal');
+    }
+
+    const [balanceAgg, pendingWithdrawalCents] = await Promise.all([
+      this.prisma.walletTransaction.aggregate({
+        where: { userId: tutorUserId },
+        _sum: { amountCents: true },
+      }),
+      this.getPendingWithdrawalCents(tutorUserId),
+    ]);
+
+    const available = Math.max(0, (balanceAgg._sum.amountCents ?? 0) - pendingWithdrawalCents);
+    if (amountCents > available) {
+      throw new BadRequestException('Insufficient available balance for withdrawal request');
+    }
+
+    const rows = await this.prisma.$queryRaw<WithdrawalRow[]>(Prisma.sql`
+      INSERT INTO withdrawal_requests (tutor_user_id, amount_cents, status)
+      VALUES (${tutorUserId}::uuid, ${amountCents}, 'pending')
+      RETURNING id, tutor_user_id, amount_cents, status, admin_note, reviewed_by_id,
+                external_transfer_id, created_at, updated_at, reviewed_at
+    `);
+
+    return this.mapWithdrawal(rows[0]);
+  }
+
+  async listTutorWithdrawals(tutorUserId: string) {
+    const rows = await this.prisma.$queryRaw<WithdrawalRow[]>(Prisma.sql`
+      SELECT id, tutor_user_id, amount_cents, status, admin_note, reviewed_by_id,
+             external_transfer_id, created_at, updated_at, reviewed_at
+      FROM withdrawal_requests
+      WHERE tutor_user_id = ${tutorUserId}::uuid
+      ORDER BY created_at DESC
+      LIMIT 200
+    `);
+
+    return rows.map((row) => this.mapWithdrawal(row));
+  }
+
+  async listAdminWithdrawals(status?: WithdrawalStatus) {
+    const rows = status
+      ? await this.prisma.$queryRaw<WithdrawalRow[]>(Prisma.sql`
+          SELECT wr.id, wr.tutor_user_id, wr.amount_cents, wr.status, wr.admin_note,
+                 wr.reviewed_by_id, wr.external_transfer_id, wr.created_at, wr.updated_at,
+                 wr.reviewed_at, u.email AS tutor_email, up.display_name AS tutor_name
+          FROM withdrawal_requests wr
+          JOIN users u ON u.id = wr.tutor_user_id
+          LEFT JOIN user_profiles up ON up.user_id = wr.tutor_user_id
+          WHERE wr.status = ${status}
+          ORDER BY wr.created_at DESC
+          LIMIT 500
+        `)
+      : await this.prisma.$queryRaw<WithdrawalRow[]>(Prisma.sql`
+          SELECT wr.id, wr.tutor_user_id, wr.amount_cents, wr.status, wr.admin_note,
+                 wr.reviewed_by_id, wr.external_transfer_id, wr.created_at, wr.updated_at,
+                 wr.reviewed_at, u.email AS tutor_email, up.display_name AS tutor_name
+          FROM withdrawal_requests wr
+          JOIN users u ON u.id = wr.tutor_user_id
+          LEFT JOIN user_profiles up ON up.user_id = wr.tutor_user_id
+          ORDER BY wr.created_at DESC
+          LIMIT 500
+        `);
+
+    return rows.map((row) => this.mapWithdrawal(row));
+  }
+
+  async reviewWithdrawalRequest(
+    withdrawalId: string,
+    adminUserId: string,
+    action: 'approve' | 'reject',
+    note?: string,
+  ) {
+    const requestRows = await this.prisma.$queryRaw<WithdrawalRow[]>(Prisma.sql`
+      SELECT id, tutor_user_id, amount_cents, status, admin_note, reviewed_by_id,
+             external_transfer_id, created_at, updated_at, reviewed_at
+      FROM withdrawal_requests
+      WHERE id = ${withdrawalId}::uuid
+      LIMIT 1
+    `);
+
+    const request = requestRows[0];
+    if (!request) {
+      throw new NotFoundException('Withdrawal request not found');
+    }
+
+    if (request.status !== 'pending') {
+      throw new ConflictException('Withdrawal request is already processed');
+    }
+
+    if (action === 'reject') {
+      await this.prisma.$executeRaw(Prisma.sql`
+        UPDATE withdrawal_requests
+        SET status = 'rejected',
+            admin_note = ${note ?? null},
+            reviewed_by_id = ${adminUserId}::uuid,
+            reviewed_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${withdrawalId}::uuid
+      `);
+
+      return { reviewed: true, status: 'rejected' as const };
+    }
+
+    const tutorProfile = await this.prisma.tutorProfile.findUnique({
+      where: { userId: request.tutor_user_id },
+      select: { stripeAccountId: true },
+    });
+
+    if (!tutorProfile?.stripeAccountId && !this.isMockPaymentsEnabled()) {
+      throw new BadRequestException('Tutor has no Stripe payout account connected');
+    }
+
+    const referenceId = `withdrawal:${withdrawalId}`;
+    const existingDebit = await this.prisma.walletTransaction.findFirst({
+      where: {
+        userId: request.tutor_user_id,
+        referenceId,
+        type: WalletTransactionType.debit,
+      },
+      select: { id: true },
+    });
+
+    if (existingDebit) {
+      throw new ConflictException('Withdrawal already debited from tutor wallet');
+    }
+
+    const balanceAgg = await this.prisma.walletTransaction.aggregate({
+      where: { userId: request.tutor_user_id },
+      _sum: { amountCents: true },
+    });
+    const currentBalance = balanceAgg._sum.amountCents ?? 0;
+    if (currentBalance < request.amount_cents) {
+      throw new BadRequestException('Tutor wallet balance is insufficient for this withdrawal');
+    }
+
+    let transferId = `mock_transfer_${withdrawalId}`;
+    if (!this.isMockPaymentsEnabled()) {
+      const transfer = await this.getStripe().transfers.create({
+        amount: Number(request.amount_cents),
+        currency: 'usd',
+        destination: tutorProfile!.stripeAccountId!,
+        metadata: {
+          withdrawalId,
+          tutorId: request.tutor_user_id,
+          approvedBy: adminUserId,
+        },
+      });
+      transferId = transfer.id;
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.walletTransaction.create({
+        data: {
+          userId: request.tutor_user_id,
+          type: WalletTransactionType.debit,
+          amountCents: -Number(request.amount_cents),
+          balanceAfter: currentBalance - Number(request.amount_cents),
+          referenceId,
+        },
+      });
+
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE withdrawal_requests
+        SET status = 'paid',
+            admin_note = ${note ?? null},
+            reviewed_by_id = ${adminUserId}::uuid,
+            reviewed_at = CURRENT_TIMESTAMP,
+            external_transfer_id = ${transferId},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${withdrawalId}::uuid
+      `);
+    });
+
+    return {
+      reviewed: true,
+      status: 'paid' as const,
+      transferId,
+      amountCents: Number(request.amount_cents),
+    };
   }
 }

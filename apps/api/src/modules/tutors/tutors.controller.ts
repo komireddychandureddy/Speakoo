@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { TutorsService } from './tutors.service';
 import { CreateTutorProfileDto } from './dto/create-tutor-profile.dto';
 import { CreateAvailabilitySlotDto } from './dto/create-availability-slot.dto';
@@ -30,6 +31,7 @@ export class TutorsController {
 
   @Public()
   @Get()
+  @SkipThrottle()
   search(@Query() dto: SearchTutorsDto) {
     return this.tutorsService.searchTutors(dto);
   }
@@ -112,6 +114,7 @@ export class TutorsController {
 
   @Public()
   @Get(':id/slots')
+  @SkipThrottle()
   getPublicSlots(@Param('id', ParseUUIDPipe) id: string, @Query() query: SlotsQueryDto) {
     return this.tutorsService.getPublicSlots(id, query.timezone);
   }

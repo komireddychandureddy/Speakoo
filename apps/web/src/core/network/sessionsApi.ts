@@ -52,3 +52,12 @@ export async function submitFeedback(payload: FeedbackPayload): Promise<Feedback
   return data;
 }
 
+export async function getSessionRecordingDownload(
+  bookingId: string,
+): Promise<{ recordingUrl: string }> {
+  const { data } = await apiClient.get<{ recordingUrl: string }>(
+    `sessions/${bookingId}/recording`,
+  );
+  return data;
+}
+

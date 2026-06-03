@@ -1,4 +1,10 @@
-import { Injectable, ForbiddenException, ConflictException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+  ConflictException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AccessToken } from 'livekit-server-sdk';
 import { PrismaService } from '../prisma/prisma.service';
@@ -25,6 +31,10 @@ export class SessionsService {
 
     if (booking.status === BookingStatus.cancelled) {
       throw new ConflictException('Booking is cancelled');
+    }
+
+    if (booking.status === BookingStatus.pending) {
+      throw new ConflictException('Session is not available until payment is completed');
     }
 
     const apiKey = this.config.getOrThrow<string>('LIVEKIT_API_KEY');
@@ -128,5 +138,28 @@ export class SessionsService {
     });
 
     return { recording: false, recordingUrl: recordingUrl ?? session.recordingUrl ?? null };
+  }
+
+  async getRecordingDownload(bookingId: string, userId: string): Promise<{ recordingUrl: string }> {
+    const booking = await this.prisma.booking.findUniqueOrThrow({
+      where: { id: bookingId },
+      include: { session: true },
+    });
+
+    const isParticipant = booking.learnerId === userId || booking.tutorId === userId;
+    if (!isParticipant) {
+      throw new ForbiddenException('Not a participant of this session');
+    }
+
+    if (booking.status !== BookingStatus.completed) {
+      throw new ConflictException('Recording is available only after session completion');
+    }
+
+    const recordingUrl = booking.session?.recordingUrl;
+    if (!recordingUrl) {
+      throw new NotFoundException('Recording is not available for this session');
+    }
+
+    return { recordingUrl };
   }
 }

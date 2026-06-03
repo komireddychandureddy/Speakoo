@@ -9,7 +9,7 @@ import { User } from '@prisma/client';
 export class FeedbackController {
   constructor(private readonly feedbackService: FeedbackService) {}
 
-  @Roles('learner')
+  @Roles('learner', 'tutor')
   @Post()
   submitFeedback(@CurrentUser() user: User, @Body() dto: CreateFeedbackDto) {
     return this.feedbackService.submitFeedback(user.id, dto);

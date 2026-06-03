@@ -100,6 +100,13 @@ enum UserSubscriptionStatus {
   canceled
 }
 
+enum WithdrawalRequestStatus {
+  pending
+  approved
+  rejected
+  paid
+}
+
 enum HomeworkStatus {
   assigned
   submitted
@@ -142,6 +149,9 @@ model User {
   kycSubmissions      TutorKycSubmission[] @relation("KycTutor")
   kycReviews          TutorKycSubmission[] @relation("KycReviewer")
   subscriptions       UserSubscription[]
+  payoutAccount       TutorPayoutAccount?
+  withdrawalRequests  WithdrawalRequest[] @relation("TutorWithdrawalRequests")
+  reviewedWithdrawals WithdrawalRequest[] @relation("AdminReviewedWithdrawals")
   learningEnrollments LearnerPathEnrollment[]
   sessionNotesAsLearner SessionNote[] @relation("SessionNoteLearner")
   sessionNotesAsTutor   SessionNote[] @relation("SessionNoteTutor")
@@ -319,6 +329,43 @@ model WalletTransaction {
   user User @relation(fields: [userId], references: [id])
 
   @@map("wallet_transactions")
+}
+
+model TutorPayoutAccount {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tutorUserId        String   @unique @map("tutor_user_id") @db.Uuid
+  accountHolderName  String   @map("account_holder_name")
+  accountNumberLast4 String   @map("account_number_last4")
+  bankName           String   @map("bank_name")
+  routingCode        String   @map("routing_code")
+  currency           String   @default("usd")
+  countryCode        String?  @map("country_code")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tutor User @relation(fields: [tutorUserId], references: [id], onDelete: Cascade)
+
+  @@map("tutor_payout_accounts")
+}
+
+model WithdrawalRequest {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  tutorUserId        String                  @map("tutor_user_id") @db.Uuid
+  amountCents        Int                     @map("amount_cents")
+  status             WithdrawalRequestStatus @default(pending)
+  adminNote          String?                 @map("admin_note") @db.Text
+  reviewedById       String?                 @map("reviewed_by_id") @db.Uuid
+  externalTransferId String?                 @map("external_transfer_id")
+  reviewedAt         DateTime?               @map("reviewed_at") @db.Timestamptz
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime                @updatedAt @map("updated_at") @db.Timestamptz
+
+  tutor      User  @relation("TutorWithdrawalRequests", fields: [tutorUserId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("AdminReviewedWithdrawals", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tutorUserId, status, createdAt], map: "withdrawal_requests_tutor_status_created_at_idx")
+  @@index([status, createdAt], map: "withdrawal_requests_status_created_at_idx")
+  @@map("withdrawal_requests")
 }
 
 model CreditBundle {

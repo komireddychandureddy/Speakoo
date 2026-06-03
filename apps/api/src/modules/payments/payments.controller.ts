@@ -21,6 +21,11 @@ import { WalletTopupDto } from './dto/wallet-topup.dto';
 import { SubscribePlanDto } from './dto/subscribe-plan.dto';
 import { UpsertSubscriptionPlanDto } from './dto/upsert-subscription-plan.dto';
 import { CancelSubscriptionDto } from './dto/cancel-subscription.dto';
+import { ConfirmMockPaymentDto } from './dto/confirm-mock-payment.dto';
+import { UpsertPayoutAccountDto } from './dto/upsert-payout-account.dto';
+import { CreateWithdrawalRequestDto } from './dto/create-withdrawal-request.dto';
+import { ReviewWithdrawalRequestDto } from './dto/review-withdrawal-request.dto';
+import { ListWithdrawalRequestsDto } from './dto/list-withdrawal-requests.dto';
 import { User } from '@prisma/client';
 
 @Controller('payments')
@@ -106,9 +111,64 @@ export class PaymentsController {
     return this.paymentsService.purchaseCredits(user.id, dto.bundleId);
   }
 
+  @Roles('learner')
+  @Post('mock/confirm')
+  confirmMockPayment(@CurrentUser() user: User, @Body() dto: ConfirmMockPaymentDto) {
+    return this.paymentsService.confirmMockPayment(user.id, dto);
+  }
+
   @Roles('tutor')
   @Post('connect/onboard')
   createConnectOnboarding(@CurrentUser() user: User) {
     return this.paymentsService.createConnectOnboarding(user.id);
+  }
+
+  @Roles('tutor')
+  @Get('tutor/payout-account')
+  getTutorPayoutAccount(@CurrentUser() user: User) {
+    return this.paymentsService.getTutorPayoutAccount(user.id);
+  }
+
+  @Roles('tutor')
+  @Post('tutor/payout-account')
+  upsertTutorPayoutAccount(@CurrentUser() user: User, @Body() dto: UpsertPayoutAccountDto) {
+    return this.paymentsService.upsertTutorPayoutAccount(user.id, dto);
+  }
+
+  @Roles('tutor')
+  @Get('tutor/payouts/summary')
+  getTutorPayoutSummary(@CurrentUser() user: User) {
+    return this.paymentsService.getTutorPayoutSummary(user.id);
+  }
+
+  @Roles('tutor')
+  @Get('tutor/withdrawals')
+  listTutorWithdrawals(@CurrentUser() user: User) {
+    return this.paymentsService.listTutorWithdrawals(user.id);
+  }
+
+  @Roles('tutor')
+  @Post('tutor/withdrawals')
+  createTutorWithdrawalRequest(
+    @CurrentUser() user: User,
+    @Body() dto: CreateWithdrawalRequestDto,
+  ) {
+    return this.paymentsService.createTutorWithdrawalRequest(user.id, dto.amountCents);
+  }
+
+  @Roles('admin')
+  @Get('admin/withdrawals')
+  listAdminWithdrawals(@Query() query: ListWithdrawalRequestsDto) {
+    return this.paymentsService.listAdminWithdrawals(query.status);
+  }
+
+  @Roles('admin')
+  @Post('admin/withdrawals/:id/review')
+  reviewWithdrawalRequest(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Body() dto: ReviewWithdrawalRequestDto,
+  ) {
+    return this.paymentsService.reviewWithdrawalRequest(id, user.id, dto.action, dto.note);
   }
 }

@@ -16,6 +16,7 @@ import { CreatePublicTutorApplicationDto } from './dto/create-public-tutor-appli
 import { CreateBulkSlotsDto } from './dto/create-bulk-slots.dto';
 
 const BCRYPT_ROUNDS = 12;
+const SLOT_WINDOW_DAYS = 7;
 
 function buildLegacyStyleRef(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -29,6 +30,23 @@ function buildLegacyStyleRef(): string {
 @Injectable()
 export class TutorsRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  private validateSlotWindow(start: Date, end: Date): void {
+    if (end <= start) {
+      throw new BadRequestException('endTime must be after startTime');
+    }
+
+    const now = new Date();
+    const maxStart = new Date(now.getTime() + SLOT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+    if (start < now) {
+      throw new BadRequestException('Slots cannot be created in the past');
+    }
+
+    if (start > maxStart) {
+      throw new BadRequestException('Slots can only be created up to 7 days from now');
+    }
+  }
 
   private async generateUniqueApplicationRef(
     tx: PrismaService | Prisma.TransactionClient = this.prisma,
@@ -79,10 +97,7 @@ export class TutorsRepository {
   async createSlot(userId: string, dto: CreateAvailabilitySlotDto) {
     const start = new Date(dto.startTime);
     const end = new Date(dto.endTime);
-
-    if (end <= start) {
-      throw new BadRequestException('endTime must be after startTime');
-    }
+    this.validateSlotWindow(start, end);
 
     const tutorProfile = await this.prisma.tutorProfile.findUnique({ where: { userId } });
     if (!tutorProfile) throw new NotFoundException('Tutor profile not found');
@@ -135,20 +150,60 @@ export class TutorsRepository {
     const tutorProfile = await this.prisma.tutorProfile.findUnique({ where: { userId } });
     if (!tutorProfile) throw new NotFoundException('Tutor profile not found');
 
-    const slots = await Promise.all(
-      dto.slots.map((slot: { startTime: string; endTime: string }) =>
-        this.prisma.availabilitySlot.create({
-          data: {
-            tutorId: tutorProfile.id,
-            startTime: new Date(slot.startTime),
-            endTime: new Date(slot.endTime),
-            status: 'available',
-          },
-        }),
-      ),
-    );
+    const parsedSlots = dto.slots.map((slot: { startTime: string; endTime: string }) => {
+      const start = new Date(slot.startTime);
+      const end = new Date(slot.endTime);
+      this.validateSlotWindow(start, end);
+      return { startTime: start, endTime: end };
+    });
 
-    return slots;
+    const sorted = [...parsedSlots].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+    for (let index = 1; index < sorted.length; index += 1) {
+      if (sorted[index - 1].endTime > sorted[index].startTime) {
+        throw new ConflictException('Bulk slots include overlapping time ranges');
+      }
+    }
+
+    const minStart = sorted[0]?.startTime;
+    const maxEnd = sorted[sorted.length - 1]?.endTime;
+
+    if (!minStart || !maxEnd) {
+      return [];
+    }
+
+    const existing = await this.prisma.availabilitySlot.findMany({
+      where: {
+        tutorId: tutorProfile.id,
+        status: { not: 'blocked' },
+        startTime: { lt: maxEnd },
+        endTime: { gt: minStart },
+      },
+      select: { startTime: true, endTime: true },
+    });
+
+    for (const slot of parsedSlots) {
+      const hasOverlap = existing.some(
+        (current) => current.startTime < slot.endTime && current.endTime > slot.startTime,
+      );
+      if (hasOverlap) {
+        throw new ConflictException('One or more slots overlap with existing availability');
+      }
+    }
+
+    const rows = parsedSlots.map((slot) => ({
+      id: randomUUID(),
+      tutorId: tutorProfile.id,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      status: 'available' as const,
+    }));
+
+    await this.prisma.availabilitySlot.createMany({ data: rows });
+
+    return this.prisma.availabilitySlot.findMany({
+      where: { id: { in: rows.map((row) => row.id) } },
+      orderBy: { startTime: 'asc' },
+    });
   }
 
   async searchTutors(dto: SearchTutorsDto) {

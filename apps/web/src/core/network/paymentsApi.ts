@@ -44,6 +44,50 @@ export interface CreditBundle {
 
 export interface CreditPurchaseIntentResponse {
   clientSecret: string;
+  paymentMode?: 'stripe' | 'mock';
+  mockReference?: string;
+}
+
+export interface MockPaymentConfirmPayload {
+  kind: 'booking' | 'credit_purchase' | 'wallet_topup';
+  bookingId?: string;
+  bundleId?: string;
+  amountCents?: number;
+}
+
+export interface TutorPayoutAccount {
+  id: string;
+  tutorUserId: string;
+  accountHolderName: string;
+  accountNumberLast4: string;
+  bankName: string;
+  routingCode: string;
+  currency: string;
+  countryCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TutorPayoutSummary {
+  currentBalanceCents: number;
+  pendingWithdrawalCents: number;
+  availableToWithdrawCents: number;
+  lifetimePayoutCents: number;
+  minimumWithdrawalCents: number;
+  hasPayoutAccount: boolean;
+}
+
+export interface WithdrawalRequest {
+  id: string;
+  tutorUserId: string;
+  amountCents: number;
+  status: 'pending' | 'approved' | 'rejected' | 'paid';
+  adminNote: string | null;
+  reviewedById: string | null;
+  externalTransferId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt: string | null;
 }
 
 export async function listSubscriptionPlans(): Promise<SubscriptionPlan[]> {
@@ -88,5 +132,42 @@ export async function purchaseCredits(bundleId: string): Promise<CreditPurchaseI
   const { data } = await apiClient.post<CreditPurchaseIntentResponse>('payments/wallet/credits', {
     bundleId,
   });
+  return data;
+}
+
+export async function confirmMockPayment(payload: MockPaymentConfirmPayload): Promise<{ confirmed: boolean }> {
+  const { data } = await apiClient.post<{ confirmed: boolean }>('payments/mock/confirm', payload);
+  return data;
+}
+
+export async function getTutorPayoutAccount(): Promise<TutorPayoutAccount | null> {
+  const { data } = await apiClient.get<TutorPayoutAccount | null>('payments/tutor/payout-account');
+  return data;
+}
+
+export async function upsertTutorPayoutAccount(payload: {
+  accountHolderName: string;
+  accountNumber: string;
+  bankName: string;
+  routingCode: string;
+  currency?: string;
+  countryCode?: string;
+}): Promise<TutorPayoutAccount> {
+  const { data } = await apiClient.post<TutorPayoutAccount>('payments/tutor/payout-account', payload);
+  return data;
+}
+
+export async function getTutorPayoutSummary(): Promise<TutorPayoutSummary> {
+  const { data } = await apiClient.get<TutorPayoutSummary>('payments/tutor/payouts/summary');
+  return data;
+}
+
+export async function listTutorWithdrawals(): Promise<WithdrawalRequest[]> {
+  const { data } = await apiClient.get<WithdrawalRequest[]>('payments/tutor/withdrawals');
+  return data;
+}
+
+export async function createTutorWithdrawalRequest(amountCents: number): Promise<WithdrawalRequest> {
+  const { data } = await apiClient.post<WithdrawalRequest>('payments/tutor/withdrawals', { amountCents });
   return data;
 }

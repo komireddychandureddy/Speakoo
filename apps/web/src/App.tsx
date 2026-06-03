@@ -41,6 +41,7 @@ import AdminApplicationDetailPage from './pages/Admin/AdminApplicationDetailPage
 import AdminIncidentsPage from './pages/Admin/AdminIncidentsPage';
 import AdminIncidentDetailPage from './pages/Admin/AdminIncidentDetailPage';
 import AdminRiskSignalsPage from './pages/Admin/AdminRiskSignalsPage';
+import AdminWithdrawalsPage from './pages/Admin/AdminWithdrawalsPage';
 import FavoritesPage from './pages/Favorites/FavoritesPage';
 import MessagesPage from './pages/Messages/MessagesPage';
 import SettingsPage from './pages/Settings/SettingsPage';
@@ -145,6 +146,7 @@ export default function App() {
           <Route path="/admin/incidents" element={<AdminIncidentsPage />} />
           <Route path="/admin/incidents/:id" element={<AdminIncidentDetailPage />} />
           <Route path="/admin/sessions" element={<AdminSessionsPage />} />
+          <Route path="/admin/withdrawals" element={<AdminWithdrawalsPage />} />
           <Route path="/admin/tutors" element={<AdminTutorsPage />} />
           <Route path="/admin/learners" element={<AdminLearnersPage />} />
           <Route path="/admin/applications" element={<AdminApplicationsPage />} />
