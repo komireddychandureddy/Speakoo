@@ -1,48 +1,59 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, FileText } from 'lucide-react';
-import { listAdminUsers, approveTutor, type AdminUser } from '../../core/network/adminApi';
+import { toApplicationReference } from '../../core/utils/applicationReference';
+import {
+  listAdminKycSubmissions,
+  reviewKycSubmission,
+  type AdminKycSubmission,
+} from '../../core/network/adminApi';
 
-type FilterKey = 'all' | 'pending' | 'approved';
+type FilterKey = 'all' | 'pending' | 'approved' | 'rejected';
 
-const STATUS_META: Record<'pending' | 'approved', { label: string; badge: string }> = {
+const STATUS_META: Record<'pending' | 'approved' | 'rejected', { label: string; badge: string }> = {
   pending: { label: 'Pending', badge: 'bg-amber-100 text-amber-700' },
   approved: { label: 'Approved', badge: 'bg-[#E8F5E9] text-[#2E7D32]' },
+  rejected: { label: 'Rejected', badge: 'bg-red-100 text-red-700' },
 };
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'pending', label: 'Pending' },
   { key: 'approved', label: 'Approved' },
+  { key: 'rejected', label: 'Rejected' },
 ];
 
 export default function AdminApplicationsPage() {
-  const [tutors, setTutors] = useState<AdminUser[]>([]);
+  const [submissions, setSubmissions] = useState<AdminKycSubmission[]>([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
 
   const load = () => {
-    listAdminUsers(1, 100, 'tutor').then((res) => setTutors(res.data)).catch(() => {});
+    listAdminKycSubmissions({ page: 1, limit: 200 })
+      .then((res) => setSubmissions(res.items))
+      .catch(() => {});
   };
 
   useEffect(() => { load(); }, []);
 
-  const countFor = (s: 'pending' | 'approved') =>
-    tutors.filter((u) => (s === 'pending' ? u.tutorProfile?.isApproved === false : u.tutorProfile?.isApproved === true)).length;
+  const countFor = (s: 'pending' | 'approved' | 'rejected') =>
+    submissions.filter((u) => u.status === s).length;
 
-  const filtered = tutors.filter((u) => {
-    const name = (u.profile?.displayName ?? u.email).toLowerCase();
-    const matchesQuery = name.includes(query.toLowerCase()) || u.email.toLowerCase().includes(query.toLowerCase());
-    const isApproved = u.tutorProfile?.isApproved === true;
+  const filtered = submissions.filter((u) => {
+    const name = (u.tutor.profile?.displayName ?? u.tutor.email).toLowerCase();
+    const matchesQuery =
+      name.includes(query.toLowerCase()) ||
+      u.tutor.email.toLowerCase().includes(query.toLowerCase()) ||
+      u.id.toLowerCase().includes(query.toLowerCase());
+    const status = u.status;
     const matchesFilter =
       filter === 'all' ||
-      (filter === 'pending' && !isApproved) ||
-      (filter === 'approved' && isApproved);
+      filter === status;
     return matchesQuery && matchesFilter;
   });
 
-  const handleApprove = async (userId: string) => {
-    await approveTutor(userId);
+  const handleReview = async (submissionId: string, status: 'approved' | 'rejected') => {
+    await reviewKycSubmission(submissionId, { status });
     load();
   };
 
@@ -51,7 +62,7 @@ export default function AdminApplicationsPage() {
       <div>
         <h1 className="text-2xl font-bold text-[#212121]">Tutor Applications</h1>
         <p className="text-[#616161] text-sm mt-1">
-          {tutors.length} total · {countFor('pending')} pending review
+          {submissions.length} total · {countFor('pending')} pending review
         </p>
       </div>
 
@@ -75,7 +86,7 @@ export default function AdminApplicationsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name or email…"
+            placeholder="Search by id, name or email..."
             className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#43A047]/30"
           />
         </div>
@@ -90,9 +101,7 @@ export default function AdminApplicationsPage() {
             }`}
           >
             {label}
-            {key !== 'all' && (
-              <span className="ml-1.5 text-xs opacity-80">({countFor(key as 'pending' | 'approved')})</span>
-            )}
+            {key !== 'all' && <span className="ml-1.5 text-xs opacity-80">({countFor(key)})</span>}
           </button>
         ))}
       </div>
@@ -114,9 +123,10 @@ export default function AdminApplicationsPage() {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filtered.map((u) => {
-              const isApproved = u.tutorProfile?.isApproved === true;
-              const status = isApproved ? 'approved' : 'pending';
-              const displayName = u.profile?.displayName ?? u.email;
+              const status = u.status;
+              const isPending = status === 'pending';
+              const reference = u.applicationRef ?? toApplicationReference(u.id);
+              const displayName = u.tutor.profile?.displayName ?? u.tutor.email;
               const initials = displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
               return (
                 <tr key={u.id} className="hover:bg-[#F8FBF0] transition-colors">
@@ -127,15 +137,14 @@ export default function AdminApplicationsPage() {
                       </span>
                       <div>
                         <p className="font-medium text-[#212121]">{displayName}</p>
-                        <p className="text-xs text-[#616161]">{u.email}</p>
+                        <p className="text-xs text-[#616161]">{u.tutor.email}</p>
+                        <p className="text-[11px] text-[#616161]">#{reference}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-[#616161]">{u.tutorProfile?.languagesTaught?.join(', ') ?? '—'}</td>
+                  <td className="px-5 py-3 text-[#616161]">{u.tutor.tutorProfile?.languagesTaught?.join(', ') ?? '—'}</td>
                   <td className="px-5 py-3 text-[#616161]">
-                    {u.tutorProfile?.hourlyRateCents != null
-                      ? `₹${Math.round(u.tutorProfile.hourlyRateCents / 100)}`
-                      : '—'}
+                    —
                   </td>
                   <td className="px-5 py-3 text-[#616161]">
                     {new Date(u.createdAt).toLocaleDateString('en-IN', {
@@ -156,13 +165,21 @@ export default function AdminApplicationsPage() {
                     >
                       <FileText size={13} /> View
                     </Link>
-                    {!isApproved && (
-                      <button
-                        onClick={() => handleApprove(u.id)}
-                        className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium bg-[#43A047] text-white hover:bg-[#2E7D32] transition-colors"
-                      >
-                        Approve
-                      </button>
+                    {isPending && (
+                      <>
+                        <button
+                          onClick={() => handleReview(u.id, 'approved')}
+                          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium bg-[#43A047] text-white hover:bg-[#2E7D32] transition-colors"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleReview(u.id, 'rejected')}
+                          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                        >
+                          Reject
+                        </button>
+                      </>
                     )}
                   </td>
                 </tr>

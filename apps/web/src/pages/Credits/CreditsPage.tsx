@@ -1,13 +1,13 @@
 import { Gem } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useI18n } from '../../core/i18n/I18nContext';
 import { useLocale } from '../../core/locale/LocaleContext';
-import { CREDIT_PACKS, MOCK_CREDIT_BALANCE } from '../../data/mockData';
 import {
   getWalletTransactions,
   type WalletTransaction,
 } from '../../core/network/bookingsApi';
-import { getWalletBalance } from '../../core/network/paymentsApi';
+import { getWalletBalance, listCreditBundles, type CreditBundle } from '../../core/network/paymentsApi';
 
 function txLabel(tx: WalletTransaction): string {
   switch (tx.type) {
@@ -24,41 +24,28 @@ function txLabel(tx: WalletTransaction): string {
   }
 }
 
-function PackCard({ pack }: { pack: (typeof CREDIT_PACKS)[0] }) {
+function PackCard({ pack, onBuy }: { pack: CreditBundle; onBuy: (bundleId: string) => void }) {
   const { t } = useI18n();
-  const { fmtCredits, fmtPrice, taxedPrice, taxLabel, taxRate } = useLocale();
+  const { fmtCredits, fmtPrice } = useLocale();
 
-  const taxed = taxedPrice(pack.priceInr);
   return (
     <div className={`bg-white rounded-2xl border-2 p-5 flex flex-col gap-3 transition-all hover:shadow-md ${
-      pack.label === 'Popular' ? 'border-[#43A047] relative' : 'border-gray-100'
+      'border-gray-100'
     }`}>
-      {pack.label === 'Popular' && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#43A047] text-white text-xs font-bold px-3 py-0.5 rounded-full">
-          Best Value
-        </span>
-      )}
-      <div className="text-sm font-semibold text-[#616161]">{pack.label}</div>
+      <div className="text-sm font-semibold text-[#616161]">{pack.name}</div>
       <div className="flex items-baseline gap-1">
         <Gem size={16} className="text-[#43A047] mt-0.5" />
         <span className="text-3xl font-bold text-[#212121]">{pack.credits.toLocaleString()}</span>
         <span className="text-sm text-[#616161]">credits</span>
       </div>
-      {pack.bonusCredits && (
-        <span className="text-xs font-medium text-[#43A047] bg-[#E8F5E9] px-2 py-0.5 rounded-full w-fit">
-          +{pack.bonusCredits} {t('cred_bonus')}
-        </span>
-      )}
       <div className="mt-auto">
-        <div className="text-lg font-bold text-[#212121]">{fmtPrice(taxed)}</div>
-        {taxRate > 0 && (
-          <div className="text-xs text-[#616161]">Incl. {taxLabel} · ≈ {fmtCredits(pack.credits)}</div>
-        )}
-        {taxRate === 0 && (
-          <div className="text-xs text-[#616161]">≈ {fmtCredits(pack.credits)}</div>
-        )}
+        <div className="text-lg font-bold text-[#212121]">{fmtPrice(pack.priceCents / 100)}</div>
+        <div className="text-xs text-[#616161]">≈ {fmtCredits(pack.credits)}</div>
       </div>
-      <button className="w-full py-2 rounded-xl bg-[#43A047] hover:bg-[#2E7D32] text-white font-semibold text-sm transition-colors">
+      <button
+        onClick={() => onBuy(pack.id)}
+        className="w-full py-2 rounded-xl bg-[#43A047] hover:bg-[#2E7D32] text-white font-semibold text-sm transition-colors"
+      >
         {t('cred_buy_now')}
       </button>
     </div>
@@ -66,9 +53,11 @@ function PackCard({ pack }: { pack: (typeof CREDIT_PACKS)[0] }) {
 }
 
 export default function CreditsPage() {
+  const navigate = useNavigate();
   const { t } = useI18n();
   const { fmtCredits, symbol } = useLocale();
-  const [balance, setBalance] = useState(Number(localStorage.getItem('speakoo_credits') ?? MOCK_CREDIT_BALANCE));
+  const [balance, setBalance] = useState(0);
+  const [bundles, setBundles] = useState<CreditBundle[]>([]);
   const [history, setHistory] = useState<WalletTransaction[]>([]);
 
   useEffect(() => {
@@ -82,6 +71,10 @@ export default function CreditsPage() {
       .then((res) => {
         setHistory(res.items);
       })
+      .catch(() => {});
+
+    listCreditBundles()
+      .then((items) => setBundles(items))
       .catch(() => {});
   }, []);
 
@@ -108,8 +101,12 @@ export default function CreditsPage() {
       <div>
         <h2 className="text-lg font-bold text-[#212121] mb-4">{t('cred_buy')}</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {CREDIT_PACKS.map((pack) => (
-            <PackCard key={pack.id} pack={pack} />
+          {bundles.map((pack) => (
+            <PackCard
+              key={pack.id}
+              pack={pack}
+              onBuy={(bundleId) => navigate(`/checkout/credits/${bundleId}`)}
+            />
           ))}
         </div>
       </div>

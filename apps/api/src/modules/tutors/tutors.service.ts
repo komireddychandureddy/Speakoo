@@ -7,6 +7,7 @@ import { SubmitKycDto } from './dto/submit-kyc.dto';
 import { ListKycDto } from './dto/list-kyc.dto';
 import { ReviewKycDto } from './dto/review-kyc.dto';
 import { RecommendTutorsDto } from './dto/recommend-tutors.dto';
+import { CreatePublicTutorApplicationDto } from './dto/create-public-tutor-application.dto';
 
 @Injectable()
 export class TutorsService {
@@ -55,6 +56,10 @@ export class TutorsService {
     return this.tutorsRepository.createSlot(userId, dto);
   }
 
+  deleteSlot(userId: string, slotId: string) {
+    return this.tutorsRepository.deleteSlot(userId, slotId);
+  }
+
   async getMySlots(userId: string, timezone?: string) {
     const slots = await this.tutorsRepository.findAvailableSlots(userId);
     return this.mapSlotsWithTimezone(slots, timezone);
@@ -62,6 +67,10 @@ export class TutorsService {
 
   searchTutors(dto: SearchTutorsDto) {
     return this.tutorsRepository.searchTutors(dto);
+  }
+
+  submitPublicApplication(dto: CreatePublicTutorApplicationDto) {
+    return this.tutorsRepository.submitPublicApplication(dto);
   }
 
   getPublicTutorProfile(userId: string) {

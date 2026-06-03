@@ -38,6 +38,99 @@ export interface AdminUserList {
   limit: number;
 }
 
+export interface AdminBooking {
+  id: string;
+  learnerId: string;
+  tutorId: string;
+  slotId: string;
+  language: string;
+  status: 'pending' | 'confirmed' | 'in_session' | 'completed' | 'cancelled';
+  priceCents: number;
+  createdAt: string;
+  slot: {
+    startTime: string;
+    endTime: string;
+  };
+  learner: {
+    id: string;
+    email: string;
+    profile: {
+      displayName: string | null;
+      countryCode: string | null;
+    } | null;
+  };
+  tutor: {
+    id: string;
+    email: string;
+    profile: {
+      displayName: string | null;
+      countryCode: string | null;
+    } | null;
+  };
+  payment?: {
+    id: string;
+    status: 'pending' | 'succeeded' | 'failed' | 'refunded';
+    amountCents: number;
+    currency: string;
+  } | null;
+  session?: {
+    id: string;
+    startedAt: string | null;
+    endedAt: string | null;
+    durationMinutes: number | null;
+  } | null;
+}
+
+export interface AdminBookingList {
+  data: AdminBooking[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export type KycSubmissionStatus = 'pending' | 'approved' | 'rejected';
+
+export interface AdminKycSubmission {
+  id: string;
+  applicationRef: string | null;
+  status: KycSubmissionStatus;
+  documentType: string;
+  documentFrontUrl: string;
+  documentBackUrl: string | null;
+  selfieUrl: string | null;
+  note: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  tutor: {
+    id: string;
+    email: string;
+    profile: {
+      displayName: string | null;
+      countryCode: string | null;
+    } | null;
+    tutorProfile: {
+      isApproved: boolean;
+      languagesTaught: string[];
+    } | null;
+  };
+  reviewedBy: {
+    id: string;
+    email: string;
+    profile: {
+      displayName: string | null;
+    } | null;
+  } | null;
+}
+
+export interface AdminKycSubmissionList {
+  items: AdminKycSubmission[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export type IncidentCategory =
   | 'abuse'
   | 'harassment'
@@ -126,8 +219,51 @@ export async function listAdminUsers(
   return data;
 }
 
+export async function listAdminBookings(
+  page = 1,
+  limit = 50,
+  status?: string,
+): Promise<AdminBookingList> {
+  const { data } = await apiClient.get<AdminBookingList>('admin/bookings', {
+    params: { page, limit, ...(status ? { status } : {}) },
+  });
+  return data;
+}
+
+export async function updateAdminBookingStatus(
+  bookingId: string,
+  status: AdminBooking['status'],
+): Promise<AdminBooking> {
+  const { data } = await apiClient.patch<AdminBooking>(`admin/bookings/${bookingId}/status`, {
+    status,
+  });
+  return data;
+}
+
 export async function approveTutor(userId: string): Promise<{ approved: boolean }> {
   const { data } = await apiClient.patch<{ approved: boolean }>(`admin/tutors/${userId}/approve`);
+  return data;
+}
+
+export async function listAdminKycSubmissions(params?: {
+  status?: KycSubmissionStatus;
+  page?: number;
+  limit?: number;
+}): Promise<AdminKycSubmissionList> {
+  const { data } = await apiClient.get<AdminKycSubmissionList>('tutors/kyc/submissions', {
+    params,
+  });
+  return data;
+}
+
+export async function reviewKycSubmission(
+  submissionId: string,
+  payload: { status: KycSubmissionStatus; note?: string },
+): Promise<AdminKycSubmission> {
+  const { data } = await apiClient.post<AdminKycSubmission>(
+    `tutors/kyc/submissions/${submissionId}/review`,
+    payload,
+  );
   return data;
 }
 

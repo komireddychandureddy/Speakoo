@@ -132,6 +132,13 @@ export class PaymentsService {
     return { clientSecret: intent.client_secret };
   }
 
+  async listCreditBundles() {
+    return this.prisma.creditBundle.findMany({
+      where: { isActive: true },
+      orderBy: { credits: 'asc' },
+    });
+  }
+
   async handleWebhook(rawBody: Buffer, signature: string) {
     const webhookSecret = this.config.getOrThrow<string>('STRIPE_WEBHOOK_SECRET');
     let event: Stripe.Event;
@@ -268,6 +275,43 @@ export class PaymentsService {
   }
 
   private async onPaymentSucceeded(intent: Stripe.PaymentIntent) {
+    const paymentType = intent.metadata['type'];
+
+    if (paymentType === 'credit_purchase') {
+      const userId = intent.metadata['userId'];
+      const bundleId = intent.metadata['bundleId'];
+      if (!userId || !bundleId) return;
+
+      const bundle = await this.prisma.creditBundle.findUnique({ where: { id: bundleId } });
+      if (!bundle) return;
+
+      const referenceId = `credit_purchase:${intent.id}`;
+      const existing = await this.prisma.walletTransaction.findFirst({
+        where: { userId, referenceId, type: WalletTransactionType.credit },
+        select: { id: true },
+      });
+      if (existing) return;
+
+      const balanceAgg = await this.prisma.walletTransaction.aggregate({
+        where: { userId },
+        _sum: { amountCents: true },
+      });
+      const prevBalance = balanceAgg._sum.amountCents ?? 0;
+
+      await this.prisma.walletTransaction.create({
+        data: {
+          userId,
+          type: WalletTransactionType.credit,
+          amountCents: bundle.credits,
+          balanceAfter: prevBalance + bundle.credits,
+          referenceId,
+        },
+      });
+
+      this.logger.log(`Credits granted for payment intent ${intent.id}`);
+      return;
+    }
+
     const bookingId = intent.metadata['bookingId'];
     if (!bookingId) return;
 

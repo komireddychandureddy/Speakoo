@@ -4,15 +4,64 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
+import { Prisma, UserRole } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTutorProfileDto } from './dto/create-tutor-profile.dto';
 import { CreateAvailabilitySlotDto } from './dto/create-availability-slot.dto';
 import { SearchTutorsDto } from './dto/search-tutors.dto';
 import { SubmitKycDto } from './dto/submit-kyc.dto';
+import { CreatePublicTutorApplicationDto } from './dto/create-public-tutor-application.dto';
+
+const BCRYPT_ROUNDS = 12;
+
+function buildLegacyStyleRef(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let index = 0; index < 5; index += 1) {
+    code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return `TUT-${code}`;
+}
 
 @Injectable()
 export class TutorsRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async generateUniqueApplicationRef(
+    tx: PrismaService | Prisma.TransactionClient = this.prisma,
+  ): Promise<string> {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const candidate = buildLegacyStyleRef();
+      const existing = await tx.tutorKycSubmission.findUnique({
+        where: { applicationRef: candidate },
+        select: { id: true },
+      });
+      if (!existing) {
+        return candidate;
+      }
+    }
+
+    throw new ConflictException('Could not allocate a unique tutor application reference');
+  }
+
+  private async backfillMissingApplicationRefs(): Promise<void> {
+    const pending = await this.prisma.tutorKycSubmission.findMany({
+      where: { applicationRef: null },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+    });
+
+    for (const item of pending) {
+      const reference = await this.generateUniqueApplicationRef();
+      await this.prisma.tutorKycSubmission.update({
+        where: { id: item.id },
+        data: { applicationRef: reference },
+      });
+    }
+  }
 
   upsertProfile(userId: string, dto: CreateTutorProfileDto) {
     return this.prisma.tutorProfile.upsert({
@@ -59,9 +108,26 @@ export class TutorsRepository {
     if (!tutorProfile) throw new NotFoundException('Tutor profile not found');
 
     return this.prisma.availabilitySlot.findMany({
-      where: { tutorId: tutorProfile.id, status: 'available' },
+      where: { tutorId: tutorProfile.id },
       orderBy: { startTime: 'asc' },
     });
+  }
+
+  async deleteSlot(userId: string, slotId: string) {
+    const tutorProfile = await this.prisma.tutorProfile.findUnique({ where: { userId } });
+    if (!tutorProfile) throw new NotFoundException('Tutor profile not found');
+
+    const slot = await this.prisma.availabilitySlot.findUnique({ where: { id: slotId } });
+    if (!slot) throw new NotFoundException('Slot not found');
+    if (slot.tutorId !== tutorProfile.id) {
+      throw new ConflictException('You can only remove your own slots');
+    }
+    if (slot.status === 'booked') {
+      throw new ConflictException('Booked slots cannot be removed');
+    }
+
+    await this.prisma.availabilitySlot.delete({ where: { id: slotId } });
+    return { deleted: true };
   }
 
   async searchTutors(dto: SearchTutorsDto) {
@@ -234,9 +300,102 @@ export class TutorsRepository {
     return ranked;
   }
 
-  submitKyc(userId: string, dto: SubmitKycDto) {
+  async submitPublicApplication(dto: CreatePublicTutorApplicationDto) {
+    const normalizedEmail = dto.email.trim().toLowerCase();
+    const displayName = `${dto.firstName.trim()} ${dto.lastName.trim()}`.trim();
+    const phone = dto.phone?.trim();
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: { tutorProfile: true },
+    });
+
+    if (existingUser && existingUser.role !== UserRole.tutor) {
+      throw new ConflictException('Email is already registered with a non-tutor account');
+    }
+
+    const user =
+      existingUser ??
+      (await this.prisma.user.create({
+        data: {
+          email: normalizedEmail,
+          passwordHash: await bcrypt.hash(randomUUID(), BCRYPT_ROUNDS),
+          role: UserRole.tutor,
+          ...(phone ? { phoneNumber: phone } : {}),
+        },
+      }));
+
+    await this.prisma.userProfile.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        displayName,
+        bio: dto.bio.trim(),
+        ...(phone ? { phoneNumber: phone } : {}),
+      },
+      update: {
+        displayName,
+        bio: dto.bio.trim(),
+        ...(phone ? { phoneNumber: phone } : {}),
+      },
+    });
+
+    await this.prisma.tutorProfile.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        languagesTaught: dto.languages,
+        hourlyRateCents: 2500,
+        cefrSpecialties: [dto.proficiency],
+        isApproved: false,
+      },
+      update: {
+        languagesTaught: dto.languages,
+        cefrSpecialties: [dto.proficiency],
+        isApproved: false,
+      },
+    });
+
+    const submission = await this.prisma.tutorKycSubmission.create({
+      data: {
+        applicationRef: await this.generateUniqueApplicationRef(),
+        tutorUserId: user.id,
+        documentType: 'public_tutor_application',
+        documentFrontUrl: 'https://speakoo.duckdns.org/tutor-apply',
+        note: [
+          `Public apply form`,
+          `Location: ${dto.city ? `${dto.city}, ` : ''}${dto.country}`,
+          `Experience: ${dto.yearsExp}`,
+          `Certifications: ${dto.certifications?.join(', ') || 'None'}`,
+          `Teaching style: ${dto.teachingStyle || 'Not provided'}`,
+          `Max sessions: ${dto.maxSessions || 'Not provided'}`,
+          `Availability: ${dto.availability.join(', ')}`,
+        ].join(' | '),
+      },
+      include: {
+        tutor: {
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { displayName: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      submissionId: submission.id,
+      tutorUserId: user.id,
+      status: submission.status,
+      applicationReference: submission.applicationRef,
+      tutor: submission.tutor,
+    };
+  }
+
+  async submitKyc(userId: string, dto: SubmitKycDto) {
     return this.prisma.tutorKycSubmission.create({
       data: {
+        applicationRef: await this.generateUniqueApplicationRef(),
         tutorUserId: userId,
         documentType: dto.documentType,
         documentFrontUrl: dto.documentFrontUrl,
@@ -250,7 +409,8 @@ export class TutorsRepository {
     });
   }
 
-  listMyKycSubmissions(userId: string) {
+  async listMyKycSubmissions(userId: string) {
+    await this.backfillMissingApplicationRefs();
     return this.prisma.tutorKycSubmission.findMany({
       where: { tutorUserId: userId },
       include: {
@@ -271,6 +431,8 @@ export class TutorsRepository {
     page: number;
     limit: number;
   }) {
+    await this.backfillMissingApplicationRefs();
+
     const where = params.status ? { status: params.status } : {};
 
     const [items, total] = await this.prisma.$transaction([

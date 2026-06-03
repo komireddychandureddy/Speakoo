@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CreditCard } from 'lucide-react';
 import { createPaymentIntent } from '../../core/network/bookingsApi';
+import { purchaseCredits } from '../../core/network/paymentsApi';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
@@ -16,7 +17,13 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
-function CheckoutForm({ clientSecret }: { clientSecret: string }) {
+function CheckoutForm({
+  clientSecret,
+  successPath,
+}: {
+  clientSecret: string;
+  successPath: string;
+}) {
   const stripe = useStripe();
   const elements = useElements();
   const navigate = useNavigate();
@@ -50,10 +57,10 @@ function CheckoutForm({ clientSecret }: { clientSecret: string }) {
         </div>
         <p className="text-green-700 font-semibold">Payment successful!</p>
         <button
-          onClick={() => navigate('/mySession')}
+          onClick={() => navigate(successPath)}
           className="bg-[#43A047] text-white rounded-xl px-6 py-2 text-sm font-semibold hover:bg-[#388E3C] transition-colors"
         >
-          Go to My Sessions
+          Continue
         </button>
       </div>
     );
@@ -82,18 +89,31 @@ function CheckoutForm({ clientSecret }: { clientSecret: string }) {
 }
 
 export default function CheckoutPage() {
-  const { bookingId } = useParams<{ bookingId: string }>();
+  const { bookingId, bundleId } = useParams<{ bookingId?: string; bundleId?: string }>();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!bookingId) return;
-    createPaymentIntent(bookingId)
-      .then((res) => setClientSecret(res.clientSecret))
-      .catch(() => setError('Could not initialise payment. Please try again.'))
-      .finally(() => setLoading(false));
-  }, [bookingId]);
+    if (bookingId) {
+      createPaymentIntent(bookingId)
+        .then((res) => setClientSecret(res.clientSecret))
+        .catch(() => setError('Could not initialise payment. Please try again.'))
+        .finally(() => setLoading(false));
+      return;
+    }
+
+    if (bundleId) {
+      purchaseCredits(bundleId)
+        .then((res) => setClientSecret(res.clientSecret))
+        .catch(() => setError('Could not initialise credit purchase. Please try again.'))
+        .finally(() => setLoading(false));
+      return;
+    }
+
+    setError('Invalid checkout request.');
+    setLoading(false);
+  }, [bookingId, bundleId]);
 
   if (loading) {
     return (
@@ -131,12 +151,21 @@ export default function CheckoutPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-800">Complete Payment</h1>
-            <p className="text-gray-400 text-xs">Booking #{bookingId?.slice(0, 8)}</p>
+            <p className="text-gray-400 text-xs">
+              {bookingId
+                ? `Booking #${bookingId.slice(0, 8)}`
+                : bundleId
+                  ? `Credits Bundle #${bundleId.slice(0, 8)}`
+                  : 'Checkout'}
+            </p>
           </div>
         </div>
         {clientSecret ? (
           <Elements stripe={stripePromise} options={{ clientSecret }}>
-            <CheckoutForm clientSecret={clientSecret} />
+            <CheckoutForm
+              clientSecret={clientSecret}
+              successPath={bookingId ? '/mySession' : '/my-credits'}
+            />
           </Elements>
         ) : (
           <div className="text-center text-gray-400">Unable to load payment form.</div>

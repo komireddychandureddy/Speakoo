@@ -9,13 +9,15 @@ import {
   ClipboardList,
   ShieldAlert,
   ShieldCheck,
+  CalendarClock,
 } from 'lucide-react';
-import { listAdminUsers } from '../../core/network/adminApi';
+import { listAdminKycSubmissions } from '../../core/network/adminApi';
 
 const NAV_ITEMS = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/admin/risks', label: 'Risks', icon: ShieldCheck },
   { to: '/admin/incidents', label: 'Incidents', icon: ShieldAlert },
+  { to: '/admin/sessions', label: 'Sessions', icon: CalendarClock },
   { to: '/admin/applications', label: 'Applications', icon: ClipboardList },
   { to: '/admin/tutors', label: 'Tutors', icon: GraduationCap },
   { to: '/admin/learners', label: 'Learners', icon: Users },
@@ -26,10 +28,9 @@ export default function AdminLayout() {
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
-    listAdminUsers(1, 200, 'tutor')
+    listAdminKycSubmissions({ status: 'pending', page: 1, limit: 200 })
       .then((res) => {
-        const count = res.data.filter((u) => !u.tutorProfile?.isApproved).length;
-        setPendingCount(count);
+        setPendingCount(res.total);
       })
       .catch(() => {});
   }, []);

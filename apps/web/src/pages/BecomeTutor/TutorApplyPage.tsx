@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react';
 import PhoneInput from '../../components/PhoneInput/PhoneInput';
+import { submitPublicTutorApplication } from '../../core/network/tutorsApi';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -52,6 +53,8 @@ export default function TutorApplyPage() {
   const [step, setStep] = useState<Step>(1);
   const [submitted, setSubmitted] = useState(false);
   const [refNumber, setRefNumber] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [form, setForm] = useState<FormData>({
     firstName: '', lastName: '', email: '', phone: '', country: 'United States', city: '',
     languages: [], proficiency: '', certifications: [], yearsExp: '',
@@ -72,21 +75,36 @@ export default function TutorApplyPage() {
   const next = () => { if (step < 4) setStep((s) => (s + 1) as Step); };
   const back = () => { if (step > 1) setStep((s) => (s - 1) as Step); };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canNext()) return;
-    const ref = `TUT-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-    const app = {
-      id: `app-${Date.now()}`,
-      refNumber: ref,
-      ...form,
-      agreed: undefined,
-      submittedAt: new Date().toISOString(),
-      status: 'pending' as const,
-    };
-    const existing: unknown[] = JSON.parse(localStorage.getItem('speakoo_applications') || 'null') ?? [];
-    localStorage.setItem('speakoo_applications', JSON.stringify([...existing, app]));
-    setRefNumber(ref);
-    setSubmitted(true);
+    setIsSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const result = await submitPublicTutorApplication({
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim().toLowerCase(),
+        ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
+        country: form.country.trim(),
+        ...(form.city.trim() ? { city: form.city.trim() } : {}),
+        languages: form.languages,
+        proficiency: form.proficiency,
+        certifications: form.certifications,
+        yearsExp: form.yearsExp,
+        bio: form.bio.trim(),
+        ...(form.teachingStyle ? { teachingStyle: form.teachingStyle } : {}),
+        ...(form.maxSessions ? { maxSessions: form.maxSessions } : {}),
+        availability: form.availability,
+      });
+
+      setRefNumber(result.applicationReference);
+      setSubmitted(true);
+    } catch {
+      setSubmitError('Unable to submit your application right now. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -413,6 +431,11 @@ export default function TutorApplyPage() {
 
           {/* Navigation Buttons */}
           <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+            {submitError ? (
+              <p className="text-sm text-red-600 font-medium">{submitError}</p>
+            ) : (
+              <div />
+            )}
             <button
               onClick={back}
               className={`flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors ${step === 1 ? 'invisible' : ''}`}
@@ -430,10 +453,10 @@ export default function TutorApplyPage() {
             ) : (
               <button
                 onClick={handleSubmit}
-                disabled={!canNext()}
+                disabled={!canNext() || isSubmitting}
                 className="flex items-center gap-2 bg-[#43A047] hover:bg-[#2E7D32] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-bold px-6 py-2.5 rounded-full transition-colors"
               >
-                Submit Application <CheckCircle size={16} />
+                {isSubmitting ? 'Submitting...' : 'Submit Application'} <CheckCircle size={16} />
               </button>
             )}
           </div>

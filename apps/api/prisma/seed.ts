@@ -1,8 +1,6 @@
 ﻿/* eslint-disable no-console */
 import { PrismaClient, UserRole, SlotStatus } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
-import { Pool } from 'pg';
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -10,11 +8,7 @@ if (!databaseUrl) {
   throw new Error('DATABASE_URL is required to run prisma/seed.ts');
 }
 
-const pool = new Pool({ connectionString: databaseUrl });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({
-  adapter,
-} as ConstructorParameters<typeof PrismaClient>[0]);
+const prisma = new PrismaClient();
 const BCRYPT_ROUNDS = 12;
 
 async function main() {
@@ -269,7 +263,4 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-    await pool.end();
-  });
+  .finally(() => prisma.$disconnect());

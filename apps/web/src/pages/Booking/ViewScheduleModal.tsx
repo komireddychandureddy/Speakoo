@@ -1,27 +1,25 @@
 ﻿import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useLocale } from '../../core/locale/LocaleContext';
-
-// Static time slots — tutor availability fetched separately when needed
-const TIME_SLOTS = [
-  '6:00 AM','7:00 AM','8:00 AM','9:00 AM','10:00 AM','11:00 AM',
-  '12:00 PM','1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM',
-  '6:00 PM','7:00 PM','8:00 PM','9:00 PM',
-];
+import type { AvailabilitySlot } from '../../core/network/tutorsApi';
 
 interface Props {
   tutorName: string;
   selectedDate: string;
+  slots: AvailabilitySlot[];
   onClose: () => void;
-  onBook: (timeSlot: string) => void;
+  onBook: (slot: AvailabilitySlot) => void;
 }
 
-// Simulate some slots as reserved
-const RESERVED_SLOTS = ['8:00 AM', '9:00 AM', '11:00 AM', '2:00 PM', '4:00 PM', '6:00 PM'];
-
-export default function ViewScheduleModal({ tutorName, selectedDate, onClose, onBook }: Props) {
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+export default function ViewScheduleModal({ tutorName, selectedDate, slots, onClose, onBook }: Props) {
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const { userTz } = useLocale();
+
+  const sortedSlots = [...slots].sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+  );
+
+  const selectedSlot = sortedSlots.find((slot) => slot.id === selectedSlotId) ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -49,10 +47,6 @@ export default function ViewScheduleModal({ tutorName, selectedDate, onClose, on
             <span className="text-gray-600">Available</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-gray-100 border border-gray-300" />
-            <span className="text-gray-400">Reserved</span>
-          </div>
-          <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded bg-[#43A047]" />
             <span className="text-gray-600">Selected</span>
           </div>
@@ -60,29 +54,36 @@ export default function ViewScheduleModal({ tutorName, selectedDate, onClose, on
 
         {/* Slots Grid */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="grid grid-cols-3 gap-2">
-            {TIME_SLOTS.map((slot) => {
-              const reserved = RESERVED_SLOTS.includes(slot);
-              const selected = selectedSlot === slot;
-              const displayTime = slot;
-              return (
-                <button
-                  key={slot}
-                  disabled={reserved}
-                  onClick={() => setSelectedSlot(slot)}
-                  className={`py-2.5 rounded-xl text-sm font-medium border-2 transition-all flex flex-col items-center ${
-                    reserved
-                      ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                      : selected
-                      ? 'bg-[#43A047] border-[#43A047] text-white'
-                      : 'bg-[#BBF7D0] border-[#14783D] text-[#14783D] hover:border-[#43A047]'
-                  }`}
-                >
-                  <span>{displayTime}</span>
-                </button>
-              );
-            })}
-          </div>
+          {sortedSlots.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-8">
+              No available slots on this day.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {sortedSlots.map((slot) => {
+                const selected = selectedSlotId === slot.id;
+                const start = new Date(slot.startTime);
+                const end = new Date(slot.endTime);
+                const displayTime = `${start.toLocaleTimeString('en-IN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })} - ${end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+                return (
+                  <button
+                    key={slot.id}
+                    onClick={() => setSelectedSlotId(slot.id)}
+                    className={`py-2.5 rounded-xl text-sm font-medium border-2 transition-all flex flex-col items-center ${
+                      selected
+                        ? 'bg-[#43A047] border-[#43A047] text-white'
+                        : 'bg-[#BBF7D0] border-[#14783D] text-[#14783D] hover:border-[#43A047]'
+                    }`}
+                  >
+                    <span>{displayTime}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-[#EEEEEE]">
@@ -92,7 +93,7 @@ export default function ViewScheduleModal({ tutorName, selectedDate, onClose, on
             className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {selectedSlot
-              ? `Book ${selectedSlot}`
+              ? 'Book Selected Slot'
               : 'Select a time slot'}
           </button>
         </div>

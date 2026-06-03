@@ -26,6 +26,9 @@ export interface AvailabilitySlot {
   startTime: string;
   endTime: string;
   status: 'available' | 'booked' | 'blocked';
+  startTimeLocal?: string;
+  endTimeLocal?: string;
+  timezone?: string;
 }
 
 export interface TutorSearchResult {
@@ -57,6 +60,30 @@ export interface RecommendTutorsParams {
   limit?: number;
 }
 
+export interface PublicTutorApplicationPayload {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  country: string;
+  city?: string;
+  languages: string[];
+  proficiency: string;
+  certifications?: string[];
+  yearsExp: string;
+  bio: string;
+  teachingStyle?: string;
+  maxSessions?: string;
+  availability: string[];
+}
+
+export interface PublicTutorApplicationResponse {
+  submissionId: string;
+  tutorUserId: string;
+  status: 'pending' | 'approved' | 'rejected';
+  applicationReference: string;
+}
+
 // ─── API calls ────────────────────────────────────────────────────────────────
 
 export async function searchTutors(params: SearchTutorsParams = {}): Promise<TutorSearchResult> {
@@ -69,8 +96,10 @@ export async function getTutorProfile(userId: string): Promise<TutorProfile> {
   return data;
 }
 
-export async function getTutorSlots(userId: string): Promise<AvailabilitySlot[]> {
-  const { data } = await apiClient.get<AvailabilitySlot[]>(`tutors/${userId}/slots`);
+export async function getTutorSlots(userId: string, timezone?: string): Promise<AvailabilitySlot[]> {
+  const { data } = await apiClient.get<AvailabilitySlot[]>(`tutors/${userId}/slots`, {
+    params: { ...(timezone ? { timezone } : {}) },
+  });
   return data;
 }
 
@@ -93,8 +122,15 @@ export async function createSlot(
   return data;
 }
 
-export async function getMySlots(): Promise<AvailabilitySlot[]> {
-  const { data } = await apiClient.get<AvailabilitySlot[]>('tutors/slots');
+export async function getMySlots(timezone?: string): Promise<AvailabilitySlot[]> {
+  const { data } = await apiClient.get<AvailabilitySlot[]>('tutors/slots', {
+    params: { ...(timezone ? { timezone } : {}) },
+  });
+  return data;
+}
+
+export async function deleteMySlot(slotId: string): Promise<{ deleted: boolean }> {
+  const { data } = await apiClient.delete<{ deleted: boolean }>(`tutors/slots/${slotId}`);
   return data;
 }
 
@@ -104,5 +140,12 @@ export async function getRecommendedTutors(
   const { data } = await apiClient.get<RecommendedTutor[]>('tutors/recommendations/me', {
     params,
   });
+  return data;
+}
+
+export async function submitPublicTutorApplication(
+  payload: PublicTutorApplicationPayload,
+): Promise<PublicTutorApplicationResponse> {
+  const { data } = await apiClient.post<PublicTutorApplicationResponse>('tutors/applications', payload);
   return data;
 }

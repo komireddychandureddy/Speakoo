@@ -35,6 +35,7 @@ import AdminLayout from './pages/Admin/AdminLayout';
 import AdminDashboardPage from './pages/Admin/AdminDashboardPage';
 import AdminTutorsPage from './pages/Admin/AdminTutorsPage';
 import AdminLearnersPage from './pages/Admin/AdminLearnersPage';
+import AdminSessionsPage from './pages/Admin/AdminSessionsPage';
 import AdminApplicationsPage from './pages/Admin/AdminApplicationsPage';
 import AdminApplicationDetailPage from './pages/Admin/AdminApplicationDetailPage';
 import AdminIncidentsPage from './pages/Admin/AdminIncidentsPage';
@@ -126,6 +127,7 @@ export default function App() {
           <Route path="/session-room/:id" element={<SessionRoomPage />} />
           <Route path="/feedback/:bookingId" element={<FeedbackPage />} />
           <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+          <Route path="/checkout/credits/:bundleId" element={<CheckoutPage />} />
           <Route path="/favorites" element={<FavoritesPage />} />
           <Route path="/messages" element={<MessagesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
@@ -142,6 +144,7 @@ export default function App() {
           <Route path="/admin/risks" element={<AdminRiskSignalsPage />} />
           <Route path="/admin/incidents" element={<AdminIncidentsPage />} />
           <Route path="/admin/incidents/:id" element={<AdminIncidentDetailPage />} />
+          <Route path="/admin/sessions" element={<AdminSessionsPage />} />
           <Route path="/admin/tutors" element={<AdminTutorsPage />} />
           <Route path="/admin/learners" element={<AdminLearnersPage />} />
           <Route path="/admin/applications" element={<AdminApplicationsPage />} />

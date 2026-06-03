@@ -1,6 +1,12 @@
 ﻿import { useState, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { searchTutors, type TutorProfile } from '../../core/network/tutorsApi';
+import {
+  getTutorSlots,
+  searchTutors,
+  type AvailabilitySlot,
+  type TutorProfile,
+} from '../../core/network/tutorsApi';
+import { createBooking } from '../../core/network/bookingsApi';
 import ViewScheduleModal from './ViewScheduleModal';
 
 const FILTER_CHIPS = ['All', 'Beginner', 'Intermediate', 'Advanced', 'Business', 'Conversation'];
@@ -24,8 +30,14 @@ export default function BookSessionPage() {
   const [activeChip, setActiveChip] = useState('All');
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
   const [tutors, setTutors] = useState<TutorProfile[]>([]);
-  const [scheduleModal, setScheduleModal] = useState<{ tutorName: string; tutorId: string } | null>(null);
+  const [scheduleModal, setScheduleModal] = useState<{
+    tutorName: string;
+    tutorId: string;
+    languages: string[];
+  } | null>(null);
+  const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [confirmedBooking, setConfirmedBooking] = useState<{ tutor: string; slot: string; date: string } | null>(null);
+  const [bookingError, setBookingError] = useState<string | null>(null);
 
   useEffect(() => {
     searchTutors({}).then((res) => setTutors(res.items)).catch(() => {});
@@ -33,15 +45,53 @@ export default function BookSessionPage() {
 
   const TIME_OPTIONS = ['All', 'Morning (6AM–12PM)', 'Afternoon (12PM–5PM)', 'Evening (5PM–9PM)'];
 
-  const handleBook = (slot: string) => {
+  const handleBook = async (slot: AvailabilitySlot) => {
     if (!scheduleModal) return;
-    setConfirmedBooking({
-      tutor: scheduleModal.tutorName,
-      slot,
-      date: weekDates[selectedDayIdx].full,
-    });
-    setScheduleModal(null);
+    setBookingError(null);
+    try {
+      const created = await createBooking({
+        slotId: slot.id,
+        tutorId: scheduleModal.tutorId,
+        language: scheduleModal.languages[0] ?? 'English',
+      });
+      const start = new Date(created.slot.startTime);
+      setConfirmedBooking({
+        tutor: scheduleModal.tutorName,
+        slot: start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+        date: weekDates[selectedDayIdx].full,
+      });
+      setScheduleModal(null);
+      setSlots([]);
+    } catch {
+      setBookingError('Unable to create booking for this slot. Please try another slot.');
+    }
   };
+
+  const loadSlots = async (tutorId: string) => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    try {
+      const all = await getTutorSlots(tutorId, timezone);
+      const selectedDate = weekDates[selectedDayIdx].full;
+      const filtered = all.filter((slot) => {
+        const date = new Date(slot.startTime);
+        const full = date.toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        });
+        return full === selectedDate;
+      });
+      setSlots(filtered);
+    } catch {
+      setSlots([]);
+    }
+  };
+
+  useEffect(() => {
+    if (scheduleModal) {
+      void loadSlots(scheduleModal.tutorId);
+    }
+  }, [selectedDayIdx]);
 
   return (
     <div className="max-w-4xl space-y-5">
@@ -121,6 +171,12 @@ export default function BookSessionPage() {
         </div>
       )}
 
+      {bookingError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-5 py-3 text-sm">
+          {bookingError}
+        </div>
+      )}
+
       <div className="space-y-4">
         {tutors.map((tutor) => {
           const displayName = tutor.user.profile?.displayName ?? 'Tutor';
@@ -141,7 +197,14 @@ export default function BookSessionPage() {
               <p className="text-xs text-gray-500 mt-1">₹{(tutor.hourlyRateCents / 100).toFixed(0)}/hr</p>
             </div>
             <button
-              onClick={() => setScheduleModal({ tutorName: displayName, tutorId: tutor.userId })}
+              onClick={() => {
+                setScheduleModal({
+                  tutorName: displayName,
+                  tutorId: tutor.userId,
+                  languages: tutor.languagesTaught,
+                });
+                void loadSlots(tutor.userId);
+              }}
               className="btn-primary flex-shrink-0"
             >
               View Schedule
@@ -155,6 +218,7 @@ export default function BookSessionPage() {
         <ViewScheduleModal
           tutorName={scheduleModal.tutorName}
           selectedDate={weekDates[selectedDayIdx].full}
+          slots={slots}
           onClose={() => setScheduleModal(null)}
           onBook={handleBook}
         />

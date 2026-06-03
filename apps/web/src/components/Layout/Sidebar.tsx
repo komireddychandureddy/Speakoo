@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useI18n } from '../../core/i18n/I18nContext';
 import { apiLogout } from '../../core/network/authApi';
 
-const NAV_ITEMS = [
+const LEARNER_ITEMS = [
   { icon: '🏠', key: 'nav_dashboard', to: '/dashboard' },
   { icon: '📅', key: 'nav_sessions', to: '/mySession' },
   { icon: '📖', key: 'nav_book', to: '/myClass' },
@@ -29,6 +29,7 @@ const TUTOR_ITEMS = [
   { icon: '🗓️', label: 'Schedule', to: '/tutor-schedule' },
   { icon: '💲', label: 'My Pricing', to: '/tutor-pricing' },
   { icon: '💸', label: 'Payouts', to: '/tutor-payout' },
+  { icon: '⚙️', label: 'Settings', to: '/settings' },
 ];
 
 function getUser(): { name?: string; role?: string } {
@@ -50,6 +51,18 @@ export default function Sidebar() {
     void apiLogout().finally(() => navigate('/'));
   };
 
+  const visibleItems = isTutor
+    ? TUTOR_ITEMS.map((item) => ({
+        icon: item.icon,
+        to: item.to,
+        label: item.label,
+      }))
+    : LEARNER_ITEMS.map((item) => ({
+        icon: item.icon,
+        to: item.to,
+        label: t(item.key),
+      }));
+
   return (
     <aside className="fixed top-0 left-0 h-full w-56 flex flex-col bg-[#1E2720] z-20 overflow-y-auto">
       {/* Logo */}
@@ -60,9 +73,9 @@ export default function Sidebar() {
         <span className="block text-[#76D275] text-xs font-medium mt-0.5">Language Learning</span>
       </div>
 
-      {/* Learner Nav Items */}
+      {/* Role-specific nav items */}
       <nav className="flex-1 py-4 space-y-0.5 px-2 overflow-y-auto">
-        {NAV_ITEMS.map((item) => (
+        {visibleItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -75,34 +88,9 @@ export default function Sidebar() {
             }
           >
             <span className="text-base leading-none">{item.icon}</span>
-            <span className="leading-tight">{t(item.key)}</span>
+            <span className="leading-tight">{item.label}</span>
           </NavLink>
         ))}
-
-        {/* Tutor Section — only shown for tutor role */}
-        {isTutor && (
-          <>
-            <div className="pt-3 mt-2 border-t border-white/10">
-              <span className="px-3 text-[10px] uppercase tracking-widest font-semibold text-gray-500">Tutor</span>
-            </div>
-            {TUTOR_ITEMS.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-[#141A16] text-white'
-                      : 'text-gray-300 hover:bg-white/10 hover:text-white'
-                  }`
-                }
-              >
-                <span className="text-base leading-none">{item.icon}</span>
-                <span className="leading-tight">{item.label}</span>
-              </NavLink>
-            ))}
-          </>
-        )}
       </nav>
 
       {/* Logout */}

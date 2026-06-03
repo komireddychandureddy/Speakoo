@@ -153,6 +153,7 @@ model User {
 
 model TutorKycSubmission {
   id                String              @id @default(uuid()) @db.Uuid
+  applicationRef    String?             @unique @map("application_ref")
   tutorUserId       String              @map("tutor_user_id") @db.Uuid
   status            KycSubmissionStatus @default(pending)
   documentType      String              @map("document_type")

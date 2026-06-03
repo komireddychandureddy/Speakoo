@@ -34,6 +34,18 @@ export interface WalletBalance {
   balanceCents: number;
 }
 
+export interface CreditBundle {
+  id: string;
+  name: string;
+  credits: number;
+  priceCents: number;
+  isActive: boolean;
+}
+
+export interface CreditPurchaseIntentResponse {
+  clientSecret: string;
+}
+
 export async function listSubscriptionPlans(): Promise<SubscriptionPlan[]> {
   const { data } = await apiClient.get<SubscriptionPlan[]>('payments/subscriptions/plans');
   return data;
@@ -64,5 +76,17 @@ export async function cancelMySubscription(reason?: string): Promise<UserSubscri
 
 export async function getWalletBalance(): Promise<WalletBalance> {
   const { data } = await apiClient.get<WalletBalance>('payments/wallet');
+  return data;
+}
+
+export async function listCreditBundles(): Promise<CreditBundle[]> {
+  const { data } = await apiClient.get<CreditBundle[]>('payments/credit-bundles');
+  return data;
+}
+
+export async function purchaseCredits(bundleId: string): Promise<CreditPurchaseIntentResponse> {
+  const { data } = await apiClient.post<CreditPurchaseIntentResponse>('payments/wallet/credits', {
+    bundleId,
+  });
   return data;
 }

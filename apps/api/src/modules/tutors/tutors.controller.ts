@@ -1,4 +1,13 @@
-import { Controller, Post, Get, Body, Query, Param, ParseUUIDPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Delete,
+  Body,
+  Query,
+  Param,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { TutorsService } from './tutors.service';
 import { CreateTutorProfileDto } from './dto/create-tutor-profile.dto';
 import { CreateAvailabilitySlotDto } from './dto/create-availability-slot.dto';
@@ -8,6 +17,7 @@ import { SubmitKycDto } from './dto/submit-kyc.dto';
 import { ListKycDto } from './dto/list-kyc.dto';
 import { ReviewKycDto } from './dto/review-kyc.dto';
 import { RecommendTutorsDto } from './dto/recommend-tutors.dto';
+import { CreatePublicTutorApplicationDto } from './dto/create-public-tutor-application.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -21,6 +31,12 @@ export class TutorsController {
   @Get()
   search(@Query() dto: SearchTutorsDto) {
     return this.tutorsService.searchTutors(dto);
+  }
+
+  @Public()
+  @Post('applications')
+  submitPublicApplication(@Body() dto: CreatePublicTutorApplicationDto) {
+    return this.tutorsService.submitPublicApplication(dto);
   }
 
   @Roles('learner')
@@ -45,6 +61,12 @@ export class TutorsController {
   @Post('slots')
   createSlot(@CurrentUser() user: User, @Body() dto: CreateAvailabilitySlotDto) {
     return this.tutorsService.createSlot(user.id, dto);
+  }
+
+  @Roles('tutor')
+  @Delete('slots/:id')
+  deleteSlot(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.tutorsService.deleteSlot(user.id, id);
   }
 
   @Roles('tutor')

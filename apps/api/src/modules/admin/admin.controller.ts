@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Param,
+  Body,
   ParseUUIDPipe,
   Query,
   ParseIntPipe,
@@ -10,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 
 @Roles('admin')
 @Controller('admin')
@@ -28,6 +30,23 @@ export class AdminController {
     @Query('role') role?: string,
   ) {
     return this.adminService.listUsers(page, limit, role);
+  }
+
+  @Get('bookings')
+  listBookings(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('status') status?: string,
+  ) {
+    return this.adminService.listBookings(page, limit, status);
+  }
+
+  @Patch('bookings/:id/status')
+  updateBookingStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateBookingStatusDto,
+  ) {
+    return this.adminService.updateBookingStatus(id, dto.status);
   }
 
   @Patch('tutors/:id/approve')

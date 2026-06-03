@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Clock } from 'lucide-react';
-import { approveTutor, type AdminUser, listAdminUsers } from '../../core/network/adminApi';
+import { toApplicationReference } from '../../core/utils/applicationReference';
+import {
+  listAdminKycSubmissions,
+  reviewKycSubmission,
+  type AdminKycSubmission,
+} from '../../core/network/adminApi';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -15,18 +20,18 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 export default function AdminApplicationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [user, setUser] = useState<AdminUser | null>(null);
-  const [approved, setApproved] = useState(false);
+  const [submission, setSubmission] = useState<AdminKycSubmission | null>(null);
 
   useEffect(() => {
-    listAdminUsers(1, 200, 'tutor').then((res) => {
-      const found = res.data.find((u) => u.id === id) ?? null;
-      setUser(found);
-      if (found) setApproved(found.tutorProfile?.isApproved === true);
-    }).catch(() => {});
+    listAdminKycSubmissions({ page: 1, limit: 200 })
+      .then((res) => {
+        const found = res.items.find((u) => u.id === id) ?? null;
+        setSubmission(found);
+      })
+      .catch(() => {});
   }, [id]);
 
-  if (!user) {
+  if (!submission) {
     return (
       <div className="text-center py-20">
         <p className="text-[#616161]">Application not found.</p>
@@ -37,12 +42,18 @@ export default function AdminApplicationDetailPage() {
     );
   }
 
-  const displayName = user.profile?.displayName ?? user.email;
+  const displayName = submission.tutor.profile?.displayName ?? submission.tutor.email;
   const initials = displayName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+  const isPending = submission.status === 'pending';
+  const reference = submission.applicationRef ?? toApplicationReference(submission.id);
 
   const handleApprove = async () => {
-    await approveTutor(user.id);
-    setApproved(true);
+    await reviewKycSubmission(submission.id, { status: 'approved' });
+    navigate('/admin/applications');
+  };
+
+  const handleReject = async () => {
+    await reviewKycSubmission(submission.id, { status: 'rejected' });
     navigate('/admin/applications');
   };
 
@@ -56,9 +67,21 @@ export default function AdminApplicationDetailPage() {
         >
           <ArrowLeft size={16} /> All Applications
         </Link>
-        <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-semibold ${approved ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-amber-100 text-amber-700'}`}>
-          {approved ? <CheckCircle size={13} /> : <Clock size={13} />}
-          {approved ? 'Approved' : 'Pending Review'}
+        <span
+          className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-semibold ${
+            submission.status === 'approved'
+              ? 'bg-[#E8F5E9] text-[#2E7D32]'
+              : submission.status === 'rejected'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-amber-100 text-amber-700'
+          }`}
+        >
+          {submission.status === 'approved' ? <CheckCircle size={13} /> : <Clock size={13} />}
+          {submission.status === 'approved'
+            ? 'Approved'
+            : submission.status === 'rejected'
+              ? 'Rejected'
+              : 'Pending Review'}
         </span>
       </div>
 
@@ -69,33 +92,32 @@ export default function AdminApplicationDetailPage() {
         </span>
         <div>
           <p className="text-xl font-bold text-[#212121]">{displayName}</p>
-          <p className="text-sm text-[#616161]">{user.email}</p>
+          <p className="text-sm text-[#616161]">{submission.tutor.email}</p>
+          <p className="text-xs text-[#616161] mt-0.5">Submission #{reference}</p>
           <p className="text-xs text-[#616161] mt-0.5">
-            Joined {new Date(user.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+            Submitted {new Date(submission.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
           </p>
         </div>
       </div>
 
       {/* Tutor Profile */}
-      {user.tutorProfile && (
+      {submission.tutor.tutorProfile && (
         <div className="card p-6">
           <h2 className="font-semibold text-[#212121] mb-4">Teaching Profile</h2>
           <div className="grid grid-cols-2 gap-y-4 gap-x-6">
-            <InfoRow label="Languages Taught" value={user.tutorProfile.languagesTaught?.join(', ') ?? '—'} />
             <InfoRow
-              label="Hourly Rate"
-              value={user.tutorProfile.hourlyRateCents != null
-                ? `₹${Math.round(user.tutorProfile.hourlyRateCents / 100)}`
-                : '—'}
+              label="Languages Taught"
+              value={submission.tutor.tutorProfile.languagesTaught?.join(', ') ?? '—'}
             />
-            <InfoRow label="Country" value={user.profile?.countryCode ?? '—'} />
-            <InfoRow label="Bio" value={user.profile?.bio ?? '—'} />
+            <InfoRow label="Document Type" value={submission.documentType} />
+            <InfoRow label="Country" value={submission.tutor.profile?.countryCode ?? '—'} />
+            <InfoRow label="Reviewer Note" value={submission.note ?? '—'} />
           </div>
         </div>
       )}
 
       {/* Review Panel */}
-      {!approved && (
+      {isPending && (
         <div className="card p-6 space-y-4">
           <h2 className="font-semibold text-[#212121]">Admin Review</h2>
           <div className="flex gap-3 flex-wrap">
@@ -104,6 +126,12 @@ export default function AdminApplicationDetailPage() {
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#43A047] hover:bg-[#2E7D32] text-white transition-colors"
             >
               <CheckCircle size={16} /> Approve
+            </button>
+            <button
+              onClick={handleReject}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-red-100 hover:bg-red-200 text-red-700 transition-colors"
+            >
+              Reject
             </button>
           </div>
         </div>

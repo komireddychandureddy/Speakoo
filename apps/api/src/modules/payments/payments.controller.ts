@@ -48,6 +48,11 @@ export class PaymentsController {
     return this.paymentsService.getWalletTransactions(user.id);
   }
 
+  @Get('credit-bundles')
+  listCreditBundles() {
+    return this.paymentsService.listCreditBundles();
+  }
+
   @Public()
   @Get('subscriptions/plans')
   listSubscriptionPlans() {
