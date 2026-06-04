@@ -31,6 +31,20 @@ export interface Booking {
     endedAt: string | null;
     durationMinutes: number | null;
   } | null;
+  learner?: {
+    id: string;
+    email?: string;
+    profile?: {
+      displayName?: string | null;
+    } | null;
+  };
+  tutor?: {
+    id: string;
+    email?: string;
+    profile?: {
+      displayName?: string | null;
+    } | null;
+  };
 }
 
 export interface CreateBookingPayload {

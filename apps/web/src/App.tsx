@@ -24,6 +24,7 @@ import TutorApplyPage from './pages/BecomeTutor/TutorApplyPage';
 import TutorDashboardPage from './pages/TutorDashboard/TutorDashboardPage';
 import TutorEarningsPage from './pages/TutorDashboard/TutorEarningsPage';
 import TutorSchedulePage from './pages/TutorDashboard/TutorSchedulePage';
+import TutorSessionsPage from './pages/TutorDashboard/TutorSessionsPage';
 import TutorPricingPage from './pages/TutorDashboard/TutorPricingPage';
 import TutorPayoutPage from './pages/TutorDashboard/TutorPayoutPage';
 import WelcomePage from './pages/Welcome/WelcomePage';
@@ -119,12 +120,14 @@ export default function App() {
           <Route path="/tutor-dashboard" element={<TutorDashboardPage />} />
           <Route path="/tutor-earnings" element={<TutorEarningsPage />} />
           <Route path="/tutor-schedule" element={<TutorSchedulePage />} />
+          <Route path="/tutor-sessions" element={<TutorSessionsPage />} />
           <Route path="/tutor-pricing" element={<TutorPricingPage />} />
           <Route path="/tutor-payout" element={<TutorPayoutPage />} />
           <Route path="/practice" element={<SpeakingPracticePage />} />
           <Route path="/practice/exercise" element={<PracticeExercisePage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/community/:id" element={<CommunityThreadPage />} />
+          <Route path="/session/:id" element={<SessionRoomPage />} />
           <Route path="/session-room/:id" element={<SessionRoomPage />} />
           <Route path="/feedback/:bookingId" element={<FeedbackPage />} />
           <Route path="/checkout/:bookingId" element={<CheckoutPage />} />

@@ -15,8 +15,14 @@ const PAGE_TITLES: Record<string, string> = {
   '/reffer_earn': 'Refer & Earn',
   '/Leaderboard': 'My Level',
   '/faq': 'FAQs',
+  '/tutor-dashboard': 'Tutor Dashboard',
+  '/tutor-earnings': 'Tutor Earnings',
+  '/tutor-schedule': 'Tutor Schedule',
+  '/tutor-sessions': 'Tutor Sessions',
   '/tutor-pricing': 'My Pricing',
   '/tutor-payout': 'Payout Settings',
+  '/practice': 'Speaking Practice',
+  '/community': 'Community',
   '/favorites': 'Saved Tutors',
   '/messages': 'Messages',
   '/settings': 'Settings',
@@ -29,7 +35,11 @@ export default function AppLayout() {
 
   const title =
     PAGE_TITLES[location.pathname] ||
-    (location.pathname.startsWith('/TutorDetailsView') ? 'Tutor Details' : 'Speakoo');
+    (location.pathname.startsWith('/TutorDetailsView')
+      ? 'Tutor Details'
+      : location.pathname.startsWith('/session-room/')
+        ? 'Live Session'
+        : 'Speakoo');
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#FAFAFA]">

@@ -285,7 +285,7 @@ export default function SessionRoomPage() {
       await endSession(id).catch(() => undefined);
     }
     roomRef.current?.disconnect();
-    navigate('/mySession');
+    navigate(user.role === 'tutor' || user.role === 'admin' ? '/tutor-sessions' : '/mySession');
   };
 
   const handleReconnectNow = () => {

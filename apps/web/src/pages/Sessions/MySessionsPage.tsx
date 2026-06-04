@@ -4,6 +4,7 @@ import { getMyBookings, type Booking, type BookingStatus } from '../../core/netw
 import { getSessionRecordingDownload } from '../../core/network/sessionsApi';
 import SessionReportModal from './SessionReportModal';
 import SessionChatModal from './SessionChatModal';
+import SessionProgress from '../../components/Sessions/SessionProgress';
 
 const HOLD_WINDOW_MS = 5 * 60 * 1000;
 
@@ -18,8 +19,9 @@ function formatCountdown(ms: number): string {
   return `${minutes}:${seconds}`;
 }
 
-type TabStatus = 'confirmed' | 'completed' | 'cancelled' | 'pending' | 'in_session';
+type TabStatus = 'all' | 'confirmed' | 'completed' | 'cancelled' | 'pending' | 'in_session';
 const TABS: { key: TabStatus; label: string }[] = [
+  { key: 'all', label: 'All' },
   { key: 'confirmed', label: 'Upcoming' },
   { key: 'in_session', label: 'In Session' },
   { key: 'completed', label: 'Completed' },
@@ -28,6 +30,7 @@ const TABS: { key: TabStatus; label: string }[] = [
 ];
 
 const STATUS_COLORS: Record<TabStatus, string> = {
+  all: 'bg-gray-100 text-gray-600',
   confirmed: 'bg-[#E6D7FF] text-[#43A047]',
   in_session: 'bg-blue-100 text-blue-700',
   completed: 'bg-[#BBF7D0] text-[#14783D]',
@@ -44,16 +47,22 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
 };
 
 export default function MySessionsPage() {
-  const [activeTab, setActiveTab] = useState<TabStatus>('confirmed');
+  const [activeTab, setActiveTab] = useState<TabStatus>('all');
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [reportBooking, setReportBooking] = useState<Booking | null>(null);
   const [chatBooking, setChatBooking] = useState<Booking | null>(null);
   const [nowMs, setNowMs] = useState(Date.now());
   const [downloadLoadingId, setDownloadLoadingId] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
 
   const loadBookings = () => {
-    getMyBookings().then(setBookings).catch(() => {});
+    getMyBookings()
+      .then((items) => {
+        setBookings(items);
+        setLastUpdatedAt(Date.now());
+      })
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -65,15 +74,33 @@ export default function MySessionsPage() {
   }, []);
 
   useEffect(() => {
+    const handleWindowFocus = () => loadBookings();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadBookings();
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
   const filtered = bookings.filter((booking) => {
-    if (activeTab === 'confirmed') {
-      // Treat unpaid/pending bookings as upcoming so users can still find them quickly.
-      return booking.status === 'confirmed' || booking.status === 'pending';
+    if (activeTab === 'all') {
+      return true;
     }
+
+    if (activeTab === 'confirmed') return booking.status === 'confirmed';
     return booking.status === activeTab;
   });
 
@@ -103,6 +130,20 @@ export default function MySessionsPage() {
 
   return (
     <div className="max-w-3xl space-y-5">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-extrabold text-gray-900">My Sessions</h1>
+        <div className="flex items-center gap-3">
+          {lastUpdatedAt && (
+            <p className="text-xs text-gray-500">
+              Updated {new Date(lastUpdatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
+          <button onClick={loadBookings} className="btn-outline" aria-label="Refresh sessions">
+            Refresh
+          </button>
+        </div>
+      </div>
+
       {/* Tab Bar */}
       <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm border border-[#EEEEEE] overflow-x-auto">
         {TABS.map((tab) => (
@@ -125,6 +166,9 @@ export default function MySessionsPage() {
         <div className="card p-8 text-center">
           <p className="text-4xl mb-3">📅</p>
           <p className="text-gray-500 font-medium">No {TABS.find((t) => t.key === activeTab)?.label.toLowerCase()} sessions</p>
+          <button className="btn-primary mt-4" onClick={() => navigate('/myClass')}>
+            Book a Session
+          </button>
         </div>
       ) : (
         <div className="space-y-4">
@@ -151,6 +195,9 @@ export default function MySessionsPage() {
                     <p className="text-xs text-gray-400 mt-0.5">
                       {start.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })} · {start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}–{end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                     </p>
+                    {booking.tutor?.profile?.displayName && (
+                      <p className="text-xs text-gray-400 mt-0.5">Tutor: {booking.tutor.profile.displayName}</p>
+                    )}
                     <p className="text-xs text-gray-400 mt-0.5">₹{(booking.priceCents / 100).toFixed(0)}</p>
                     {holdActive && (
                       <p className="text-xs text-amber-700 mt-1 font-semibold">
@@ -162,6 +209,7 @@ export default function MySessionsPage() {
                         Payment window expired. Rebook this slot.
                       </p>
                     )}
+                    <SessionProgress status={booking.status} />
                   </div>
                 </div>
 

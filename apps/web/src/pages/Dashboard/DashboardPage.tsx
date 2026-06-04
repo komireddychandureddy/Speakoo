@@ -98,7 +98,7 @@ export default function DashboardPage() {
                       {start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
-                  <button className="btn-primary flex-shrink-0" onClick={() => navigate(`/session/${booking.id}`)}>Join</button>
+                  <button className="btn-primary flex-shrink-0" onClick={() => navigate(`/session-room/${booking.id}`)}>Join</button>
                 </div>
               );
             })}

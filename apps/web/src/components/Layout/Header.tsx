@@ -1,9 +1,10 @@
-﻿import { useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Bell, Gem } from 'lucide-react';
 import NotificationsPanel from '../Notifications/NotificationsPanel';
 import { NOTIFICATIONS, MOCK_CREDIT_BALANCE } from '../../data/mockData';
 import { LanguageSwitcher } from '../../core/i18n/I18nContext';
 import { useLocale } from '../../core/locale/LocaleContext';
+import { getWalletBalance } from '../../core/network/paymentsApi';
 
 interface HeaderProps {
   title: string;
@@ -12,9 +13,23 @@ interface HeaderProps {
 
 export default function Header({ title, onMenuToggle }: HeaderProps) {
   const [showNotifs, setShowNotifs] = useState(false);
+  const [credits, setCredits] = useState<number>(() => {
+    return Number(localStorage.getItem('speakoo_credits') ?? MOCK_CREDIT_BALANCE);
+  });
   const unread = NOTIFICATIONS.filter((n) => !n.isRead).length;
   const { fmtCredits } = useLocale();
-  const balance = Number(localStorage.getItem('speakoo_credits') ?? MOCK_CREDIT_BALANCE);
+
+  useEffect(() => {
+    getWalletBalance()
+      .then((wallet) => {
+        const next = Math.max(0, Math.round(wallet.balanceCents / 100));
+        setCredits(next);
+        localStorage.setItem('speakoo_credits', String(next));
+      })
+      .catch(() => {
+        // Keep fallback credits if wallet endpoint is not available for this role.
+      });
+  }, []);
 
   const userInitial = (() => {
     try {
@@ -40,7 +55,7 @@ export default function Header({ title, onMenuToggle }: HeaderProps) {
         {/* Credits */}
         <div className="flex items-center gap-1.5 bg-[#E8F5E9] px-3 py-1.5 rounded-full">
           <Gem size={14} className="text-[#2E7D32]" />
-          <span className="text-sm font-semibold text-[#2E7D32]">{balance} ≈ {fmtCredits(balance)}</span>
+          <span className="text-sm font-semibold text-[#2E7D32]">{credits} ≈ {fmtCredits(credits)}</span>
         </div>
 
         <LanguageSwitcher />

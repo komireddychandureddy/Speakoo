@@ -27,6 +27,7 @@ const TUTOR_ITEMS = [
   { icon: '📊', label: 'Tutor Dashboard', to: '/tutor-dashboard' },
   { icon: '💰', label: 'Tutor Earnings', to: '/tutor-earnings' },
   { icon: '🗓️', label: 'Schedule', to: '/tutor-schedule' },
+  { icon: '🧾', label: 'All Sessions', to: '/tutor-sessions' },
   { icon: '💲', label: 'My Pricing', to: '/tutor-pricing' },
   { icon: '💸', label: 'Payouts', to: '/tutor-payout' },
   { icon: '⚙️', label: 'Settings', to: '/settings' },
