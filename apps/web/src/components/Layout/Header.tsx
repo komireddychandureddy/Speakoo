@@ -18,6 +18,7 @@ export default function Header({ title, onMenuToggle }: HeaderProps) {
   });
   const unread = NOTIFICATIONS.filter((n) => !n.isRead).length;
   const { fmtCredits } = useLocale();
+  const buildVersion = __APP_BUILD_VERSION__;
 
   useEffect(() => {
     getWalletBalance()
@@ -57,6 +58,14 @@ export default function Header({ title, onMenuToggle }: HeaderProps) {
           <Gem size={14} className="text-[#2E7D32]" />
           <span className="text-sm font-semibold text-[#2E7D32]">{credits} ≈ {fmtCredits(credits)}</span>
         </div>
+
+        <span
+          className="hidden md:inline-flex items-center rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold px-2 py-1"
+          title={`Build ${buildVersion}`}
+          aria-label="Build version"
+        >
+          {buildVersion}
+        </span>
 
         <LanguageSwitcher />
 
