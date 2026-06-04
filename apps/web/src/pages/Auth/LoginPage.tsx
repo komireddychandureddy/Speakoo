@@ -413,17 +413,19 @@ export default function LoginPage() {
                       Forgot Password?
                     </button>
                   </div>
-                  <HCaptcha
-                    sitekey={HCAPTCHA_SITE_KEY}
-                    onVerify={(token) => {
-                      setLoginCaptchaToken(token);
-                      setError('');
-                    }}
-                    onExpire={() => setLoginCaptchaToken('')}
-                    onError={() => setLoginCaptchaToken('')}
-                    ref={loginCaptchaRef}
-                    theme="light"
-                  />
+                  {captchaEnabled && (
+                    <HCaptcha
+                      sitekey={HCAPTCHA_SITE_KEY}
+                      onVerify={(token) => {
+                        setLoginCaptchaToken(token);
+                        setError('');
+                      }}
+                      onExpire={() => setLoginCaptchaToken('')}
+                      onError={() => setLoginCaptchaToken('')}
+                      ref={loginCaptchaRef}
+                      theme="light"
+                    />
+                  )}
                   <button
                     type="submit"
                     disabled={loading || (captchaEnabled && !loginCaptchaToken.trim())}
@@ -473,17 +475,19 @@ export default function LoginPage() {
                       {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
-                  <HCaptcha
-                    sitekey={HCAPTCHA_SITE_KEY}
-                    onVerify={(token) => {
-                      setSignupCaptchaToken(token);
-                      setError('');
-                    }}
-                    onExpire={() => setSignupCaptchaToken('')}
-                    onError={() => setSignupCaptchaToken('')}
-                    ref={signupCaptchaRef}
-                    theme="light"
-                  />
+                  {captchaEnabled && (
+                    <HCaptcha
+                      sitekey={HCAPTCHA_SITE_KEY}
+                      onVerify={(token) => {
+                        setSignupCaptchaToken(token);
+                        setError('');
+                      }}
+                      onExpire={() => setSignupCaptchaToken('')}
+                      onError={() => setSignupCaptchaToken('')}
+                      ref={signupCaptchaRef}
+                      theme="light"
+                    />
+                  )}
                   <button
                     type="submit"
                     disabled={loading || (captchaEnabled && !signupCaptchaToken.trim())}
