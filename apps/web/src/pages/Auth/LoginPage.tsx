@@ -53,6 +53,7 @@ export default function LoginPage() {
   const [signupPw, setSignupPw] = useState('');
   const [signupCaptchaToken, setSignupCaptchaToken] = useState('');
   const signupCaptchaRef = useRef<HCaptcha>(null);
+  const captchaEnabled = Boolean(HCAPTCHA_SITE_KEY?.trim());
 
   // Forgot password fields
   const [forgotEmail, setForgotEmail] = useState('');
@@ -63,6 +64,9 @@ export default function LoginPage() {
     setError('');
     if (!loginIdentifier.trim()) return setError('Please enter your email address or phone number.');
     if (!loginPassword) return setError('Please enter your password.');
+    if (captchaEnabled && !loginCaptchaToken.trim()) {
+      return setError('Please complete the captcha challenge.');
+    }
     
     // Basic client-side validation for phone format (if it starts with +)
     if (loginIdentifier.trim().startsWith('+')) {
@@ -112,6 +116,9 @@ export default function LoginPage() {
     if (!signupName.trim()) return setError('Please enter your full name.');
     if (!signupEmail.trim()) return setError('Please enter your email address.');
     if (signupPw.length < 8) return setError('Password must be at least 8 characters.');
+    if (captchaEnabled && !signupCaptchaToken.trim()) {
+      return setError('Please complete the captcha challenge.');
+    }
     
     // Validate phone if provided
     if (signupPhone.trim()) {
@@ -408,13 +415,18 @@ export default function LoginPage() {
                   </div>
                   <HCaptcha
                     sitekey={HCAPTCHA_SITE_KEY}
-                    onVerify={setLoginCaptchaToken}
+                    onVerify={(token) => {
+                      setLoginCaptchaToken(token);
+                      setError('');
+                    }}
+                    onExpire={() => setLoginCaptchaToken('')}
+                    onError={() => setLoginCaptchaToken('')}
                     ref={loginCaptchaRef}
                     theme="light"
                   />
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || (captchaEnabled && !loginCaptchaToken.trim())}
                     className="btn-primary w-full py-3 text-base disabled:opacity-60"
                   >
                     {loading ? 'Logging in…' : 'Login'}
@@ -463,13 +475,18 @@ export default function LoginPage() {
                   </div>
                   <HCaptcha
                     sitekey={HCAPTCHA_SITE_KEY}
-                    onVerify={setSignupCaptchaToken}
+                    onVerify={(token) => {
+                      setSignupCaptchaToken(token);
+                      setError('');
+                    }}
+                    onExpire={() => setSignupCaptchaToken('')}
+                    onError={() => setSignupCaptchaToken('')}
                     ref={signupCaptchaRef}
                     theme="light"
                   />
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || (captchaEnabled && !signupCaptchaToken.trim())}
                     className="btn-primary w-full py-3 text-base disabled:opacity-60"
                   >
                     {loading ? 'Creating account…' : 'Create Account'}
