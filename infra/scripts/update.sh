@@ -16,6 +16,29 @@ API_DIR="$APP_ROOT/apps/api"
 WEB_DIR="$APP_ROOT/apps/web"
 DOCKER_DIR="$APP_ROOT/infra/docker"
 
+fix_web_permissions() {
+    local current_uid
+    current_uid=$(id -u)
+
+    if [ -d "$WEB_DIR/node_modules" ]; then
+        local owner_uid
+        owner_uid=$(stat -c '%u' "$WEB_DIR/node_modules" 2>/dev/null || echo "$current_uid")
+        if [ "$owner_uid" != "$current_uid" ]; then
+            echo "⚠ Detected root-owned web node_modules. Attempting permission repair..."
+            if command -v sudo >/dev/null 2>&1; then
+                sudo chown -R "$(id -u):$(id -g)" "$WEB_DIR/node_modules" || true
+            fi
+        fi
+    fi
+
+    if [ -d "$HOME/.npm" ] && [ ! -w "$HOME/.npm" ]; then
+        echo "⚠ ~/.npm is not writable. Attempting permission repair..."
+        if command -v sudo >/dev/null 2>&1; then
+            sudo chown -R "$(id -u):$(id -g)" "$HOME/.npm" || true
+        fi
+    fi
+}
+
 # Validate prerequisites
 if [ ! -f "$DOCKER_DIR/.env" ]; then
     echo "Error: .env not found in infra/docker/"
@@ -80,7 +103,9 @@ if [ ! -d "$WEB_DIR" ] || [ ! -f "$WEB_DIR/package.json" ]; then
     exit 1
 fi
 cd "$WEB_DIR"
-npm ci
+fix_web_permissions
+mkdir -p "$WEB_DIR/.npm-cache"
+npm ci --cache "$WEB_DIR/.npm-cache" --no-audit --no-fund
 npm run build
 echo "✓ Web app built to apps/web/dist"
 
