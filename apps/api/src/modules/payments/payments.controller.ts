@@ -149,10 +149,7 @@ export class PaymentsController {
 
   @Roles('tutor')
   @Post('tutor/withdrawals')
-  createTutorWithdrawalRequest(
-    @CurrentUser() user: User,
-    @Body() dto: CreateWithdrawalRequestDto,
-  ) {
+  createTutorWithdrawalRequest(@CurrentUser() user: User, @Body() dto: CreateWithdrawalRequestDto) {
     return this.paymentsService.createTutorWithdrawalRequest(user.id, dto.amountCents);
   }
 

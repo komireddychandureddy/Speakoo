@@ -23,10 +23,15 @@ export class NotificationProcessor {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  private buildIdempotencyKey(data: NotificationJobData): string {
+    const base = `${data.bookingId}:${data.userId}:${data.type}:${data.channel}`;
+    return data.idempotencySuffix ? `${base}:${data.idempotencySuffix}` : base;
+  }
+
   @Process()
   async handle(job: Job<NotificationJobData>) {
-    const { userId, bookingId, type, channel } = job.data;
-    const idempotencyKey = `${bookingId}:${type}:${channel}`;
+    const { userId, bookingId, type, channel, subjectOverride, bodyOverride } = job.data;
+    const idempotencyKey = this.buildIdempotencyKey(job.data);
 
     const alreadySent = await this.prisma.notificationLog.findUnique({ where: { idempotencyKey } });
     if (alreadySent) return;
@@ -41,8 +46,8 @@ export class NotificationProcessor {
       await resend.emails.send({
         from: this.config.getOrThrow('RESEND_FROM_EMAIL'),
         to: user.email,
-        subject: this.getSubject(type),
-        text: this.getBody(type, user.profile?.displayName ?? 'Learner'),
+        subject: subjectOverride ?? this.getSubject(type),
+        text: bodyOverride ?? this.getBody(type, user.profile?.displayName ?? 'Learner'),
       });
     }
 
@@ -65,7 +70,7 @@ export class NotificationProcessor {
       await twilio.messages.create({
         from: this.config.getOrThrow('TWILIO_WHATSAPP_FROM'),
         to: `whatsapp:${phoneNumber}`,
-        body: this.getBody(type, user.profile?.displayName ?? 'there'),
+        body: bodyOverride ?? this.getBody(type, user.profile?.displayName ?? 'there'),
       });
     }
 
@@ -79,8 +84,8 @@ export class NotificationProcessor {
         return;
       }
 
-      const title = this.getSubject(type);
-      const body = this.getBody(type, user.profile?.displayName ?? 'there');
+      const title = subjectOverride ?? this.getSubject(type);
+      const body = bodyOverride ?? this.getBody(type, user.profile?.displayName ?? 'there');
 
       await Promise.all(
         tokens.map(async (token) => {

@@ -42,10 +42,7 @@ export class AdminController {
   }
 
   @Patch('bookings/:id/status')
-  updateBookingStatus(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateBookingStatusDto,
-  ) {
+  updateBookingStatus(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateBookingStatusDto) {
     return this.adminService.updateBookingStatus(id, dto.status);
   }
 

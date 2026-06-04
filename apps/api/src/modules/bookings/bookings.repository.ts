@@ -144,7 +144,11 @@ export class BookingsRepository {
       await this.releaseExpiredPendingBookings(tx);
       return tx.booking.findMany({
         where: { learnerId },
-        include: { slot: true, session: true, tutor: { include: { profile: true } } },
+        include: {
+          slot: true,
+          session: { include: { feedback: { select: { reviewerId: true } } } },
+          tutor: { include: { profile: true } },
+        },
         orderBy: { createdAt: 'desc' },
       });
     });
@@ -155,7 +159,11 @@ export class BookingsRepository {
       await this.releaseExpiredPendingBookings(tx);
       return tx.booking.findMany({
         where: { tutorId },
-        include: { slot: true, session: true, learner: { include: { profile: true } } },
+        include: {
+          slot: true,
+          session: { include: { feedback: { select: { reviewerId: true } } } },
+          learner: { include: { profile: true } },
+        },
         orderBy: { createdAt: 'desc' },
       });
     });
@@ -170,7 +178,7 @@ export class BookingsRepository {
           slot: true,
           learner: { include: { profile: true } },
           tutor: { include: { profile: true } },
-          session: true,
+          session: { include: { feedback: { select: { reviewerId: true } } } },
           payment: true,
         },
       });

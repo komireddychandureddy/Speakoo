@@ -16,7 +16,8 @@ import { CreatePublicTutorApplicationDto } from './dto/create-public-tutor-appli
 import { CreateBulkSlotsDto } from './dto/create-bulk-slots.dto';
 
 const BCRYPT_ROUNDS = 12;
-const SLOT_WINDOW_DAYS = 7;
+const SLOT_WINDOW_DAYS = 10;
+const MAX_SLOTS_PER_DAY = 30;
 
 function buildLegacyStyleRef(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -31,6 +32,59 @@ function buildLegacyStyleRef(): string {
 export class TutorsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  private getUtcDayStart(date: Date): Date {
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  }
+
+  private getUtcDayEnd(date: Date): Date {
+    const start = this.getUtcDayStart(date);
+    return new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  }
+
+  private toUtcDayKey(date: Date): string {
+    const month = `${date.getUTCMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getUTCDate()}`.padStart(2, '0');
+    return `${date.getUTCFullYear()}-${month}-${day}`;
+  }
+
+  private async validateDailySlotLimit(
+    tutorId: string,
+    slots: Array<{ startTime: Date }>,
+  ): Promise<void> {
+    const requestedByDay = new Map<string, { count: number; dayStart: Date; dayEnd: Date }>();
+
+    for (const slot of slots) {
+      const dayKey = this.toUtcDayKey(slot.startTime);
+      const current = requestedByDay.get(dayKey);
+
+      if (current) {
+        current.count += 1;
+      } else {
+        requestedByDay.set(dayKey, {
+          count: 1,
+          dayStart: this.getUtcDayStart(slot.startTime),
+          dayEnd: this.getUtcDayEnd(slot.startTime),
+        });
+      }
+    }
+
+    for (const item of requestedByDay.values()) {
+      const existingCount = await this.prisma.availabilitySlot.count({
+        where: {
+          tutorId,
+          status: { not: 'blocked' },
+          startTime: { gte: item.dayStart, lt: item.dayEnd },
+        },
+      });
+
+      if (existingCount + item.count > MAX_SLOTS_PER_DAY) {
+        throw new BadRequestException(
+          `A tutor can create up to ${MAX_SLOTS_PER_DAY} slots per day`,
+        );
+      }
+    }
+  }
+
   private validateSlotWindow(start: Date, end: Date): void {
     if (end <= start) {
       throw new BadRequestException('endTime must be after startTime');
@@ -44,7 +98,7 @@ export class TutorsRepository {
     }
 
     if (start > maxStart) {
-      throw new BadRequestException('Slots can only be created up to 7 days from now');
+      throw new BadRequestException('Slots can only be created up to 10 days from now');
     }
   }
 
@@ -102,6 +156,8 @@ export class TutorsRepository {
     const tutorProfile = await this.prisma.tutorProfile.findUnique({ where: { userId } });
     if (!tutorProfile) throw new NotFoundException('Tutor profile not found');
 
+    await this.validateDailySlotLimit(tutorProfile.id, [{ startTime: start }]);
+
     const overlap = await this.prisma.availabilitySlot.findFirst({
       where: {
         tutorId: tutorProfile.id,
@@ -156,6 +212,8 @@ export class TutorsRepository {
       this.validateSlotWindow(start, end);
       return { startTime: start, endTime: end };
     });
+
+    await this.validateDailySlotLimit(tutorProfile.id, parsedSlots);
 
     const sorted = [...parsedSlots].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
     for (let index = 1; index < sorted.length; index += 1) {

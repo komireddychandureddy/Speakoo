@@ -30,6 +30,9 @@ export interface Booking {
     startedAt: string | null;
     endedAt: string | null;
     durationMinutes: number | null;
+    feedback?: Array<{
+      reviewerId: string;
+    }>;
   } | null;
   learner?: {
     id: string;

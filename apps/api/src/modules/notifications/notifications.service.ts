@@ -12,6 +12,9 @@ export interface NotificationJobData {
   type: NotificationType;
   channel: NotificationChannel;
   scheduledFor?: Date;
+  subjectOverride?: string;
+  bodyOverride?: string;
+  idempotencySuffix?: string;
 }
 
 @Injectable()
@@ -23,6 +26,11 @@ export class NotificationsService {
     @InjectQueue(NOTIFICATION_QUEUE) private readonly queue: Queue<NotificationJobData>,
     private readonly prisma: PrismaService,
   ) {}
+
+  private buildIdempotencyKey(data: NotificationJobData): string {
+    const base = `${data.bookingId}:${data.userId}:${data.type}:${data.channel}`;
+    return data.idempotencySuffix ? `${base}:${data.idempotencySuffix}` : base;
+  }
 
   private async ensureDeviceTokensTable() {
     if (!this.deviceTokensTableReady) {
@@ -83,6 +91,8 @@ export class NotificationsService {
     const now = Date.now();
 
     if (reminder60.getTime() > now) {
+      const delay = reminder60.getTime() - now;
+
       await this.enqueue(
         {
           userId: booking.learnerId,
@@ -90,9 +100,8 @@ export class NotificationsService {
           type: NotificationType.reminder_60min,
           channel: NotificationChannel.email,
         },
-        reminder60.getTime() - now,
+        delay,
       );
-
       await this.enqueue(
         {
           userId: booking.learnerId,
@@ -100,7 +109,7 @@ export class NotificationsService {
           type: NotificationType.reminder_60min,
           channel: NotificationChannel.whatsapp,
         },
-        reminder60.getTime() - now,
+        delay,
       );
       await this.enqueue(
         {
@@ -109,11 +118,32 @@ export class NotificationsService {
           type: NotificationType.reminder_60min,
           channel: NotificationChannel.push,
         },
-        reminder60.getTime() - now,
+        delay,
+      );
+
+      await this.enqueue(
+        {
+          userId: booking.tutorId,
+          bookingId,
+          type: NotificationType.reminder_60min,
+          channel: NotificationChannel.email,
+        },
+        delay,
+      );
+      await this.enqueue(
+        {
+          userId: booking.tutorId,
+          bookingId,
+          type: NotificationType.reminder_60min,
+          channel: NotificationChannel.push,
+        },
+        delay,
       );
     }
 
     if (reminder10.getTime() > now) {
+      const delay = reminder10.getTime() - now;
+
       await this.enqueue(
         {
           userId: booking.learnerId,
@@ -121,7 +151,7 @@ export class NotificationsService {
           type: NotificationType.reminder_10min,
           channel: NotificationChannel.email,
         },
-        reminder10.getTime() - now,
+        delay,
       );
       await this.enqueue(
         {
@@ -130,9 +160,49 @@ export class NotificationsService {
           type: NotificationType.reminder_10min,
           channel: NotificationChannel.push,
         },
-        reminder10.getTime() - now,
+        delay,
+      );
+
+      await this.enqueue(
+        {
+          userId: booking.tutorId,
+          bookingId,
+          type: NotificationType.reminder_10min,
+          channel: NotificationChannel.email,
+        },
+        delay,
+      );
+      await this.enqueue(
+        {
+          userId: booking.tutorId,
+          bookingId,
+          type: NotificationType.reminder_10min,
+          channel: NotificationChannel.push,
+        },
+        delay,
       );
     }
+  }
+
+  async sendSessionJoinNudge(params: {
+    bookingId: string;
+    targetUserId: string;
+    message: string;
+    senderUserId: string;
+    channel?: NotificationChannel;
+  }): Promise<void> {
+    const channel = params.channel ?? NotificationChannel.push;
+    const timeBucket = Math.floor(Date.now() / 60_000);
+
+    await this.enqueue({
+      userId: params.targetUserId,
+      bookingId: params.bookingId,
+      type: NotificationType.session_summary,
+      channel,
+      subjectOverride: 'Session started, please join',
+      bodyOverride: params.message,
+      idempotencySuffix: `session-nudge:${params.senderUserId}:${timeBucket}`,
+    });
   }
 
   async registerDeviceToken(userId: string, token: string): Promise<{ registered: boolean }> {
@@ -163,7 +233,7 @@ export class NotificationsService {
   }
 
   private async enqueue(data: NotificationJobData, delayMs = 0) {
-    const idempotencyKey = `${data.bookingId}:${data.type}:${data.channel}`;
+    const idempotencyKey = this.buildIdempotencyKey(data);
 
     const alreadySent = await this.prisma.notificationLog.findUnique({
       where: { idempotencyKey },

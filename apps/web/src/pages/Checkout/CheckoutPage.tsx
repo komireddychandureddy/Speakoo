@@ -217,7 +217,7 @@ export default function CheckoutPage() {
       } else {
         throw new Error('Invalid checkout request');
       }
-      window.location.assign(bookingId ? '/mySession' : '/my-credits');
+      window.location.assign(bookingId ? '/mySession?bookingSuccess=1' : '/my-credits');
     } catch {
       setError('Mock payment failed. Please try again.');
     } finally {
@@ -291,7 +291,7 @@ export default function CheckoutPage() {
             <Elements stripe={stripePromise} options={{ clientSecret }}>
               <CheckoutForm
                 clientSecret={clientSecret}
-                successPath={bookingId ? '/mySession' : '/my-credits'}
+                successPath={bookingId ? '/mySession?bookingSuccess=1' : '/my-credits'}
               />
             </Elements>
           )

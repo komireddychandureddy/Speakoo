@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { getMyBookings, type Booking, type BookingStatus } from '../../core/network/bookingsApi';
 import { getSessionRecordingDownload } from '../../core/network/sessionsApi';
-import SessionReportModal from './SessionReportModal';
 import SessionChatModal from './SessionChatModal';
 import SessionProgress from '../../components/Sessions/SessionProgress';
 
@@ -24,9 +23,9 @@ const TABS: { key: TabStatus; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'confirmed', label: 'Upcoming' },
   { key: 'in_session', label: 'In Session' },
+  { key: 'pending', label: 'Pending Feedback' },
   { key: 'completed', label: 'Completed' },
   { key: 'cancelled', label: 'Cancelled' },
-  { key: 'pending', label: 'Pending' },
 ];
 
 const STATUS_COLORS: Record<TabStatus, string> = {
@@ -39,22 +38,42 @@ const STATUS_COLORS: Record<TabStatus, string> = {
 };
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
-  pending: 'Pending',
+  pending: 'Pending Payment',
   confirmed: 'Upcoming',
   in_session: 'In Session',
   completed: 'Completed',
   cancelled: 'Cancelled',
 };
 
+function getJoinWindowStart(startTime: string): number {
+  return new Date(startTime).getTime() - 5 * 60_000;
+}
+
 export default function MySessionsPage() {
   const [activeTab, setActiveTab] = useState<TabStatus>('all');
   const navigate = useNavigate();
+  const location = useLocation();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [reportBooking, setReportBooking] = useState<Booking | null>(null);
   const [chatBooking, setChatBooking] = useState<Booking | null>(null);
   const [nowMs, setNowMs] = useState(Date.now());
   const [downloadLoadingId, setDownloadLoadingId] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const [bookingSuccessMessage, setBookingSuccessMessage] = useState<string | null>(null);
+  const currentUserId = (() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('speakoo_user') ?? '{}') as { id?: string };
+      return u.id ?? '';
+    } catch {
+      return '';
+    }
+  })();
+
+  const isPendingFeedback = (booking: Booking): boolean => {
+    if (booking.status !== 'completed') return false;
+    if (!currentUserId) return false;
+    const feedback = booking.session?.feedback ?? [];
+    return !feedback.some((item) => item.reviewerId === currentUserId);
+  };
 
   const loadBookings = () => {
     getMyBookings()
@@ -72,6 +91,21 @@ export default function MySessionsPage() {
     const refreshTimer = window.setInterval(loadBookings, 20_000);
     return () => window.clearInterval(refreshTimer);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('bookingSuccess') === '1') {
+      setBookingSuccessMessage('Booking successful! Your session is now confirmed.');
+      params.delete('bookingSuccess');
+      navigate(
+        {
+          pathname: location.pathname,
+          search: params.toString() ? `?${params.toString()}` : '',
+        },
+        { replace: true },
+      );
+    }
+  }, [location.pathname, location.search, navigate]);
 
   useEffect(() => {
     const handleWindowFocus = () => loadBookings();
@@ -101,6 +135,8 @@ export default function MySessionsPage() {
     }
 
     if (activeTab === 'confirmed') return booking.status === 'confirmed';
+    if (activeTab === 'pending') return isPendingFeedback(booking);
+    if (activeTab === 'completed') return booking.status === 'completed' && !isPendingFeedback(booking);
     return booking.status === activeTab;
   });
 
@@ -162,6 +198,17 @@ export default function MySessionsPage() {
       </div>
 
       {/* Session Cards */}
+      {bookingSuccessMessage && (
+        <div className="card p-3 border border-green-200 bg-green-50 text-green-700 text-sm flex items-center justify-between gap-3">
+          <span>{bookingSuccessMessage}</span>
+          <button
+            onClick={() => setBookingSuccessMessage(null)}
+            className="text-xs font-semibold text-green-700 hover:text-green-900"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       {filtered.length === 0 ? (
         <div className="card p-8 text-center">
           <p className="text-4xl mb-3">📅</p>
@@ -179,6 +226,12 @@ export default function MySessionsPage() {
             const holdMsLeft = holdExpiresAt - nowMs;
             const holdActive = booking.status === 'pending' && holdMsLeft > 0;
             const holdExpired = booking.status === 'pending' && holdMsLeft <= 0;
+            const joinEnabled =
+              (booking.status === 'confirmed' || booking.status === 'in_session') &&
+              nowMs >= getJoinWindowStart(booking.slot.startTime) &&
+              nowMs < new Date(booking.slot.endTime).getTime();
+            const pendingFeedback = isPendingFeedback(booking);
+            const statusLabel = pendingFeedback ? 'Pending Feedback' : STATUS_LABELS[booking.status];
             return (
               <div key={booking.id} className="card px-5 py-4">
                 <div className="flex items-start gap-4">
@@ -189,7 +242,7 @@ export default function MySessionsPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-bold text-gray-900">{booking.language} Session</p>
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[booking.status as TabStatus] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {STATUS_LABELS[booking.status]}
+                        {statusLabel}
                       </span>
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">
@@ -216,11 +269,23 @@ export default function MySessionsPage() {
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-2 mt-4">
                   {(booking.status === 'confirmed' || booking.status === 'in_session') && (
-                    <button className="btn-primary" onClick={() => navigate('/session-room/' + booking.id)}>Join Session</button>
+                    <button
+                      className="btn-primary"
+                      onClick={() => navigate('/session-room/' + booking.id)}
+                      disabled={!joinEnabled}
+                    >
+                      {joinEnabled
+                        ? 'Join Session'
+                        : nowMs < getJoinWindowStart(booking.slot.startTime)
+                          ? 'Join opens 5 min before'
+                          : 'Session Ended'}
+                    </button>
                   )}
-                  {booking.status === 'completed' && (
+                  {pendingFeedback && (
+                    <button onClick={() => navigate('/feedback/' + booking.id)} className="btn-primary">Give Feedback</button>
+                  )}
+                  {booking.status === 'completed' && !pendingFeedback && (
                     <>
-                      <button onClick={() => setReportBooking(booking)} className="btn-primary">Give Feedback</button>
                       {booking.session?.recordingUrl && (
                         <button
                           onClick={() => void handleDownloadRecording(booking)}
@@ -252,12 +317,6 @@ export default function MySessionsPage() {
       )}
 
       {/* Modals */}
-      {reportBooking && (
-        <SessionReportModal
-          booking={reportBooking}
-          onClose={() => setReportBooking(null)}
-        />
-      )}
       {chatBooking && (
         <SessionChatModal
           booking={chatBooking}

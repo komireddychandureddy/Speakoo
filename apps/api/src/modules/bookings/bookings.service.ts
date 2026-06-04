@@ -28,7 +28,10 @@ export class BookingsService {
 
     // Wallet-paid bookings are confirmed immediately and need reminder scheduling.
     if (booking.status === BookingStatus.confirmed) {
-      await this.notificationsService.scheduleBookingNotifications(booking.id, booking.slot.startTime);
+      await this.notificationsService.scheduleBookingNotifications(
+        booking.id,
+        booking.slot.startTime,
+      );
     }
 
     return booking;

@@ -24,6 +24,10 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
   cancelled: 'Cancelled',
 };
 
+function getJoinWindowStart(startTime: string): number {
+  return new Date(startTime).getTime() - 5 * 60_000;
+}
+
 export default function TutorSessionsPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TutorTab>('all');
@@ -192,9 +196,15 @@ export default function TutorSessionsPage() {
           {filtered.map((booking) => {
             const start = new Date(booking.slot.startTime);
             const end = new Date(booking.slot.endTime);
+            const nowMs = Date.now();
             const learnerName = booking.learner?.profile?.displayName?.trim() || 'Learner';
             const learnerEmail = booking.learner?.email || null;
-            const canJoin = booking.status === 'confirmed' || booking.status === 'in_session';
+            const canStartNow =
+              booking.status === 'confirmed' &&
+              nowMs >= getJoinWindowStart(booking.slot.startTime) &&
+              nowMs < new Date(booking.slot.endTime).getTime();
+            const canJoinInSession =
+              booking.status === 'in_session' && nowMs < new Date(booking.slot.endTime).getTime();
 
             return (
               <div key={booking.id} className="card px-5 py-4">
@@ -232,9 +242,15 @@ export default function TutorSessionsPage() {
                       <button
                         onClick={() => void handleStartSession(booking.id)}
                         className="btn-primary"
-                        disabled={actionBookingId === booking.id}
+                        disabled={actionBookingId === booking.id || !canStartNow}
                       >
-                        {actionBookingId === booking.id ? 'Starting…' : 'Start Session'}
+                        {actionBookingId === booking.id
+                          ? 'Starting…'
+                          : canStartNow
+                            ? 'Start Session'
+                            : nowMs < getJoinWindowStart(booking.slot.startTime)
+                              ? 'Opens 5 min before'
+                              : 'Session Ended'}
                       </button>
                     )}
                     {booking.status === 'in_session' && (
@@ -242,8 +258,9 @@ export default function TutorSessionsPage() {
                         <button
                           onClick={() => navigate('/session-room/' + booking.id)}
                           className="btn-primary"
+                          disabled={!canJoinInSession}
                         >
-                          Join Session
+                          {canJoinInSession ? 'Join Session' : 'Session Ended'}
                         </button>
                         <button
                           onClick={() => void handleEndSession(booking.id)}

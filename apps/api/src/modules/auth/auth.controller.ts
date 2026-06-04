@@ -11,7 +11,7 @@ import {
   Param,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -60,6 +60,7 @@ export class AuthController {
 
   @Public()
   @Post('refresh')
+  @SkipThrottle({ default: true })
   @HttpCode(HttpStatus.OK)
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies?.[REFRESH_COOKIE] as string | undefined;

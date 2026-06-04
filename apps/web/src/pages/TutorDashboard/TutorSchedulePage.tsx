@@ -10,7 +10,6 @@ import {
   type AvailabilitySlot,
 } from '../../core/network/tutorsApi';
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HALF_HOURS = Array.from({ length: 48 }, (_, index) => index);
 
 function formatHalfHour(index: number): string {
@@ -23,13 +22,12 @@ function formatHalfHour(index: number): string {
 
 function getWeekDates(offset: number): Date[] {
   const now = new Date();
-  const dayOfWeek = now.getDay();
-  const monday = new Date(now);
-  monday.setHours(0, 0, 0, 0);
-  monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7) + offset * 7);
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(now.getDate() + offset * 7);
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
     return d;
   });
 }
@@ -40,6 +38,7 @@ export default function TutorSchedulePage() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [bookingsError, setBookingsError] = useState<string | null>(null);
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const lastClickRef = useRef<string | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -49,7 +48,15 @@ export default function TutorSchedulePage() {
   const load = () => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     getMySlots(timezone).then(setSlots).catch(() => {});
-    getMyBookings().then(setBookings).catch(() => {});
+    getMyBookings()
+      .then((items) => {
+        setBookings(items);
+        setBookingsError(null);
+      })
+      .catch(() => {
+        setBookings([]);
+        setBookingsError('Could not load booking history. Please refresh.');
+      });
   };
 
   const refreshSlots = useCallback(() => {
@@ -72,7 +79,23 @@ export default function TutorSchedulePage() {
 
   useEffect(() => {
     load();
+
+    const refreshTimer = window.setInterval(load, 20_000);
+
+    const handleWindowFocus = () => load();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        load();
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
+      window.clearInterval(refreshTimer);
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
   }, []);
@@ -81,8 +104,7 @@ export default function TutorSchedulePage() {
     const map = new Map<string, AvailabilitySlot>();
     for (const slot of slots) {
       const start = new Date(slot.startTime);
-      const dayIndex = (start.getDay() + 6) % 7;
-      const key = `${start.toDateString()}-${dayIndex}-${start.getHours() * 2 + (start.getMinutes() >= 30 ? 1 : 0)}`;
+      const key = `${start.toDateString()}-${start.getHours() * 2 + (start.getMinutes() >= 30 ? 1 : 0)}`;
       map.set(key, slot);
     }
     return map;
@@ -130,8 +152,7 @@ export default function TutorSchedulePage() {
   const handleCellClick = useCallback(
     (date: Date, halfHourIndex: number, event: React.MouseEvent) => {
       const selectKey = `${date.toDateString()}-${halfHourIndex}`;
-      const dayIndex = (date.getDay() + 6) % 7;
-      const slotKey = `${date.toDateString()}-${dayIndex}-${halfHourIndex}`;
+      const slotKey = `${date.toDateString()}-${halfHourIndex}`;
       const existingSlot = slotMap.get(slotKey);
 
       if (existingSlot || (!event.shiftKey && selectedSlots.size === 0)) {
@@ -159,8 +180,7 @@ export default function TutorSchedulePage() {
         const tempTime = new Date(startTime);
         while (tempTime <= endTime) {
           const rangeSelectKey = `${tempTime.toDateString()}-${tempTime.getHours() * 2 + (tempTime.getMinutes() >= 30 ? 1 : 0)}`;
-          const rangeDayIndex = (tempTime.getDay() + 6) % 7;
-          const rangeSlotKey = `${tempTime.toDateString()}-${rangeDayIndex}-${tempTime.getHours() * 2 + (tempTime.getMinutes() >= 30 ? 1 : 0)}`;
+          const rangeSlotKey = `${tempTime.toDateString()}-${tempTime.getHours() * 2 + (tempTime.getMinutes() >= 30 ? 1 : 0)}`;
           if (!slotMap.get(rangeSlotKey)) {
             newSelected.add(rangeSelectKey);
           }
@@ -293,6 +313,12 @@ export default function TutorSchedulePage() {
                 <Plus size={14} />
                 Create All
               </button>
+              <button
+                onClick={load}
+                className="px-3 py-1.5 text-sm rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Refresh
+              </button>
             </div>
           </div>
         )}
@@ -301,10 +327,12 @@ export default function TutorSchedulePage() {
           <div className="min-w-[760px]">
             <div className="grid grid-cols-8 gap-1 mb-1">
               <div className="text-xs text-gray-400 font-semibold text-center py-2">Time</div>
-              {DAYS.map((d, index) => (
-                <div key={d} className="text-center">
-                  <p className="text-xs font-bold text-gray-700">{d}</p>
-                  <p className="text-xs mt-0.5 text-gray-400">{weekDates[index].getDate()}</p>
+              {weekDates.map((date) => (
+                <div key={date.toDateString()} className="text-center">
+                  <p className="text-xs font-bold text-gray-700">
+                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                  </p>
+                  <p className="text-xs mt-0.5 text-gray-400">{date.getDate()}</p>
                 </div>
               ))}
             </div>
@@ -317,7 +345,7 @@ export default function TutorSchedulePage() {
                   </div>
                   {weekDates.map((date, dayIndex) => {
                     const selectKey = `${date.toDateString()}-${halfHourIndex}`;
-                    const slotKey = `${date.toDateString()}-${dayIndex}-${halfHourIndex}`;
+                    const slotKey = `${date.toDateString()}-${halfHourIndex}`;
                     const slot = slotMap.get(slotKey);
                     const isSelected = selectedSlots.has(selectKey);
                     const start = new Date(date);
@@ -326,7 +354,7 @@ export default function TutorSchedulePage() {
 
                     return (
                       <div
-                        key={`${dayIndex}-${halfHourIndex}`}
+                        key={`${date.toDateString()}-${halfHourIndex}`}
                         onClick={(e) => handleCellClick(date, halfHourIndex, e)}
                         className={`h-7 rounded-md text-xs flex items-center justify-center transition-all select-none cursor-pointer ${
                           slot?.status === 'booked'
@@ -365,7 +393,15 @@ export default function TutorSchedulePage() {
       </div>
 
       <div className="card px-5 py-5">
-        <h3 className="font-bold text-gray-900 mb-3">Booking History</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-gray-900">Booking History</h3>
+          <button onClick={load} className="btn-outline">Refresh</button>
+        </div>
+        {bookingsError && (
+          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {bookingsError}
+          </div>
+        )}
         {bookings.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">No bookings yet.</p>
         ) : (
@@ -384,7 +420,12 @@ export default function TutorSchedulePage() {
                     key={booking.id}
                     className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-sm"
                   >
-                    <span className="font-medium text-gray-800">{booking.language}</span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-800">{booking.language}</p>
+                      {booking.learner?.profile?.displayName && (
+                        <p className="text-xs text-gray-500 truncate">Learner: {booking.learner.profile.displayName}</p>
+                      )}
+                    </div>
                     <span className="text-gray-600">{start.toLocaleString('en-IN')}</span>
                     <span className="text-xs px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-700">
                       {booking.status}

@@ -512,7 +512,10 @@ export class PaymentsService {
       include: { slot: true },
     });
 
-    await this.notificationsService.scheduleBookingNotifications(bookingId, bookingWithSlot.slot.startTime);
+    await this.notificationsService.scheduleBookingNotifications(
+      bookingId,
+      bookingWithSlot.slot.startTime,
+    );
 
     this.logger.log(`Payment succeeded for booking ${bookingId}`);
   }
@@ -616,7 +619,9 @@ export class PaymentsService {
         throw new BadRequestException('bundleId is required for credit purchase mock confirmation');
       }
 
-      const bundle = await this.prisma.creditBundle.findUniqueOrThrow({ where: { id: dto.bundleId } });
+      const bundle = await this.prisma.creditBundle.findUniqueOrThrow({
+        where: { id: dto.bundleId },
+      });
       await this.creditWallet(
         userId,
         bundle.credits,
@@ -1229,7 +1234,9 @@ export class PaymentsService {
 
     const account = await this.getTutorPayoutAccount(tutorUserId);
     if (!account) {
-      throw new BadRequestException('Please add payout account details before requesting withdrawal');
+      throw new BadRequestException(
+        'Please add payout account details before requesting withdrawal',
+      );
     }
 
     const [balanceAgg, pendingWithdrawalCents] = await Promise.all([

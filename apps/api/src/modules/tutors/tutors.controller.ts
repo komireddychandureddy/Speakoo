@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Delete,
-  Body,
-  Query,
-  Param,
-  ParseUUIDPipe,
-} from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Query, Param, ParseUUIDPipe } from '@nestjs/common';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { TutorsService } from './tutors.service';
 import { CreateTutorProfileDto } from './dto/create-tutor-profile.dto';
@@ -25,6 +16,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { User } from '@prisma/client';
 
+@SkipThrottle({ auth: true })
 @Controller('tutors')
 export class TutorsController {
   constructor(private readonly tutorsService: TutorsService) {}
@@ -62,7 +54,7 @@ export class TutorsController {
 
   @Roles('tutor')
   @Post('slots')
-  @Throttle({ default: { ttl: 60_000, limit: 240 } })
+  @Throttle({ default: { ttl: 60_000, limit: 1200 } })
   createSlot(@CurrentUser() user: User, @Body() dto: CreateAvailabilitySlotDto) {
     return this.tutorsService.createSlot(user.id, dto);
   }
@@ -75,7 +67,7 @@ export class TutorsController {
 
   @Roles('tutor')
   @Post('slots/bulk')
-  @Throttle({ default: { ttl: 60_000, limit: 120 } })
+  @Throttle({ default: { ttl: 60_000, limit: 400 } })
   createBulkSlots(@CurrentUser() user: User, @Body() dto: CreateBulkSlotsDto) {
     return this.tutorsService.createBulkSlots(user.id, dto);
   }

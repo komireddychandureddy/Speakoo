@@ -1,9 +1,13 @@
 import { Controller, Post, Get, Param, Body } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { SessionsService } from './sessions.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { User } from '@prisma/client';
+import { SendSessionNudgeDto } from './dto/send-session-nudge.dto';
+import { UpdateSessionPresenceDto } from './dto/update-session-presence.dto';
 
+@SkipThrottle({ auth: true })
 @Controller('sessions')
 export class SessionsController {
   constructor(private readonly sessionsService: SessionsService) {}
@@ -37,6 +41,24 @@ export class SessionsController {
     @Body() body: { recordingUrl?: string },
   ) {
     return this.sessionsService.stopRecording(bookingId, user.id, body.recordingUrl);
+  }
+
+  @Post(':bookingId/nudge')
+  sendSessionNudge(
+    @Param('bookingId') bookingId: string,
+    @CurrentUser() user: User,
+    @Body() dto: SendSessionNudgeDto,
+  ) {
+    return this.sessionsService.sendSessionNudge(bookingId, user.id, dto);
+  }
+
+  @Post(':bookingId/presence')
+  updatePresence(
+    @Param('bookingId') bookingId: string,
+    @CurrentUser() user: User,
+    @Body() dto: UpdateSessionPresenceDto,
+  ) {
+    return this.sessionsService.updatePresence(bookingId, user.id, dto.status);
   }
 
   @Get(':bookingId/recording')

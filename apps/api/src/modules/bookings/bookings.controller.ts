@@ -6,26 +6,27 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { User } from '@prisma/client';
 
+@SkipThrottle({ auth: true })
 @Controller('bookings')
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
 
   @Roles('learner')
   @Post()
-  @Throttle({ default: { ttl: 60_000, limit: 180 } })
+  @Throttle({ default: { ttl: 60_000, limit: 600 } })
   create(@CurrentUser() user: User, @Body() dto: CreateBookingDto) {
     return this.bookingsService.createBooking(user.id, dto);
   }
 
   @Get()
-  @SkipThrottle()
+  @SkipThrottle({ default: true, auth: true })
   getMyBookings(@CurrentUser() user: User) {
     const role = user.role === 'tutor' ? 'tutor' : 'learner';
     return this.bookingsService.getMyBookings(user.id, role);
   }
 
   @Get(':id')
-  @SkipThrottle()
+  @SkipThrottle({ default: true, auth: true })
   getById(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
     return this.bookingsService.getBookingById(id, user.id, user.role);
   }

@@ -168,4 +168,5 @@ echo "Services status:"
 docker compose ps
 echo ""
 echo "View logs with: docker compose logs -f api"
+echo "Run smoke tests with: bash infra/scripts/post-deploy-smoke.sh"
 echo ""

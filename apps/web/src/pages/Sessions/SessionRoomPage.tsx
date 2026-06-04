@@ -15,7 +15,16 @@ import {
   VideoOff,
 } from 'lucide-react';
 import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client';
-import { endSession, getSessionToken, startSession } from '../../core/network/sessionsApi';
+import {
+  endSession,
+  getSessionToken,
+  sendSessionNudge,
+  startSession,
+  startSessionRecording,
+  stopSessionRecording,
+  updateSessionPresence,
+} from '../../core/network/sessionsApi';
+import { getBookingById } from '../../core/network/bookingsApi';
 
 interface ChatMessage {
   id: string;
@@ -43,9 +52,23 @@ export default function SessionRoomPage() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'reconnecting' | 'disconnected'>('connecting');
   const [remoteIdentity, setRemoteIdentity] = useState<string>('Waiting for participant…');
+  const [localDisplayName, setLocalDisplayName] = useState<string>('You');
+  const [remoteDisplayName, setRemoteDisplayName] = useState<string>('Participant');
   const [participantCount, setParticipantCount] = useState(1);
   const [sessionNonce, setSessionNonce] = useState(0);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [layoutMode, setLayoutMode] = useState<'horizontal' | 'vertical'>('vertical');
+  const [backgroundMode, setBackgroundMode] = useState<'none' | 'blur' | 'dim'>('none');
+  const [recordingOn, setRecordingOn] = useState(false);
+  const [recordingBusy, setRecordingBusy] = useState(false);
+  const [nudgeBusy, setNudgeBusy] = useState(false);
+  const [nudgeInfo, setNudgeInfo] = useState<string | null>(null);
+  const [nudgeSent, setNudgeSent] = useState(false);
+  const [joinInfo, setJoinInfo] = useState<string | null>(null);
+  const [scheduledStartMs, setScheduledStartMs] = useState<number | null>(null);
+  const [scheduledEndMs, setScheduledEndMs] = useState<number | null>(null);
+  const [remainingToEndMs, setRemainingToEndMs] = useState<number | null>(null);
+  const [showAutoEndWarning, setShowAutoEndWarning] = useState(false);
 
   const roomRef = useRef<Room | null>(null);
   const localVideoRef = useRef<HTMLDivElement>(null);
@@ -54,6 +77,8 @@ export default function SessionRoomPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const isLeavingRef = useRef(false);
+  const warnedRef = useRef(false);
+  const autoEndedRef = useRef(false);
 
   const user = (() => {
     try {
@@ -71,6 +96,61 @@ export default function SessionRoomPage() {
     const timer = window.setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!id) return;
+
+    getBookingById(id)
+      .then((booking) => {
+        const localName = user.name?.trim() || 'You';
+        setLocalDisplayName(localName);
+
+        if (user.role === 'tutor' || user.role === 'admin') {
+          setRemoteDisplayName(
+            booking.learner?.profile?.displayName?.trim() || booking.learner?.email || 'Learner',
+          );
+        } else {
+          setRemoteDisplayName(
+            booking.tutor?.profile?.displayName?.trim() || booking.tutor?.email || 'Tutor',
+          );
+        }
+
+        const startMs = new Date(booking.slot.startTime).getTime();
+        const endMs = new Date(booking.slot.endTime).getTime();
+        setScheduledStartMs(startMs);
+        setScheduledEndMs(endMs);
+        setRemainingToEndMs(Math.max(0, endMs - Date.now()));
+      })
+      .catch(() => {
+        setLocalDisplayName(user.name?.trim() || 'You');
+        setRemoteDisplayName('Participant');
+      });
+  }, [id, user.name, user.role]);
+
+  useEffect(() => {
+    if (!scheduledEndMs) return;
+
+    const tick = () => {
+      const now = Date.now();
+      const left = scheduledEndMs - now;
+      setRemainingToEndMs(Math.max(0, left));
+
+      if (left <= 5 * 60_000 && left > 0 && !warnedRef.current) {
+        warnedRef.current = true;
+        setShowAutoEndWarning(true);
+      }
+
+      if (left <= 0 && !autoEndedRef.current) {
+        autoEndedRef.current = true;
+        setShowAutoEndWarning(false);
+        void handleAutoEndSession();
+      }
+    };
+
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [scheduledEndMs]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -119,6 +199,9 @@ export default function SessionRoomPage() {
           setConnectionStatus('connected');
           setReconnectAttempts(0);
           setParticipantCount(1 + room.remoteParticipants.size);
+          if (id) {
+            await updateSessionPresence(id, 'joined').catch(() => undefined);
+          }
           await room.localParticipant.setMicrophoneEnabled(true);
           await room.localParticipant.setCameraEnabled(true);
         });
@@ -137,6 +220,12 @@ export default function SessionRoomPage() {
         room.on(RoomEvent.ParticipantConnected, (participant) => {
           setParticipantCount(1 + room.remoteParticipants.size);
           setRemoteIdentity(participant.identity || 'Participant');
+          const message =
+            user.role === 'tutor' || user.role === 'admin'
+              ? 'Learner joined the session.'
+              : 'Tutor joined the session.';
+          setJoinInfo(message);
+          window.setTimeout(() => setJoinInfo(null), 3000);
         });
 
         room.on(RoomEvent.ParticipantDisconnected, () => {
@@ -281,6 +370,9 @@ export default function SessionRoomPage() {
 
   const handleLeave = async () => {
     isLeavingRef.current = true;
+    if (id) {
+      await updateSessionPresence(id, 'left').catch(() => undefined);
+    }
     if ((user.role === 'tutor' || user.role === 'admin') && id) {
       await endSession(id).catch(() => undefined);
     }
@@ -295,6 +387,63 @@ export default function SessionRoomPage() {
     setTokenError(null);
     setSessionNonce((value) => value + 1);
   };
+
+  const handleAutoEndSession = async () => {
+    if (!id) return;
+
+    isLeavingRef.current = true;
+    await updateSessionPresence(id, 'left').catch(() => undefined);
+    if (user.role === 'tutor' || user.role === 'admin') {
+      await endSession(id).catch(() => undefined);
+      roomRef.current?.disconnect();
+      navigate('/tutor-sessions');
+      return;
+    }
+
+    roomRef.current?.disconnect();
+    navigate('/mySession');
+  };
+
+  const handleToggleRecording = async () => {
+    if (!id || recordingBusy) return;
+    setRecordingBusy(true);
+    try {
+      if (!recordingOn) {
+        await startSessionRecording(id);
+        setRecordingOn(true);
+      } else {
+        await stopSessionRecording(id);
+        setRecordingOn(false);
+      }
+    } finally {
+      setRecordingBusy(false);
+    }
+  };
+
+  const handleSendNudge = async () => {
+    if (!id || nudgeBusy || nudgeSent) return;
+    setNudgeBusy(true);
+    setNudgeInfo(null);
+    try {
+      const result = await sendSessionNudge(id, { channel: 'push' });
+      if (result.sent) {
+        setNudgeSent(true);
+        setNudgeInfo('Join reminder sent.');
+      } else {
+        setNudgeInfo('Other participant is already in the session.');
+      }
+      window.setTimeout(() => setNudgeInfo(null), 3000);
+    } finally {
+      setNudgeBusy(false);
+    }
+  };
+
+  const localVideoFxClass =
+    backgroundMode === 'blur'
+      ? 'backdrop-blur-md'
+      : backgroundMode === 'dim'
+        ? 'brightness-75'
+        : '';
 
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-white overflow-hidden">
@@ -315,6 +464,9 @@ export default function SessionRoomPage() {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          {recordingOn && (
+            <span className="text-xs font-bold px-2 py-1 rounded bg-red-600 text-white animate-pulse">REC</span>
+          )}
           <span className="text-sm font-mono bg-gray-700 px-3 py-1 rounded-lg text-green-400">{formatTime(elapsed)}</span>
           <button onClick={handleCopyLink} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors">
             {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
@@ -330,6 +482,21 @@ export default function SessionRoomPage() {
         {tokenError && (
           <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-red-600 text-white text-sm px-4 py-2 rounded-lg shadow-lg">
             {tokenError}
+          </div>
+        )}
+        {showAutoEndWarning && remainingToEndMs !== null && remainingToEndMs > 0 && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-amber-500 text-white text-sm px-4 py-2 rounded-lg shadow-lg">
+            Session will auto-end in {formatTime(Math.floor(remainingToEndMs / 1000))}
+          </div>
+        )}
+        {nudgeInfo && (
+          <div className="absolute top-28 left-1/2 -translate-x-1/2 z-20 bg-[#43A047] text-white text-sm px-4 py-2 rounded-lg shadow-lg">
+            {nudgeInfo}
+          </div>
+        )}
+        {joinInfo && (
+          <div className="absolute top-40 left-1/2 -translate-x-1/2 z-20 bg-[#1E88E5] text-white text-sm px-4 py-2 rounded-lg shadow-lg">
+            {joinInfo}
           </div>
         )}
         {connectionStatus === 'reconnecting' && !tokenError && (
@@ -355,18 +522,18 @@ export default function SessionRoomPage() {
           </div>
         )}
 
-        <div className="flex-1 flex flex-col gap-3 p-4 overflow-hidden">
-          <div className="flex-1 relative rounded-2xl overflow-hidden bg-gray-800 min-h-0">
+        <div className={`flex-1 p-4 overflow-hidden ${layoutMode === 'horizontal' ? 'grid grid-cols-1 lg:grid-cols-2 gap-3' : 'flex flex-col gap-3'}`}>
+          <div className="relative rounded-2xl overflow-hidden bg-gray-800 min-h-0 flex-1">
             <div ref={remoteVideoRef} className="absolute inset-0 flex items-center justify-center bg-black" />
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center text-gray-300 text-sm">
-              {connectionStatus !== 'connected' ? 'Connecting…' : remoteIdentity}
+              {connectionStatus !== 'connected' ? 'Connecting…' : remoteDisplayName}
             </div>
             <div className="absolute bottom-3 left-3 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-lg text-sm font-semibold">
-              {remoteIdentity}
+              {remoteDisplayName}
             </div>
           </div>
 
-          <div className="h-32 relative rounded-xl overflow-hidden bg-gray-700">
+          <div className={`relative rounded-xl overflow-hidden bg-gray-700 ${layoutMode === 'horizontal' ? 'min-h-[220px]' : 'h-32'} ${localVideoFxClass}`}>
             <div ref={localVideoRef} className="absolute inset-0 bg-black" />
             {!camOn && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-gray-300 bg-gray-800/90">
@@ -374,7 +541,7 @@ export default function SessionRoomPage() {
                 <span className="text-xs">Camera off</span>
               </div>
             )}
-            <div className="absolute bottom-2 left-2 bg-black/50 px-2 py-0.5 rounded text-xs font-semibold">You</div>
+            <div className="absolute bottom-2 left-2 bg-black/50 px-2 py-0.5 rounded text-xs font-semibold">{localDisplayName}</div>
           </div>
 
           <div ref={remoteAudioRef} className="hidden" />
@@ -418,6 +585,19 @@ export default function SessionRoomPage() {
       <div className="flex items-center gap-2 px-5 py-2 bg-gray-800/60 border-t border-gray-700 text-xs text-gray-400">
         <Users size={13} />
         <span>{participantCount} participant{participantCount > 1 ? 's' : ''}</span>
+        {scheduledStartMs && scheduledEndMs && (
+          <span className="ml-3">
+            Scheduled:{' '}
+            {new Date(scheduledStartMs).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+            {' - '}
+            {new Date(scheduledEndMs).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
+        {remainingToEndMs !== null && (
+          <span className="ml-3 text-green-300 font-semibold">
+            Ends in {formatTime(Math.floor(remainingToEndMs / 1000))}
+          </span>
+        )}
         {handRaised && <span className="ml-3 text-yellow-400 font-semibold animate-bounce">✋ Hand raised</span>}
       </div>
 
@@ -430,6 +610,42 @@ export default function SessionRoomPage() {
         </button>
         <button onClick={() => void handleToggleScreen()} title="Share Screen" className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${screenOn ? 'bg-[#43A047] hover:bg-[#2E7D32]' : 'bg-gray-700 hover:bg-gray-600'}`}>
           <Monitor size={20} />
+        </button>
+        <button
+          onClick={() => setLayoutMode((mode) => (mode === 'vertical' ? 'horizontal' : 'vertical'))}
+          title="Toggle Layout"
+          className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-colors text-xs font-bold"
+        >
+          {layoutMode === 'vertical' ? 'V' : 'H'}
+        </button>
+        <button
+          onClick={() => setBackgroundMode((mode) => (mode === 'none' ? 'blur' : mode === 'blur' ? 'dim' : 'none'))}
+          title="Background Effect"
+          className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-colors text-xs font-bold"
+        >
+          BG
+        </button>
+        <button
+          onClick={() => void handleToggleRecording()}
+          disabled={recordingBusy}
+          title={recordingOn ? 'Stop Recording' : 'Start Recording'}
+          className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${recordingOn ? 'bg-red-600 hover:bg-red-500' : 'bg-gray-700 hover:bg-gray-600'} disabled:opacity-50 text-xs font-bold`}
+        >
+          {recordingOn ? 'REC' : 'REC'}
+        </button>
+        <button
+          onClick={() => void handleSendNudge()}
+          disabled={nudgeBusy || nudgeSent}
+          title={user.role === 'tutor' ? 'Notify learner to join' : 'Notify tutor to join'}
+          className="px-3 h-12 rounded-full bg-[#1E88E5] hover:bg-[#1565C0] disabled:opacity-50 flex items-center justify-center transition-colors text-xs font-semibold"
+        >
+          {nudgeBusy
+            ? 'Sending…'
+            : nudgeSent
+              ? 'Notification Sent'
+              : user.role === 'tutor'
+                ? 'Notify Learner'
+                : 'Notify Tutor'}
         </button>
         <button onClick={() => setHandRaised((v) => !v)} title="Raise Hand" className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${handRaised ? 'bg-yellow-500 hover:bg-yellow-400' : 'bg-gray-700 hover:bg-gray-600'}`}>
           <Hand size={20} />
