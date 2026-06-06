@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Landmark, Clock } from 'lucide-react';
+import { Clock, ExternalLink, Landmark } from 'lucide-react';
 import { useI18n } from '../../core/i18n/I18nContext';
 import { useLocale } from '../../core/locale/LocaleContext';
 import {
+  createConnectOnboarding,
   createTutorWithdrawalRequest,
+  getTutorConnectStatus,
   getTutorPayoutAccount,
   getTutorPayoutSummary,
   listTutorWithdrawals,
-  upsertTutorPayoutAccount,
+  type TutorConnectStatus,
   type TutorPayoutAccount,
   type TutorPayoutSummary,
   type WithdrawalRequest,
@@ -17,38 +19,28 @@ export default function TutorPayoutPage() {
   const { t } = useI18n();
   const { fmtPrice } = useLocale();
   const [summary, setSummary] = useState<TutorPayoutSummary | null>(null);
+  const [connectStatus, setConnectStatus] = useState<TutorConnectStatus | null>(null);
   const [account, setAccount] = useState<TutorPayoutAccount | null>(null);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [saveLoading, setSaveLoading] = useState(false);
+  const [connectLoading, setConnectLoading] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
-
-  const [accountHolderName, setAccountHolderName] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [routingCode, setRoutingCode] = useState('');
-  const [countryCode, setCountryCode] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
 
   const loadAll = async () => {
     try {
       setError(null);
-      const [summaryRes, accountRes, withdrawalsRes] = await Promise.all([
+      const [summaryRes, accountRes, connectRes, withdrawalsRes] = await Promise.all([
         getTutorPayoutSummary(),
         getTutorPayoutAccount(),
+        getTutorConnectStatus(),
         listTutorWithdrawals(),
       ]);
       setSummary(summaryRes);
       setAccount(accountRes);
+      setConnectStatus(connectRes);
       setWithdrawals(withdrawalsRes);
-
-      if (accountRes) {
-        setAccountHolderName(accountRes.accountHolderName);
-        setBankName(accountRes.bankName);
-        setRoutingCode(accountRes.routingCode);
-        setCountryCode(accountRes.countryCode ?? '');
-      }
     } catch {
       setError('Failed to load payout data. Please try again.');
     } finally {
@@ -69,29 +61,15 @@ export default function TutorPayoutPage() {
     return Math.round(amount * 100);
   }, [withdrawAmount]);
 
-  const handleSaveAccount = async () => {
-    if (!accountHolderName.trim() || !accountNumber.trim() || !bankName.trim() || !routingCode.trim()) {
-      setError('Please complete all payout account fields.');
-      return;
-    }
-
+  const handleConnectOnboarding = async () => {
     try {
-      setSaveLoading(true);
+      setConnectLoading(true);
       setError(null);
-      const updated = await upsertTutorPayoutAccount({
-        accountHolderName: accountHolderName.trim(),
-        accountNumber: accountNumber.trim(),
-        bankName: bankName.trim(),
-        routingCode: routingCode.trim(),
-        ...(countryCode.trim() && { countryCode: countryCode.trim().toUpperCase() }),
-      });
-      setAccount(updated);
-      setAccountNumber('');
-      await loadAll();
+      const result = await createConnectOnboarding();
+      window.location.href = result.onboardingUrl;
     } catch {
-      setError('Failed to save payout account. Please verify details and try again.');
-    } finally {
-      setSaveLoading(false);
+      setError('Failed to start Stripe onboarding. Please try again.');
+      setConnectLoading(false);
     }
   };
 
@@ -121,8 +99,13 @@ export default function TutorPayoutPage() {
     return 'bg-yellow-100 text-yellow-700';
   };
 
+  const connectReady =
+    Boolean(summary?.hasPayoutAccount) &&
+    Boolean(connectStatus?.payoutsEnabled) &&
+    Boolean(connectStatus?.hasExternalBankAccount);
+
   if (loading) {
-    return <div className="text-sm text-[#616161]">Loading payout data…</div>;
+    return <div className="text-sm text-[#616161]">Loading payout data...</div>;
   }
 
   return (
@@ -141,7 +124,6 @@ export default function TutorPayoutPage() {
         </div>
       )}
 
-      {/* Pending Payout Card */}
       <div className="bg-gradient-to-r from-[#2E7D32] to-[#43A047] text-white rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <div className="text-sm opacity-80">{t('payout_pending')}</div>
@@ -159,56 +141,56 @@ export default function TutorPayoutPage() {
         </div>
       </div>
 
-      {/* Payout Account */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
-        <div className="flex items-center gap-2 font-bold text-[#212121]">
-          <Landmark size={18} className="text-[#43A047]" />
-          <span>Payout Account Details</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input
-            value={accountHolderName}
-            onChange={(event) => setAccountHolderName(event.target.value)}
-            placeholder="Account holder name"
-            className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
-          />
-          <input
-            value={accountNumber}
-            onChange={(event) => setAccountNumber(event.target.value)}
-            placeholder={account ? `Account number (ends with ${account.accountNumberLast4})` : 'Account number'}
-            className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
-          />
-          <input
-            value={bankName}
-            onChange={(event) => setBankName(event.target.value)}
-            placeholder="Bank name"
-            className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
-          />
-          <input
-            value={routingCode}
-            onChange={(event) => setRoutingCode(event.target.value)}
-            placeholder="Routing / IFSC code"
-            className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
-          />
-          <input
-            value={countryCode}
-            onChange={(event) => setCountryCode(event.target.value.toUpperCase())}
-            placeholder="Country code (e.g. IN)"
-            className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
-          />
-        </div>
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 font-bold text-[#212121]">
+            <Landmark size={18} className="text-[#43A047]" />
+            <span>Stripe Connect Bank Setup</span>
+          </div>
           <button
-            onClick={() => void handleSaveAccount()}
-            disabled={saveLoading}
-            className="px-4 py-2 rounded-xl bg-[#43A047] hover:bg-[#2E7D32] text-white text-sm font-semibold disabled:opacity-60"
+            onClick={() => void handleConnectOnboarding()}
+            disabled={connectLoading}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#43A047] hover:bg-[#2E7D32] text-white text-sm font-semibold disabled:opacity-60"
           >
-            {saveLoading ? 'Saving…' : 'Save Payout Account'}
+            <ExternalLink size={14} />
+            {connectLoading ? 'Opening...' : connectStatus?.accountId ? 'Continue Setup' : 'Connect Bank'}
           </button>
         </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          <div className="rounded-xl border border-gray-200 px-4 py-3">
+            <p className="text-[#616161]">Account ID</p>
+            <p className="font-semibold text-[#212121] mt-1">{connectStatus?.accountId ?? 'Not connected'}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 px-4 py-3">
+            <p className="text-[#616161]">Payouts Enabled</p>
+            <p className="font-semibold text-[#212121] mt-1">{connectStatus?.payoutsEnabled ? 'Yes' : 'No'}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 px-4 py-3">
+            <p className="text-[#616161]">Bank Account</p>
+            <p className="font-semibold text-[#212121] mt-1">
+              {account
+                ? `${account.bankName} •••• ${account.accountNumberLast4}`
+                : connectStatus?.hasExternalBankAccount
+                  ? 'Connected'
+                  : 'Not connected'}
+            </p>
+          </div>
+          <div className="rounded-xl border border-gray-200 px-4 py-3">
+            <p className="text-[#616161]">Onboarding Required</p>
+            <p className="font-semibold text-[#212121] mt-1">
+              {connectStatus?.onboardingRequired ? 'Yes' : 'No'}
+            </p>
+          </div>
+        </div>
+
+        {Boolean(connectStatus?.currentlyDue?.length) && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            Stripe still needs information: {connectStatus?.currentlyDue.join(', ')}
+          </div>
+        )}
       </div>
 
-      {/* Request Withdrawal */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
         <h2 className="text-base font-bold text-[#212121]">Request Withdrawal</h2>
         <div className="flex flex-col sm:flex-row gap-3">
@@ -222,18 +204,19 @@ export default function TutorPayoutPage() {
           />
           <button
             onClick={() => void handleRequestWithdrawal()}
-            disabled={requestLoading || !summary?.hasPayoutAccount}
+            disabled={requestLoading || !connectReady}
             className="px-4 py-2 rounded-xl bg-[#43A047] hover:bg-[#2E7D32] text-white text-sm font-semibold disabled:opacity-60"
           >
-            {requestLoading ? 'Submitting…' : 'Request Withdrawal'}
+            {requestLoading ? 'Submitting...' : 'Request Withdrawal'}
           </button>
         </div>
-        {!summary?.hasPayoutAccount && (
-          <p className="text-xs text-amber-700">Add payout account details before creating withdrawal requests.</p>
+        {!connectReady && (
+          <p className="text-xs text-amber-700">
+            Complete Stripe Connect onboarding and bank setup before creating withdrawal requests.
+          </p>
         )}
       </div>
 
-      {/* Payout History */}
       <div>
         <h2 className="text-lg font-bold text-[#212121] mb-3">Withdrawal History</h2>
         <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
@@ -247,7 +230,9 @@ export default function TutorPayoutPage() {
                     year: 'numeric',
                   })}
                 </div>
-                <div className={`inline-block text-xs font-medium mt-0.5 px-2 py-0.5 rounded-full ${statusClass(item.status)}`}>
+                <div
+                  className={`inline-block text-xs font-medium mt-0.5 px-2 py-0.5 rounded-full ${statusClass(item.status)}`}
+                >
                   {item.status}
                 </div>
                 {item.adminNote && <p className="text-xs text-[#616161] mt-1">{item.adminNote}</p>}

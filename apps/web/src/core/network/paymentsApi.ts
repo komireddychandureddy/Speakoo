@@ -48,6 +48,25 @@ export interface CreditPurchaseIntentResponse {
   mockReference?: string;
 }
 
+export interface WalletSetupIntentResponse {
+  clientSecret: string;
+  paymentMode?: 'stripe' | 'mock';
+}
+
+export interface WalletPaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  isDefault: boolean;
+}
+
+export interface WalletPaymentMethodsResponse {
+  defaultPaymentMethodId: string | null;
+  items: WalletPaymentMethod[];
+}
+
 export interface MockPaymentConfirmPayload {
   kind: 'booking' | 'credit_purchase' | 'wallet_topup';
   bookingId?: string;
@@ -75,6 +94,23 @@ export interface TutorPayoutSummary {
   lifetimePayoutCents: number;
   minimumWithdrawalCents: number;
   hasPayoutAccount: boolean;
+}
+
+export interface TutorConnectStatus {
+  accountId: string | null;
+  detailsSubmitted: boolean;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  hasExternalBankAccount: boolean;
+  onboardingRequired: boolean;
+  currentlyDue: string[];
+  pastDue: string[];
+  disabledReason: string | null;
+}
+
+export interface ConnectOnboardingResponse {
+  accountId: string;
+  onboardingUrl: string;
 }
 
 export interface WithdrawalRequest {
@@ -123,6 +159,27 @@ export async function getWalletBalance(): Promise<WalletBalance> {
   return data;
 }
 
+export async function createWalletSetupIntent(): Promise<WalletSetupIntentResponse> {
+  const { data } = await apiClient.post<WalletSetupIntentResponse>('payments/wallet/setup-intent');
+  return data;
+}
+
+export async function listWalletPaymentMethods(): Promise<WalletPaymentMethodsResponse> {
+  const { data } = await apiClient.get<WalletPaymentMethodsResponse>('payments/wallet/payment-methods');
+  return data;
+}
+
+export async function setDefaultWalletPaymentMethod(paymentMethodId: string): Promise<{
+  updated: boolean;
+  paymentMethodId: string;
+}> {
+  const { data } = await apiClient.post<{
+    updated: boolean;
+    paymentMethodId: string;
+  }>('payments/wallet/payment-methods/default', { paymentMethodId });
+  return data;
+}
+
 export async function listCreditBundles(): Promise<CreditBundle[]> {
   const { data } = await apiClient.get<CreditBundle[]>('payments/credit-bundles');
   return data;
@@ -145,15 +202,13 @@ export async function getTutorPayoutAccount(): Promise<TutorPayoutAccount | null
   return data;
 }
 
-export async function upsertTutorPayoutAccount(payload: {
-  accountHolderName: string;
-  accountNumber: string;
-  bankName: string;
-  routingCode: string;
-  currency?: string;
-  countryCode?: string;
-}): Promise<TutorPayoutAccount> {
-  const { data } = await apiClient.post<TutorPayoutAccount>('payments/tutor/payout-account', payload);
+export async function getTutorConnectStatus(): Promise<TutorConnectStatus> {
+  const { data } = await apiClient.get<TutorConnectStatus>('payments/connect/status');
+  return data;
+}
+
+export async function createConnectOnboarding(): Promise<ConnectOnboardingResponse> {
+  const { data } = await apiClient.post<ConnectOnboardingResponse>('payments/connect/onboard');
   return data;
 }
 

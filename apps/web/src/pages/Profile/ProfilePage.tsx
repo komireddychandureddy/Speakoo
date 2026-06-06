@@ -19,7 +19,6 @@ export default function ProfilePage() {
 
   const [name, setName] = useState(storedUser.name ?? '');
   const [email, setEmail] = useState(storedUser.email ?? '');
-  const mobile = storedUser.mobile ?? '';
   const [bio, setBio] = useState('');
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('India');

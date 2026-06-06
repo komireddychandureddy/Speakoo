@@ -31,10 +31,8 @@ function formatCountdown(ms: number): string {
 }
 
 function CheckoutForm({
-  clientSecret,
   successPath,
 }: {
-  clientSecret: string;
   successPath: string;
 }) {
   const stripe = useStripe();
@@ -290,7 +288,6 @@ export default function CheckoutPage() {
           ) : (
             <Elements stripe={stripePromise} options={{ clientSecret }}>
               <CheckoutForm
-                clientSecret={clientSecret}
                 successPath={bookingId ? '/mySession?bookingSuccess=1' : '/my-credits'}
               />
             </Elements>

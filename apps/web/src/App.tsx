@@ -68,18 +68,6 @@ function AdminPrivateRoute({ children }: { children: React.ReactNode }) {
   }
 }
 
-function TutorPrivateRoute({ children }: { children: React.ReactNode }) {
-  const raw = localStorage.getItem('speakoo_user');
-  if (!raw) return <Navigate to="/login" replace />;
-  try {
-    const user = JSON.parse(raw) as { role?: string };
-    if (user.role !== 'tutor' && user.role !== 'admin') return <Navigate to="/dashboard" replace />;
-    return <>{children}</>;
-  } catch {
-    return <Navigate to="/login" replace />;
-  }
-}
-
 // Restore the access token from localStorage on app start
 bootstrapAuth();
 

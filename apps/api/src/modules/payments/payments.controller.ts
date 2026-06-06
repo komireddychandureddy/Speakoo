@@ -26,6 +26,7 @@ import { UpsertPayoutAccountDto } from './dto/upsert-payout-account.dto';
 import { CreateWithdrawalRequestDto } from './dto/create-withdrawal-request.dto';
 import { ReviewWithdrawalRequestDto } from './dto/review-withdrawal-request.dto';
 import { ListWithdrawalRequestsDto } from './dto/list-withdrawal-requests.dto';
+import { SetDefaultWalletPaymentMethodDto } from './dto/set-default-wallet-payment-method.dto';
 import { User } from '@prisma/client';
 
 @Controller('payments')
@@ -51,6 +52,27 @@ export class PaymentsController {
   @Get('wallet/transactions')
   getWalletTransactions(@CurrentUser() user: User) {
     return this.paymentsService.getWalletTransactions(user.id);
+  }
+
+  @Roles('learner')
+  @Post('wallet/setup-intent')
+  createWalletSetupIntent(@CurrentUser() user: User) {
+    return this.paymentsService.createWalletSetupIntent(user.id);
+  }
+
+  @Roles('learner')
+  @Get('wallet/payment-methods')
+  listWalletPaymentMethods(@CurrentUser() user: User) {
+    return this.paymentsService.listWalletPaymentMethods(user.id);
+  }
+
+  @Roles('learner')
+  @Post('wallet/payment-methods/default')
+  setDefaultWalletPaymentMethod(
+    @CurrentUser() user: User,
+    @Body() dto: SetDefaultWalletPaymentMethodDto,
+  ) {
+    return this.paymentsService.setDefaultWalletPaymentMethod(user.id, dto.paymentMethodId);
   }
 
   @Get('credit-bundles')
@@ -121,6 +143,22 @@ export class PaymentsController {
   @Post('connect/onboard')
   createConnectOnboarding(@CurrentUser() user: User) {
     return this.paymentsService.createConnectOnboarding(user.id);
+  }
+
+  @Roles('tutor')
+  @Get('connect/status')
+  getConnectStatus(@CurrentUser() user: User): Promise<{
+    accountId: string | null;
+    detailsSubmitted: boolean;
+    chargesEnabled: boolean;
+    payoutsEnabled: boolean;
+    hasExternalBankAccount: boolean;
+    onboardingRequired: boolean;
+    currentlyDue: string[];
+    pastDue: string[];
+    disabledReason: string | null;
+  }> {
+    return this.paymentsService.getTutorConnectStatus(user.id);
   }
 
   @Roles('tutor')

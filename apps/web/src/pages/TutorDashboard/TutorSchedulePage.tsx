@@ -343,7 +343,7 @@ export default function TutorSchedulePage() {
                   <div className="text-xs text-gray-400 text-center py-1 font-medium">
                     {formatHalfHour(halfHourIndex)}
                   </div>
-                  {weekDates.map((date, dayIndex) => {
+                  {weekDates.map((date) => {
                     const selectKey = `${date.toDateString()}-${halfHourIndex}`;
                     const slotKey = `${date.toDateString()}-${halfHourIndex}`;
                     const slot = slotMap.get(slotKey);

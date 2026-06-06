@@ -1,13 +1,26 @@
 import { Gem } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { useI18n } from '../../core/i18n/I18nContext';
 import { useLocale } from '../../core/locale/LocaleContext';
 import {
   getWalletTransactions,
   type WalletTransaction,
 } from '../../core/network/bookingsApi';
-import { getWalletBalance, listCreditBundles, type CreditBundle } from '../../core/network/paymentsApi';
+import {
+  createWalletSetupIntent,
+  getWalletBalance,
+  listCreditBundles,
+  listWalletPaymentMethods,
+  setDefaultWalletPaymentMethod,
+  type CreditBundle,
+  type WalletPaymentMethod,
+} from '../../core/network/paymentsApi';
+
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 function txLabel(tx: WalletTransaction): string {
   switch (tx.type) {
@@ -52,6 +65,56 @@ function PackCard({ pack, onBuy }: { pack: CreditBundle; onBuy: (bundleId: strin
   );
 }
 
+function AddCardForm({
+  onSuccess,
+}: {
+  onSuccess: () => Promise<void>;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    const result = await stripe.confirmSetup({
+      elements,
+      confirmParams: {},
+      redirect: 'if_required',
+    });
+
+    if (result.error) {
+      setError(result.error.message || 'Unable to save card.');
+      setSubmitting(false);
+      return;
+    }
+
+    await onSuccess();
+    setSubmitting(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <PaymentElement options={{ layout: 'tabs' }} />
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <button
+        type="submit"
+        disabled={!stripe || submitting}
+        className="px-4 py-2 rounded-xl bg-[#43A047] hover:bg-[#2E7D32] text-white text-sm font-semibold disabled:opacity-60"
+      >
+        {submitting ? 'Saving...' : 'Save Card'}
+      </button>
+    </form>
+  );
+}
+
 export default function CreditsPage() {
   const navigate = useNavigate();
   const { t } = useI18n();
@@ -59,6 +122,11 @@ export default function CreditsPage() {
   const [balance, setBalance] = useState(0);
   const [bundles, setBundles] = useState<CreditBundle[]>([]);
   const [history, setHistory] = useState<WalletTransaction[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<WalletPaymentMethod[]>([]);
+  const [defaultPaymentMethodId, setDefaultPaymentMethodId] = useState<string | null>(null);
+  const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null);
+  const [cardSetupError, setCardSetupError] = useState<string | null>(null);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
 
   useEffect(() => {
     getWalletBalance()
@@ -76,7 +144,48 @@ export default function CreditsPage() {
     listCreditBundles()
       .then((items) => setBundles(items))
       .catch(() => {});
+
+    listWalletPaymentMethods()
+      .then((res) => {
+        setPaymentMethods(res.items);
+        setDefaultPaymentMethodId(res.defaultPaymentMethodId);
+      })
+      .catch(() => {});
   }, []);
+
+  const refreshPaymentMethods = async () => {
+    const methods = await listWalletPaymentMethods();
+    setPaymentMethods(methods.items);
+    setDefaultPaymentMethodId(methods.defaultPaymentMethodId);
+    setSetupClientSecret(null);
+  };
+
+  const handleStartAddCard = async () => {
+    if (!stripePromise) {
+      setCardSetupError('Stripe publishable key is not configured.');
+      return;
+    }
+
+    try {
+      setCardSetupError(null);
+      const setup = await createWalletSetupIntent();
+      setSetupClientSecret(setup.clientSecret);
+    } catch {
+      setCardSetupError('Could not start card setup. Please try again.');
+    }
+  };
+
+  const handleSetDefaultCard = async (paymentMethodId: string) => {
+    try {
+      setSettingDefaultId(paymentMethodId);
+      await setDefaultWalletPaymentMethod(paymentMethodId);
+      await refreshPaymentMethods();
+    } catch {
+      setCardSetupError('Could not set default card. Please try again.');
+    } finally {
+      setSettingDefaultId(null);
+    }
+  };
 
   const rows = useMemo(() => history.slice(0, 30), [history]);
 
@@ -109,6 +218,61 @@ export default function CreditsPage() {
             />
           ))}
         </div>
+      </div>
+
+      {/* Wallet Payment Methods */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-[#212121]">Wallet Payment Methods</h2>
+          <button
+            onClick={() => void handleStartAddCard()}
+            className="px-4 py-2 rounded-xl bg-[#43A047] hover:bg-[#2E7D32] text-white text-sm font-semibold"
+          >
+            Add Card
+          </button>
+        </div>
+
+        {cardSetupError && <p className="text-xs text-red-600">{cardSetupError}</p>}
+
+        {setupClientSecret && stripePromise && (
+          <div className="rounded-xl border border-gray-200 p-4">
+            <Elements stripe={stripePromise} options={{ clientSecret: setupClientSecret }}>
+              <AddCardForm onSuccess={refreshPaymentMethods} />
+            </Elements>
+          </div>
+        )}
+
+        {paymentMethods.length === 0 ? (
+          <p className="text-sm text-[#616161]">No saved cards yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {paymentMethods.map((method) => (
+              <div
+                key={method.id}
+                className="flex items-center justify-between border border-gray-100 rounded-xl px-4 py-3"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-[#212121]">
+                    {method.brand.toUpperCase()} •••• {method.last4}
+                  </p>
+                  <p className="text-xs text-[#616161]">
+                    Expires {method.expMonth.toString().padStart(2, '0')}/{method.expYear}
+                    {defaultPaymentMethodId === method.id ? ' • Default' : ''}
+                  </p>
+                </div>
+                {defaultPaymentMethodId !== method.id && (
+                  <button
+                    onClick={() => void handleSetDefaultCard(method.id)}
+                    disabled={settingDefaultId === method.id}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    {settingDefaultId === method.id ? 'Saving...' : 'Set Default'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* How Credits Work */}

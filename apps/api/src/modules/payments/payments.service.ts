@@ -57,6 +57,18 @@ interface WithdrawalRow {
   tutor_name?: string | null;
 }
 
+interface StripeConnectStatus {
+  accountId: string | null;
+  detailsSubmitted: boolean;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  hasExternalBankAccount: boolean;
+  onboardingRequired: boolean;
+  currentlyDue: string[];
+  pastDue: string[];
+  disabledReason: string | null;
+}
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
@@ -347,7 +359,25 @@ export class PaymentsService {
       await this.onInvoicePaid(invoice);
     }
 
+    if (event.type === 'account.updated') {
+      const account = event.data.object as Stripe.Account;
+      await this.onStripeAccountUpdated(account);
+    }
+
     return { received: true };
+  }
+
+  private async onStripeAccountUpdated(account: Stripe.Account) {
+    const tutorProfile = await this.prisma.tutorProfile.findFirst({
+      where: { stripeAccountId: account.id },
+      select: { userId: true },
+    });
+    if (!tutorProfile) return;
+
+    const fullAccount = await this.getStripe().accounts.retrieve(account.id, {
+      expand: ['external_accounts'],
+    });
+    await this.syncPayoutAccountFromStripe(tutorProfile.userId, fullAccount);
   }
 
   private toUserSubscriptionStatus(status: Stripe.Subscription.Status): UserSubscriptionStatus {
@@ -485,6 +515,40 @@ export class PaymentsService {
       return;
     }
 
+    if (paymentType === 'wallet_topup') {
+      const userId = intent.metadata['userId'];
+      if (!userId) return;
+
+      const referenceId = `wallet_topup:${intent.id}`;
+      const existing = await this.prisma.walletTransaction.findFirst({
+        where: { userId, referenceId, type: WalletTransactionType.credit },
+        select: { id: true },
+      });
+      if (existing) return;
+
+      const amountCents = intent.amount_received > 0 ? intent.amount_received : intent.amount;
+      if (!amountCents || amountCents <= 0) return;
+
+      const balanceAgg = await this.prisma.walletTransaction.aggregate({
+        where: { userId },
+        _sum: { amountCents: true },
+      });
+      const prevBalance = balanceAgg._sum.amountCents ?? 0;
+
+      await this.prisma.walletTransaction.create({
+        data: {
+          userId,
+          type: WalletTransactionType.credit,
+          amountCents,
+          balanceAfter: prevBalance + amountCents,
+          referenceId,
+        },
+      });
+
+      this.logger.log(`Wallet top-up credited for payment intent ${intent.id}`);
+      return;
+    }
+
     const bookingId = intent.metadata['bookingId'];
     if (!bookingId) return;
 
@@ -578,6 +642,91 @@ export class PaymentsService {
     return { items, total };
   }
 
+  async createWalletSetupIntent(userId: string): Promise<{ clientSecret: string }> {
+    if (this.isMockPaymentsEnabled()) {
+      return {
+        clientSecret: `mock_setup_intent_${userId}_${Date.now()}`,
+        paymentMode: 'mock' as const,
+      } as {
+        clientSecret: string;
+        paymentMode: 'mock' | 'stripe';
+      };
+    }
+
+    const stripe = this.getStripe();
+    const customerId = await this.getOrCreateStripeCustomer(userId);
+    const setupIntent = await stripe.setupIntents.create({
+      customer: customerId,
+      usage: 'off_session',
+      payment_method_types: ['card'],
+      metadata: { userId, type: 'wallet_setup' },
+    });
+
+    return {
+      clientSecret: setupIntent.client_secret as string,
+      paymentMode: 'stripe' as const,
+    } as {
+      clientSecret: string;
+      paymentMode: 'mock' | 'stripe';
+    };
+  }
+
+  async listWalletPaymentMethods(userId: string) {
+    if (this.isMockPaymentsEnabled()) {
+      return { items: [], defaultPaymentMethodId: null };
+    }
+
+    const stripe = this.getStripe();
+    const customerId = await this.getOrCreateStripeCustomer(userId);
+    const customer = await stripe.customers.retrieve(customerId);
+
+    const defaultPaymentMethodId =
+      !customer.deleted && typeof customer.invoice_settings.default_payment_method === 'string'
+        ? customer.invoice_settings.default_payment_method
+        : null;
+
+    const methods = await stripe.paymentMethods.list({
+      customer: customerId,
+      type: 'card',
+    });
+
+    return {
+      defaultPaymentMethodId,
+      items: methods.data.map((method) => ({
+        id: method.id,
+        brand: method.card?.brand ?? 'unknown',
+        last4: method.card?.last4 ?? '0000',
+        expMonth: method.card?.exp_month ?? 0,
+        expYear: method.card?.exp_year ?? 0,
+        isDefault: defaultPaymentMethodId === method.id,
+      })),
+    };
+  }
+
+  async setDefaultWalletPaymentMethod(userId: string, paymentMethodId: string) {
+    if (this.isMockPaymentsEnabled()) {
+      return { updated: true, paymentMethodId };
+    }
+
+    const stripe = this.getStripe();
+    const customerId = await this.getOrCreateStripeCustomer(userId);
+    const method = await stripe.paymentMethods.retrieve(paymentMethodId);
+
+    if (typeof method.customer === 'string' && method.customer !== customerId) {
+      throw new BadRequestException('Payment method belongs to another customer');
+    }
+
+    if (!method.customer) {
+      await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
+    }
+
+    await stripe.customers.update(customerId, {
+      invoice_settings: { default_payment_method: paymentMethodId },
+    });
+
+    return { updated: true, paymentMethodId };
+  }
+
   async topupWallet(userId: string, amountCents: number): Promise<{ clientSecret: string }> {
     if (this.isMockPaymentsEnabled()) {
       return {
@@ -648,18 +797,32 @@ export class PaymentsService {
   async createConnectOnboarding(
     userId: string,
   ): Promise<{ accountId: string; onboardingUrl: string }> {
-    const tutorProfile = await this.prisma.tutorProfile.findUniqueOrThrow({ where: { userId } });
+    const tutorProfile = await this.prisma.tutorProfile.findUniqueOrThrow({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            email: true,
+            profile: { select: { countryCode: true } },
+          },
+        },
+      },
+    });
 
     const stripe = this.getStripe();
     let accountId = tutorProfile.stripeAccountId;
 
     if (!accountId) {
+      const country = tutorProfile.user.profile?.countryCode?.toUpperCase() ?? 'US';
       const account = await stripe.accounts.create({
         type: 'express',
+        country,
+        email: tutorProfile.user.email,
         capabilities: {
           card_payments: { requested: true },
           transfers: { requested: true },
         },
+        metadata: { tutorUserId: userId },
       });
       accountId = account.id;
       await this.prisma.tutorProfile.update({
@@ -1062,6 +1225,14 @@ export class PaymentsService {
       return { transferred: false, amountCents: 0 };
     }
 
+    const connectStatus = await this.getTutorConnectStatus(booking.tutorId);
+    if (!connectStatus.payoutsEnabled || !connectStatus.hasExternalBankAccount) {
+      this.logger.warn(
+        `Skipping payout for booking ${bookingId}: tutor Stripe account is not payout-ready`,
+      );
+      return { transferred: false, amountCents: 0 };
+    }
+
     const amountCents = booking.priceCents - booking.platformFeeCents;
     if (amountCents <= 0) {
       return { transferred: false, amountCents: 0 };
@@ -1146,7 +1317,122 @@ export class PaymentsService {
     return Number(rows[0]?.total_cents ?? 0);
   }
 
+  private async syncPayoutAccountFromStripe(
+    tutorUserId: string,
+    account: Stripe.Account,
+  ): Promise<void> {
+    const bankAccount = (account.external_accounts?.data ?? []).find(
+      (item): item is Stripe.BankAccount => item.object === 'bank_account',
+    );
+
+    if (!bankAccount) {
+      return;
+    }
+
+    const accountHolderName =
+      bankAccount.account_holder_name?.trim() ||
+      account.business_profile?.name?.trim() ||
+      account.settings?.payments?.statement_descriptor?.trim() ||
+      'Stripe Connected Account';
+
+    await this.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO tutor_payout_accounts (
+        tutor_user_id,
+        account_holder_name,
+        account_number_last4,
+        bank_name,
+        routing_code,
+        currency,
+        country_code
+      ) VALUES (
+        ${tutorUserId}::uuid,
+        ${accountHolderName},
+        ${bankAccount.last4 ?? '0000'},
+        ${bankAccount.bank_name ?? 'Stripe Bank Account'},
+        ${bankAccount.routing_number ?? 'managed_by_stripe'},
+        ${bankAccount.currency?.toLowerCase() ?? 'usd'},
+        ${bankAccount.country?.toUpperCase() ?? account.country?.toUpperCase() ?? null}
+      )
+      ON CONFLICT (tutor_user_id)
+      DO UPDATE SET
+        account_holder_name = EXCLUDED.account_holder_name,
+        account_number_last4 = EXCLUDED.account_number_last4,
+        bank_name = EXCLUDED.bank_name,
+        routing_code = EXCLUDED.routing_code,
+        currency = EXCLUDED.currency,
+        country_code = EXCLUDED.country_code,
+        updated_at = CURRENT_TIMESTAMP
+    `);
+  }
+
+  private async retrieveTutorStripeAccount(userId: string): Promise<{
+    accountId: string | null;
+    account: Stripe.Account | null;
+  }> {
+    const tutorProfile = await this.prisma.tutorProfile.findUnique({
+      where: { userId },
+      select: { stripeAccountId: true },
+    });
+
+    if (!tutorProfile?.stripeAccountId) {
+      return { accountId: null, account: null };
+    }
+
+    const account = await this.getStripe().accounts.retrieve(tutorProfile.stripeAccountId, {
+      expand: ['external_accounts'],
+    });
+    await this.syncPayoutAccountFromStripe(userId, account);
+
+    return {
+      accountId: tutorProfile.stripeAccountId,
+      account,
+    };
+  }
+
+  async getTutorConnectStatus(userId: string): Promise<StripeConnectStatus> {
+    const { accountId, account } = await this.retrieveTutorStripeAccount(userId);
+
+    if (!accountId || !account) {
+      return {
+        accountId: null,
+        detailsSubmitted: false,
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        hasExternalBankAccount: false,
+        onboardingRequired: true,
+        currentlyDue: [],
+        pastDue: [],
+        disabledReason: null,
+      };
+    }
+
+    const currentlyDue = account.requirements?.currently_due ?? [];
+    const pastDue = account.requirements?.past_due ?? [];
+    const hasExternalBankAccount =
+      (account.external_accounts?.data ?? []).some((item) => item.object === 'bank_account') ??
+      false;
+    const onboardingRequired =
+      !account.details_submitted ||
+      !account.payouts_enabled ||
+      currentlyDue.length > 0 ||
+      pastDue.length > 0;
+
+    return {
+      accountId,
+      detailsSubmitted: account.details_submitted,
+      chargesEnabled: account.charges_enabled,
+      payoutsEnabled: account.payouts_enabled,
+      hasExternalBankAccount,
+      onboardingRequired,
+      currentlyDue,
+      pastDue,
+      disabledReason: account.requirements?.disabled_reason ?? null,
+    };
+  }
+
   async getTutorPayoutAccount(tutorUserId: string) {
+    await this.retrieveTutorStripeAccount(tutorUserId);
+
     const rows = await this.prisma.$queryRaw<PayoutAccountRow[]>(Prisma.sql`
       SELECT id, tutor_user_id, account_holder_name, account_number_last4, bank_name,
              routing_code, currency, country_code, created_at, updated_at
@@ -1160,46 +1446,16 @@ export class PaymentsService {
   }
 
   async upsertTutorPayoutAccount(tutorUserId: string, dto: UpsertPayoutAccountDto) {
-    const normalizedAccount = dto.accountNumber.replace(/\s+/g, '');
-    const accountLast4 = normalizedAccount.slice(-4);
-
-    if (accountLast4.length < 4) {
-      throw new BadRequestException('accountNumber must contain at least 4 digits');
-    }
-
-    await this.prisma.$executeRaw(Prisma.sql`
-      INSERT INTO tutor_payout_accounts (
-        tutor_user_id,
-        account_holder_name,
-        account_number_last4,
-        bank_name,
-        routing_code,
-        currency,
-        country_code
-      ) VALUES (
-        ${tutorUserId}::uuid,
-        ${dto.accountHolderName.trim()},
-        ${accountLast4},
-        ${dto.bankName.trim()},
-        ${dto.routingCode.trim()},
-        ${dto.currency?.toLowerCase() ?? 'usd'},
-        ${dto.countryCode?.toUpperCase() ?? null}
-      )
-      ON CONFLICT (tutor_user_id)
-      DO UPDATE SET
-        account_holder_name = EXCLUDED.account_holder_name,
-        account_number_last4 = EXCLUDED.account_number_last4,
-        bank_name = EXCLUDED.bank_name,
-        routing_code = EXCLUDED.routing_code,
-        currency = EXCLUDED.currency,
-        country_code = EXCLUDED.country_code,
-        updated_at = CURRENT_TIMESTAMP
-    `);
-
-    return this.getTutorPayoutAccount(tutorUserId);
+    void tutorUserId;
+    void dto;
+    throw new BadRequestException(
+      'Manual bank account entry is disabled. Use Stripe Connect onboarding endpoint instead.',
+    );
   }
 
   async getTutorPayoutSummary(tutorUserId: string) {
+    const connectStatus = await this.getTutorConnectStatus(tutorUserId);
+
     const [balanceAgg, payoutAgg, pendingWithdrawalCents, account] = await Promise.all([
       this.prisma.walletTransaction.aggregate({
         where: { userId: tutorUserId },
@@ -1223,7 +1479,7 @@ export class PaymentsService {
       availableToWithdrawCents,
       lifetimePayoutCents,
       minimumWithdrawalCents: MIN_WITHDRAWAL_CENTS,
-      hasPayoutAccount: Boolean(account),
+      hasPayoutAccount: Boolean(account) && connectStatus.payoutsEnabled,
     };
   }
 
@@ -1232,10 +1488,20 @@ export class PaymentsService {
       throw new BadRequestException('Amount is below the minimum withdrawal threshold');
     }
 
-    const account = await this.getTutorPayoutAccount(tutorUserId);
-    if (!account) {
+    const [account, connectStatus] = await Promise.all([
+      this.getTutorPayoutAccount(tutorUserId),
+      this.getTutorConnectStatus(tutorUserId),
+    ]);
+
+    if (!account || !connectStatus.hasExternalBankAccount) {
       throw new BadRequestException(
-        'Please add payout account details before requesting withdrawal',
+        'Please complete Stripe Connect bank account setup before requesting withdrawal',
+      );
+    }
+
+    if (!connectStatus.payoutsEnabled) {
+      throw new BadRequestException(
+        'Stripe payouts are not enabled yet. Complete onboarding requirements and try again.',
       );
     }
 
@@ -1346,6 +1612,15 @@ export class PaymentsService {
 
     if (!tutorProfile?.stripeAccountId && !this.isMockPaymentsEnabled()) {
       throw new BadRequestException('Tutor has no Stripe payout account connected');
+    }
+
+    if (!this.isMockPaymentsEnabled()) {
+      const connectStatus = await this.getTutorConnectStatus(request.tutor_user_id);
+      if (!connectStatus.payoutsEnabled || !connectStatus.hasExternalBankAccount) {
+        throw new BadRequestException(
+          'Tutor Stripe account is not ready for payouts. Ask tutor to complete onboarding.',
+        );
+      }
     }
 
     const referenceId = `withdrawal:${withdrawalId}`;

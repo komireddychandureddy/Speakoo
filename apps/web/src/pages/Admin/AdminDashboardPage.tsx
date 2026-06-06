@@ -2,14 +2,6 @@ import { useEffect, useState } from 'react';
 import { Users, GraduationCap, CalendarCheck, TrendingUp, FileCheck } from 'lucide-react';
 import { getAdminStats, type AdminStats } from '../../core/network/adminApi';
 
-const STATUS_COLORS: Record<string, string> = {
-  upcoming: 'bg-blue-100 text-blue-700',
-  completed: 'bg-[#E8F5E9] text-[#2E7D32]',
-  cancelled: 'bg-red-100 text-red-700',
-  missed: 'bg-amber-100 text-amber-700',
-  pending: 'bg-gray-100 text-gray-600',
-};
-
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
