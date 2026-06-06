@@ -1,28 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Volume2, CheckCircle, RefreshCw } from 'lucide-react';
-import { LEVELED_READINGS, type CEFRLevel } from '../../data/mockData';
+import {
+  listPracticeExerciseContent,
+  listPracticeReadings,
+  type PracticeReadingPassage,
+} from '../../core/network/contentApi';
 import VocabularyTrainerExercise from './VocabularyTrainerExercise';
 import GrammarDrillExercise from './GrammarDrillExercise';
 import DictationExercise from './DictationExercise';
 
-const PHONETICS = [
-  { ipa: '/iː/', word: 'see', eg: 'tree, feel' },    { ipa: '/ɪ/', word: 'sit', eg: 'big, hit' },
-  { ipa: '/e/', word: 'ten', eg: 'bed, red' },        { ipa: '/æ/', word: 'cat', eg: 'hat, map' },
-  { ipa: '/ɑː/', word: 'car', eg: 'far, dark' },      { ipa: '/ʌ/', word: 'cup', eg: 'bus, run' },
-  { ipa: '/ɜː/', word: 'bird', eg: 'her, word' },     { ipa: '/ɔː/', word: 'saw', eg: 'four, door' },
-];
-
-const PUZZLE_WORDS = ['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dog'];
-const PUZZLE_ANS = 'The quick brown fox jumps over the lazy dog';
-
-const FILL = [
-  { s: 'She ___ to school every day.',       opts: ['go', 'goes', 'going'],    ans: 1 },
-  { s: 'They ___ playing football right now.', opts: ['is', 'are', 'was'],     ans: 1 },
-  { s: 'He has already ___ his homework.',   opts: ['finish', 'finishes', 'finished'], ans: 2 },
-];
-
-const LISTEN_TEXT = 'Good morning! I would like to order a large coffee with a little milk and no sugar, please.';
+type CEFRLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
 
 function speak(text: string) {
   if ('speechSynthesis' in window) {
@@ -38,24 +26,47 @@ function ReadingExercise() {
   const [answers, setAnswers] = useState<number[]>([]);
   const [submitted, setSubmitted] = useState(false);
 
-  const data = LEVELED_READINGS.find((r) => r.level === level) ?? LEVELED_READINGS[2];
-  const score = answers.filter((a, i) => a === data.questions[i].ans).length;
+  const [reading, setReading] = useState<PracticeReadingPassage | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const changeLevel = (l: CEFRLevel) => { setLevel(l); setAnswers([]); setSubmitted(false); };
+  useEffect(() => {
+    setLoading(true);
+    listPracticeReadings(level)
+      .then((items) => {
+        setReading(items[0] ?? null);
+      })
+      .finally(() => setLoading(false));
+  }, [level]);
+
+  const data = reading;
+  const questions = data?.questions ?? [];
+  const score = answers.filter((a, i) => a === questions[i]?.ans).length;
+
+  const changeLevel = async (l: CEFRLevel) => {
+    setLevel(l);
+    setAnswers([]);
+    setSubmitted(false);
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         {CEFR_LEVELS.map((l) => (
-          <button key={l} onClick={() => changeLevel(l)}
+          <button key={l} onClick={() => void changeLevel(l)}
             className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${level === l ? 'bg-[#43A047] text-white border-[#43A047]' : 'border-gray-300 text-[#616161] hover:border-[#43A047]'}`}>
             {l}
           </button>
         ))}
       </div>
+      {loading ? (
+        <div className="card p-4 text-sm text-[#616161]">Loading reading passage...</div>
+      ) : !data ? (
+        <div className="card p-4 text-sm text-[#616161]">No reading passage found for this CEFR level yet.</div>
+      ) : (
+        <>
       <p className="text-xs font-semibold text-[#616161]">{data.title}</p>
       <div className="bg-[#F8FBF0] border border-[#C8E6C9] rounded-xl p-4 text-sm text-[#212121] leading-relaxed">{data.passage}</div>
-      {data.questions.map((q, qi) => (
+      {questions.map((q, qi) => (
         <div key={`${level}-${qi}`} className="card p-4">
           <p className="font-semibold text-sm mb-3">{qi + 1}. {q.q}</p>
           <div className="grid gap-2">
@@ -74,33 +85,64 @@ function ReadingExercise() {
         </div>
       ))}
       {!submitted ? (
-        <button disabled={answers.length < data.questions.length} onClick={() => setSubmitted(true)} className="btn-primary w-full py-2.5 disabled:opacity-40">Submit Answers</button>
+        <button disabled={answers.length < questions.length} onClick={() => setSubmitted(true)} className="btn-primary w-full py-2.5 disabled:opacity-40">Submit Answers</button>
       ) : (
         <div className="card p-4 text-center bg-[#E8F5E9]">
           <CheckCircle size={24} className="text-[#43A047] mx-auto mb-1" />
-          <p className="font-bold text-lg text-[#2E7D32]">{score}/{data.questions.length} Correct!</p>
+          <p className="font-bold text-lg text-[#2E7D32]">{score}/{questions.length} Correct!</p>
           <p className="text-sm text-[#616161]">You earned {score * 10} XP</p>
         </div>
+      )}
+      </>
       )}
     </div>
   );
 }
 
 function ListeningExercise() {
+  const [listenText, setListenText] = useState('');
+  const [opts, setOpts] = useState<string[]>([]);
+  const [correctIndex, setCorrectIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [revealed, setRevealed] = useState(false);
   const [chosen, setChosen] = useState<number | null>(null);
-  const opts = ['Tea without milk', 'Large coffee with milk', 'Small black coffee'];
+
+  useEffect(() => {
+    listPracticeExerciseContent('listening')
+      .then((items) => {
+        const payload = (items[0]?.payload ?? null) as
+          | { transcript?: string; options?: string[]; answerIndex?: number }
+          | null;
+        setListenText(payload?.transcript ?? '');
+        setOpts(payload?.options ?? []);
+        setCorrectIndex(typeof payload?.answerIndex === 'number' ? payload.answerIndex : 0);
+      })
+      .catch(() => {
+        setListenText('');
+        setOpts([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return <div className="card p-4 text-sm text-[#616161]">Loading listening exercise...</div>;
+  }
+
+  if (!listenText || opts.length === 0) {
+    return <div className="card p-4 text-sm text-[#616161]">No listening exercise content available.</div>;
+  }
+
   return (
     <div className="space-y-4">
       <div className="card p-6 text-center">
         <p className="text-sm text-[#616161] mb-4">Press play to hear the audio, then answer the question below.</p>
-        <button onClick={() => speak(LISTEN_TEXT)} className="inline-flex items-center gap-2 bg-[#43A047] hover:bg-[#2E7D32] text-white px-6 py-3 rounded-xl font-semibold transition-colors">
+        <button onClick={() => speak(listenText)} className="inline-flex items-center gap-2 bg-[#43A047] hover:bg-[#2E7D32] text-white px-6 py-3 rounded-xl font-semibold transition-colors">
           <Volume2 size={18} /> Play Audio
         </button>
         <button onClick={() => setRevealed(!revealed)} className="block mx-auto mt-3 text-xs text-[#43A047] underline">
           {revealed ? 'Hide' : 'Show'} Transcript
         </button>
-        {revealed && <p className="mt-3 text-sm text-[#212121] bg-[#F8FBF0] rounded-lg p-3 text-left">{LISTEN_TEXT}</p>}
+        {revealed && <p className="mt-3 text-sm text-[#212121] bg-[#F8FBF0] rounded-lg p-3 text-left">{listenText}</p>}
       </div>
       <div className="card p-4">
         <p className="font-semibold text-sm mb-3">What did the person order?</p>
@@ -112,19 +154,49 @@ function ListeningExercise() {
             </button>
           ))}
         </div>
-        {chosen === 1 && <p className="mt-3 text-sm text-green-700 font-semibold flex items-center gap-1"><CheckCircle size={14} /> Correct! +10 XP</p>}
-        {chosen !== null && chosen !== 1 && <p className="mt-3 text-sm text-red-600">Not quite — try listening again.</p>}
+        {chosen === correctIndex && <p className="mt-3 text-sm text-green-700 font-semibold flex items-center gap-1"><CheckCircle size={14} /> Correct! +10 XP</p>}
+        {chosen !== null && chosen !== correctIndex && <p className="mt-3 text-sm text-red-600">Not quite — try listening again.</p>}
       </div>
     </div>
   );
 }
 
 function PhoneticsDrill() {
+  const [phonetics, setPhonetics] = useState<Array<{ ipa: string; word: string; eg: string }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    listPracticeExerciseContent('phonetics')
+      .then((items) => {
+        const payload = (items[0]?.payload ?? null) as
+          | Array<{ ipa?: string; word?: string; eg?: string }>
+          | null;
+        if (Array.isArray(payload) && payload.length > 0) {
+          const normalized = payload
+            .filter((item) => item.ipa && item.word)
+            .map((item) => ({ ipa: item.ipa as string, word: item.word as string, eg: item.eg ?? '' }));
+          setPhonetics(normalized);
+        }
+      })
+      .catch(() => {
+        setPhonetics([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return <div className="card p-4 text-sm text-[#616161]">Loading phonetics drill...</div>;
+  }
+
+  if (phonetics.length === 0) {
+    return <div className="card p-4 text-sm text-[#616161]">No phonetics content available.</div>;
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-[#616161]">Tap a phoneme card to hear it. Practice by repeating each sound aloud.</p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {PHONETICS.map((p) => (
+        {phonetics.map((p) => (
           <button key={p.ipa} onClick={() => speak(`${p.word}. ${p.word}.`)}
             className="card p-3 hover:border-[#43A047] hover:shadow-md transition-all text-center group">
             <span className="block text-2xl font-mono font-bold text-[#43A047]">{p.ipa}</span>
@@ -140,9 +212,41 @@ function PhoneticsDrill() {
 }
 
 function WordPuzzle() {
-  const [bank, setBank] = useState(() => [...PUZZLE_WORDS].sort(() => Math.random() - 0.5));
+  const [puzzleWords, setPuzzleWords] = useState<string[]>([]);
+  const [answer, setAnswer] = useState('');
+  const [bank, setBank] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string[]>([]);
-  const done = selected.join(' ') === PUZZLE_ANS;
+  const done = selected.join(' ') === answer;
+
+  useEffect(() => {
+    listPracticeExerciseContent('word-puzzle')
+      .then((items) => {
+        const payload = (items[0]?.payload ?? null) as
+          | { words?: string[]; answer?: string }
+          | null;
+        const words = payload?.words ?? [];
+        if (words.length > 0) {
+          setPuzzleWords(words);
+          setBank([...words].sort(() => Math.random() - 0.5));
+        }
+        if (payload?.answer) setAnswer(payload.answer);
+      })
+      .catch(() => {
+        setPuzzleWords([]);
+        setBank([]);
+        setAnswer('');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return <div className="card p-4 text-sm text-[#616161]">Loading word puzzle...</div>;
+  }
+
+  if (puzzleWords.length === 0 || !answer) {
+    return <div className="card p-4 text-sm text-[#616161]">No word puzzle content available.</div>;
+  }
 
   const addWord = (i: number) => {
     setSelected([...selected, bank[i]]);
@@ -152,7 +256,7 @@ function WordPuzzle() {
     setBank([...bank, selected[i]]);
     setSelected(selected.filter((_, idx) => idx !== i));
   };
-  const reset = () => { setSelected([]); setBank([...PUZZLE_WORDS].sort(() => Math.random() - 0.5)); };
+  const reset = () => { setSelected([]); setBank([...puzzleWords].sort(() => Math.random() - 0.5)); };
 
   return (
     <div className="space-y-4">
@@ -179,12 +283,42 @@ function WordPuzzle() {
 }
 
 function FillBlank() {
+  const [fill, setFill] = useState<Array<{ s: string; opts: string[]; ans: number }>>([]);
+  const [loading, setLoading] = useState(true);
   const [answers, setAnswers] = useState<number[]>([]);
   const [submitted, setSubmitted] = useState(false);
-  const score = answers.filter((a, i) => a === FILL[i].ans).length;
+
+  useEffect(() => {
+    listPracticeExerciseContent('sentence')
+      .then((items) => {
+        const payload = (items[0]?.payload ?? null) as
+          | Array<{ s?: string; opts?: string[]; ans?: number }>
+          | null;
+        if (Array.isArray(payload) && payload.length > 0) {
+          const normalized = payload
+            .filter((q) => q.s && Array.isArray(q.opts) && typeof q.ans === 'number')
+            .map((q) => ({ s: q.s as string, opts: q.opts as string[], ans: q.ans as number }));
+          setFill(normalized);
+        }
+      })
+      .catch(() => {
+        setFill([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const score = answers.filter((a, i) => a === fill[i].ans).length;
+
+  if (loading) {
+    return <div className="card p-4 text-sm text-[#616161]">Loading sentence exercise...</div>;
+  }
+
+  if (fill.length === 0) {
+    return <div className="card p-4 text-sm text-[#616161]">No sentence exercise content available.</div>;
+  }
   return (
     <div className="space-y-4">
-      {FILL.map((q, qi) => (
+      {fill.map((q, qi) => (
         <div key={qi} className="card p-4">
           <p className="font-semibold text-sm mb-3">{q.s}</p>
           <div className="flex flex-wrap gap-2">
@@ -201,10 +335,10 @@ function FillBlank() {
         </div>
       ))}
       {!submitted ? (
-        <button disabled={answers.length < FILL.length} onClick={() => setSubmitted(true)} className="btn-primary w-full py-2.5 disabled:opacity-40">Submit</button>
+        <button disabled={answers.length < fill.length} onClick={() => setSubmitted(true)} className="btn-primary w-full py-2.5 disabled:opacity-40">Submit</button>
       ) : (
         <div className="card p-4 text-center bg-[#E8F5E9]">
-          <p className="font-bold text-lg text-[#2E7D32]">{score}/{FILL.length} Correct! +{score * 15} XP</p>
+          <p className="font-bold text-lg text-[#2E7D32]">{score}/{fill.length} Correct! +{score * 15} XP</p>
         </div>
       )}
     </div>

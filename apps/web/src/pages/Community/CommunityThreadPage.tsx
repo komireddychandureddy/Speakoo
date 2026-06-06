@@ -1,7 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ThumbsUp, Send, MessageSquare } from 'lucide-react';
-import { COMMUNITY_THREADS, COMMUNITY_REPLIES, type CommunityReply } from '../../data/mockData';
+import {
+  addCommunityReply,
+  getCommunityThread,
+  likeCommunityThread,
+  type CommunityReply,
+  type CommunityThreadDetail,
+} from '../../core/network/communityApi';
 
 const CAT_LABEL: Record<string, string> = {
   question: '❓ Question', discussion: '💬 Discussion', tip: '💡 Tip', resource: '📚 Resource',
@@ -24,11 +30,32 @@ export default function CommunityThreadPage() {
   const navigate = useNavigate();
   const [liked, setLiked] = useState(false);
   const [reply, setReply] = useState('');
-  const [replies, setReplies] = useState<CommunityReply[]>(
-    COMMUNITY_REPLIES.filter((r) => r.threadId === id),
-  );
+  const [thread, setThread] = useState<CommunityThreadDetail | null>(null);
+  const [replies, setReplies] = useState<CommunityReply[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const thread = COMMUNITY_THREADS.find((t) => t.id === id);
+  useEffect(() => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
+    getCommunityThread(id)
+      .then((data) => {
+        setThread(data);
+        setReplies(data.replies);
+        setError(null);
+      })
+      .catch(() => {
+        setError('Thread not found.');
+      })
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return <div className="card p-8 text-center text-[#616161]">Loading thread...</div>;
+  }
 
   if (!thread) {
     return (
@@ -39,19 +66,29 @@ export default function CommunityThreadPage() {
     );
   }
 
-  const handleReply = () => {
+  const handleReply = async () => {
     if (!reply.trim()) return;
-    const newReply: CommunityReply = {
-      id: `cr-new-${Date.now()}`,
-      threadId: id!,
-      authorName: 'You',
-      authorAvatar: 'ME',
-      body: reply.trim(),
-      createdAt: new Date().toISOString(),
-      likes: 0,
-    };
-    setReplies([...replies, newReply]);
-    setReply('');
+    if (!id) return;
+    try {
+      const created = await addCommunityReply(id, reply.trim());
+      setReplies((prev) => [...prev, created]);
+      setReply('');
+      setThread((prev) => (prev ? { ...prev, replyCount: prev.replyCount + 1 } : prev));
+      setError(null);
+    } catch {
+      setError('Unable to post your reply.');
+    }
+  };
+
+  const handleLike = async () => {
+    if (!id || liked) return;
+    try {
+      const updated = await likeCommunityThread(id);
+      setLiked(true);
+      setThread((prev) => (prev ? { ...prev, likesCount: updated.likesCount } : prev));
+    } catch {
+      setError('Unable to register your like right now.');
+    }
   };
 
   return (
@@ -60,10 +97,16 @@ export default function CommunityThreadPage() {
         <ArrowLeft size={16} /> Back to Community Forum
       </button>
 
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* Thread card */}
       <div className="card p-5">
         <div className="flex items-center gap-2 flex-wrap mb-3">
-          <span className="text-xl leading-none">{thread.flag}</span>
+          <span className="text-xl leading-none">🌍</span>
           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CAT_COLOR[thread.category]}`}>
             {CAT_LABEL[thread.category]}
           </span>
@@ -75,15 +118,15 @@ export default function CommunityThreadPage() {
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-100 flex-wrap">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-[#E8F5E9] flex items-center justify-center text-xs font-bold text-[#43A047]">
-              {thread.authorAvatar}
+              {(thread.author.profile?.displayName ?? 'U').slice(0, 2).toUpperCase()}
             </div>
-            <span className="text-sm font-semibold text-[#212121]">{thread.authorName}</span>
+            <span className="text-sm font-semibold text-[#212121]">{thread.author.profile?.displayName ?? 'Community Member'}</span>
           </div>
           <span className="text-xs text-[#616161]">{timeAgo(thread.createdAt)}</span>
           <button
-            onClick={() => setLiked(!liked)}
+            onClick={() => void handleLike()}
             className={`ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${liked ? 'border-[#43A047] bg-[#E8F5E9] text-[#43A047]' : 'border-gray-200 text-[#616161] hover:border-[#43A047]'}`}>
-            <ThumbsUp size={12} /> {thread.likes + (liked ? 1 : 0)}
+            <ThumbsUp size={12} /> {thread.likesCount}
           </button>
         </div>
 
@@ -109,14 +152,14 @@ export default function CommunityThreadPage() {
             <div key={r.id} className="card p-4">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-7 h-7 rounded-full bg-[#E8F5E9] flex items-center justify-center text-xs font-bold text-[#43A047]">
-                  {r.authorAvatar}
+                  {(r.author.profile?.displayName ?? 'U').slice(0, 2).toUpperCase()}
                 </div>
-                <span className="text-sm font-semibold text-[#212121]">{r.authorName}</span>
+                <span className="text-sm font-semibold text-[#212121]">{r.author.profile?.displayName ?? 'Community Member'}</span>
                 <span className="text-xs text-[#616161] ml-auto">{timeAgo(r.createdAt)}</span>
               </div>
               <p className="text-sm text-[#424242] leading-relaxed">{r.body}</p>
               <div className="flex items-center gap-1 mt-2 text-xs text-[#616161]">
-                <ThumbsUp size={11} /> {r.likes}
+                <ThumbsUp size={11} /> {r.likesCount}
               </div>
             </div>
           ))}
@@ -134,7 +177,7 @@ export default function CommunityThreadPage() {
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#43A047]"
         />
         <button
-          onClick={handleReply}
+          onClick={() => void handleReply()}
           disabled={!reply.trim()}
           className="mt-2 btn-primary flex items-center gap-2 px-4 py-2 text-sm disabled:opacity-40">
           <Send size={14} /> Post Reply

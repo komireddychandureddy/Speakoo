@@ -1,55 +1,64 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle, RotateCcw, ChevronRight } from 'lucide-react';
+import { listPracticeExerciseContent } from '../../core/network/contentApi';
 
-const VOCAB = [
-  {
-    word: 'Eloquent',
-    sentence: 'The speaker gave an ___ speech that moved the entire audience.',
-    opts: ['Angry and emotional', 'Fluent and persuasive in speaking', 'Short and unclear', 'Loud and aggressive'],
-    ans: 1,
-  },
-  {
-    word: 'Ambiguous',
-    sentence: 'The contract clause was ___ and required legal clarification.',
-    opts: ['Extremely clear', 'Having more than one possible meaning', 'Written in legal terms', 'Short and simple'],
-    ans: 1,
-  },
-  {
-    word: 'Meticulous',
-    sentence: 'She was ___ in her research, checking every single source.',
-    opts: ['Very lazy and careless', 'Easily distracted', 'Showing great attention to detail', 'Done very quickly'],
-    ans: 2,
-  },
-  {
-    word: 'Resilient',
-    sentence: 'Despite many setbacks, the entrepreneur remained ___ and kept moving forward.',
-    opts: ['Extremely stubborn', 'Able to recover quickly from difficulties', 'Easily discouraged', 'Very cautious'],
-    ans: 1,
-  },
-  {
-    word: 'Pragmatic',
-    sentence: 'He took a ___ approach and focused on what would actually work.',
-    opts: ['Idealistic and dreamy', 'Dealing with things sensibly and realistically', 'Based on theory only', 'Overly emotional'],
-    ans: 1,
-  },
-  {
-    word: 'Verbose',
-    sentence: 'His ___ writing style made the report much longer than necessary.',
-    opts: ['Very clear and concise', 'Using more words than needed', 'Written in a foreign language', 'Extremely technical'],
-    ans: 1,
-  },
-];
+type VocabularyItem = { word: string; sentence: string; opts: string[]; ans: number };
 
 export default function VocabularyTrainerExercise() {
+  const [vocab, setVocab] = useState<VocabularyItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
   const [chosen, setChosen] = useState<number | null>(null);
   const [xp, setXp] = useState(0);
   const [known, setKnown] = useState<boolean[]>([]);
 
-  const word = VOCAB[index];
+  useEffect(() => {
+    listPracticeExerciseContent('vocabulary')
+      .then((items) => {
+        const payload = (items[0]?.payload ?? null) as
+          | Array<{ word?: string; sentence?: string; opts?: string[]; ans?: number }>
+          | null;
+
+        if (Array.isArray(payload) && payload.length > 0) {
+          const normalized = payload
+            .filter(
+              (item) =>
+                item.word && item.sentence && Array.isArray(item.opts) && typeof item.ans === 'number',
+            )
+            .map((item) => ({
+              word: item.word as string,
+              sentence: item.sentence as string,
+              opts: item.opts as string[],
+              ans: item.ans as number,
+            }));
+
+          if (normalized.length > 0) {
+            setVocab(normalized);
+            setIndex(0);
+            setChosen(null);
+            setXp(0);
+            setKnown([]);
+          }
+        }
+      })
+      .catch(() => {
+        setVocab([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return <div className="card p-4 text-sm text-[#616161]">Loading vocabulary exercise...</div>;
+  }
+
+  if (vocab.length === 0) {
+    return <div className="card p-4 text-sm text-[#616161]">No vocabulary exercise content available.</div>;
+  }
+
+  const word = vocab[index];
   const submitted = chosen !== null;
   const isCorrect = chosen === word?.ans;
-  const done = index >= VOCAB.length;
+  const done = index >= vocab.length;
 
   const handleChoice = (i: number) => {
     if (submitted) return;
@@ -69,7 +78,7 @@ export default function VocabularyTrainerExercise() {
     return (
       <div className="card p-8 text-center space-y-3">
         <CheckCircle size={32} className="text-[#43A047] mx-auto" />
-        <p className="text-xl font-bold text-[#212121]">{known.filter(Boolean).length}/{VOCAB.length} words mastered!</p>
+        <p className="text-xl font-bold text-[#212121]">{known.filter(Boolean).length}/{vocab.length} words mastered!</p>
         <p className="text-sm text-[#616161]">You earned {xp} XP this session.</p>
         <button onClick={reset} className="inline-flex items-center gap-1 text-sm text-[#43A047] hover:underline">
           <RotateCcw size={13} /> Practice again
@@ -81,11 +90,11 @@ export default function VocabularyTrainerExercise() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between text-sm">
-        <span className="text-[#616161]">Word {index + 1} of {VOCAB.length}</span>
+        <span className="text-[#616161]">Word {index + 1} of {vocab.length}</span>
         <span className="font-semibold text-[#43A047]">{xp} XP earned</span>
       </div>
       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div className="h-full bg-[#43A047] rounded-full transition-all" style={{ width: `${(index / VOCAB.length) * 100}%` }} />
+        <div className="h-full bg-[#43A047] rounded-full transition-all" style={{ width: `${(index / vocab.length) * 100}%` }} />
       </div>
 
       <div className="card p-6 text-center bg-gradient-to-br from-[#F8FBF0] to-white">

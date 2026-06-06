@@ -1,5 +1,5 @@
-﻿import { useState } from 'react';
-import { CURRICULUM_NOTES } from '../../data/mockData';
+﻿import { useEffect, useState } from 'react';
+import { listMySessionNotes, type SessionNoteItem } from '../../core/network/learningApi';
 
 const FEATURE_CARDS = [
   {
@@ -26,19 +26,29 @@ const NOTES_PER_PAGE = 6;
 
 export default function CurriculumPage() {
   const [page, setPage] = useState(1);
-  const totalPages = Math.ceil(CURRICULUM_NOTES.length / NOTES_PER_PAGE);
-  const paginatedNotes = CURRICULUM_NOTES.slice(
+  const [notes, setNotes] = useState<SessionNoteItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    listMySessionNotes()
+      .then((items) => setNotes(items))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const totalPages = Math.ceil(notes.length / NOTES_PER_PAGE);
+  const paginatedNotes = notes.slice(
     (page - 1) * NOTES_PER_PAGE,
     page * NOTES_PER_PAGE
   );
 
-  const handleDownload = (noteId: string, topic: string) => {
-    const content = `Session Notes\n\nTopic: ${topic}\n\n[PDF content would be here]\n`;
+  const handleDownload = (note: SessionNoteItem) => {
+    const created = new Date(note.createdAt).toLocaleString();
+    const content = `Session Notes\n\nSummary: ${note.summary}\n\nStrengths: ${note.strengths ?? 'N/A'}\nWeaknesses: ${note.weaknesses ?? 'N/A'}\nNext Steps: ${note.nextSteps ?? 'N/A'}\nCreated: ${created}\n`;
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `note-${noteId}-${topic.replace(/\s+/g, '-')}.txt`;
+    a.download = `session-note-${note.id}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -64,20 +74,24 @@ export default function CurriculumPage() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-gray-900">Session Notes</h3>
-          <p className="text-xs text-gray-400">{CURRICULUM_NOTES.length} sessions total</p>
+          <p className="text-xs text-gray-400">{notes.length} sessions total</p>
         </div>
         <div className="space-y-3">
-          {paginatedNotes.map((note) => (
+          {loading ? (
+            <div className="card px-5 py-4 text-sm text-gray-500">Loading session notes...</div>
+          ) : paginatedNotes.length === 0 ? (
+            <div className="card px-5 py-4 text-sm text-gray-500">No session notes available yet.</div>
+          ) : paginatedNotes.map((note, index) => (
             <div key={note.id} className="card px-5 py-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-[#E8F5E9] flex items-center justify-center flex-shrink-0">
-                <span className="text-[#43A047] font-bold text-sm">#{note.sessionNumber}</span>
+                <span className="text-[#43A047] font-bold text-sm">#{(page - 1) * NOTES_PER_PAGE + index + 1}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 text-sm truncate">{note.topic}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{note.date}</p>
+                <p className="font-semibold text-gray-900 text-sm truncate">{note.summary}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{new Date(note.createdAt).toLocaleDateString()}</p>
               </div>
               <button
-                onClick={() => handleDownload(note.id, note.topic)}
+                onClick={() => handleDownload(note)}
                 className="btn-outline flex-shrink-0 text-xs"
               >
                 ⬇ PDF

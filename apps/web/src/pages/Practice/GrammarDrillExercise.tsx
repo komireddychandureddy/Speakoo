@@ -1,42 +1,79 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, RotateCcw } from 'lucide-react';
+import { listPracticeExerciseContent } from '../../core/network/contentApi';
 
 const CATEGORIES = ['Verb Tenses', 'Prepositions', 'Pronouns', 'Conditionals'] as const;
 type GrammarCategory = (typeof CATEGORIES)[number];
 
-const DRILLS: Record<GrammarCategory, { s: string; opts: string[]; ans: number; exp: string }[]> = {
-  'Verb Tenses': [
-    { s: 'By next year, she ___ at this company for a decade.', opts: ['works', 'will have worked', 'has worked'], ans: 1, exp: 'Future Perfect: action completed before a future point.' },
-    { s: 'He ___ his homework when she called.', opts: ['was doing', 'has done', 'did'], ans: 0, exp: 'Past Continuous: an ongoing action interrupted by another.' },
-    { s: 'I ___ English since I was six years old.', opts: ['learn', 'have been learning', 'learned'], ans: 1, exp: 'Present Perfect Continuous: action started in the past, still ongoing.' },
-  ],
-  'Prepositions': [
-    { s: 'She arrived ___ the airport just in time.', opts: ['to', 'at', 'in'], ans: 1, exp: '"at" is used for specific locations like airports, stations, and schools.' },
-    { s: 'The meeting is scheduled ___ Monday morning.', opts: ['in', 'on', 'at'], ans: 1, exp: '"on" is used with days of the week.' },
-    { s: 'He has been working ___ this project for months.', opts: ['at', 'with', 'on'], ans: 2, exp: '"work on" is the correct collocation for projects and tasks.' },
-  ],
-  'Pronouns': [
-    { s: '___ is the person who called last night?', opts: ['Whom', 'Who', 'Whose'], ans: 1, exp: '"Who" is a subject pronoun — it is the subject of "called".' },
-    { s: 'Give the package to ___ is responsible.', opts: ['whoever', 'whomever', "whoever's"], ans: 0, exp: '"Whoever" is the subject of "is responsible".' },
-    { s: 'The results surprised both him and ___.', opts: ['I', 'me', 'myself'], ans: 1, exp: 'In objective position (after "and"), use the object pronoun "me".' },
-  ],
-  'Conditionals': [
-    { s: 'If she ___ harder, she would pass the exam.', opts: ['studies', 'studied', 'had studied'], ans: 1, exp: 'Type 2 Conditional: hypothetical present/future situation.' },
-    { s: 'If it ___ tomorrow, we will cancel the event.', opts: ['rains', 'rained', 'had rained'], ans: 0, exp: 'Type 1 Conditional: real or likely future condition.' },
-    { s: 'If they ___ the map, they would not have gotten lost.', opts: ['bring', 'brought', 'had brought'], ans: 2, exp: 'Type 3 Conditional: hypothetical past situation.' },
-  ],
+type DrillQuestion = { s: string; opts: string[]; ans: number; exp: string };
+type DrillMap = Record<GrammarCategory, DrillQuestion[]>;
+
+const EMPTY_DRILLS: DrillMap = {
+  'Verb Tenses': [],
+  Prepositions: [],
+  Pronouns: [],
+  Conditionals: [],
 };
 
 export default function GrammarDrillExercise() {
+  const [drills, setDrills] = useState(EMPTY_DRILLS);
+  const [loading, setLoading] = useState(true);
   const [cat, setCat] = useState<GrammarCategory>('Verb Tenses');
   const [answers, setAnswers] = useState<number[]>([]);
   const [submitted, setSubmitted] = useState(false);
 
-  const qs = DRILLS[cat];
+  useEffect(() => {
+    listPracticeExerciseContent('grammar')
+      .then((items) => {
+        const payload = (items[0]?.payload ?? null) as
+          | Partial<Record<GrammarCategory, Array<{ s?: string; opts?: string[]; ans?: number; exp?: string }>>>
+          | null;
+
+        if (!payload || typeof payload !== 'object') return;
+
+        const next: DrillMap = { ...EMPTY_DRILLS };
+        for (const category of CATEGORIES) {
+          const list = payload[category];
+          if (!Array.isArray(list)) continue;
+          const normalized = list
+            .filter(
+              (item) => item.s && Array.isArray(item.opts) && typeof item.ans === 'number' && item.exp,
+            )
+            .map((item) => ({
+              s: item.s as string,
+              opts: item.opts as string[],
+              ans: item.ans as number,
+              exp: item.exp as string,
+            }));
+
+          if (normalized.length > 0) {
+            next[category] = normalized;
+          }
+        }
+
+        setDrills(next);
+        setAnswers([]);
+        setSubmitted(false);
+      })
+      .catch(() => {
+        setDrills(EMPTY_DRILLS);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const qs = useMemo(() => drills[cat], [drills, cat]);
   const score = answers.filter((a, i) => a === qs[i].ans).length;
 
   const reset = () => { setAnswers([]); setSubmitted(false); };
   const changeCategory = (c: GrammarCategory) => { setCat(c); setAnswers([]); setSubmitted(false); };
+
+  if (loading) {
+    return <div className="card p-4 text-sm text-[#616161]">Loading grammar drills...</div>;
+  }
+
+  if (qs.length === 0) {
+    return <div className="card p-4 text-sm text-[#616161]">No grammar drills available for this category.</div>;
+  }
 
   return (
     <div className="space-y-4">

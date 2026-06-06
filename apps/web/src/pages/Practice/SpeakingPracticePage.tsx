@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Mic, BookOpen, Headphones, Volume2, Puzzle, AlignLeft,
   Users, Clock, Gem, CheckCircle, Video, Library, GraduationCap, Mic2,
 } from 'lucide-react';
-import { PRACTICE_SESSIONS, type CEFRLevel } from '../../data/mockData';
+import { joinPracticeSession, listPracticeSessions, type PracticeSession } from '../../core/network/practiceApi';
+
+type CEFRLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
 
 const EXERCISE_TYPES = [
   { type: 'speaking',    icon: Mic,           label: 'Speaking',        desc: 'Live group calls',            color: '#43A047', bg: '#E8F5E9' },
@@ -26,10 +29,38 @@ const LEVEL_COLOR: Record<CEFRLevel, string> = {
   C2: 'bg-red-100 text-red-700',
 };
 
+function getLevelColor(level: string): string {
+  return LEVEL_COLOR[level as CEFRLevel] ?? 'bg-gray-100 text-gray-700';
+}
+
 export default function SpeakingPracticePage() {
   const navigate = useNavigate();
   const userCredits = 120;
   const demoCompleted = true;
+  const [sessions, setSessions] = useState<PracticeSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    listPracticeSessions()
+      .then((data) => {
+        setSessions(data);
+        setError(null);
+      })
+      .catch(() => {
+        setError('Unable to load practice sessions right now.');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleJoin = async (sessionId: string) => {
+    try {
+      await joinPracticeSession(sessionId);
+      navigate(`/practice/join/${sessionId}`);
+    } catch {
+      setError('Unable to join this practice session. It may be full.');
+    }
+  };
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -83,29 +114,40 @@ export default function SpeakingPracticePage() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-bold text-[#212121]">Upcoming Group Sessions</h2>
-          <span className="text-xs text-[#43A047] font-semibold">{PRACTICE_SESSIONS.length} scheduled</span>
+          <span className="text-xs text-[#43A047] font-semibold">{sessions.length} scheduled</span>
         </div>
+        {error && (
+          <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
         <div className="space-y-3">
-          {PRACTICE_SESSIONS.map((s) => {
+          {loading ? (
+            <div className="card p-6 text-sm text-[#616161]">Loading sessions...</div>
+          ) : sessions.length === 0 ? (
+            <div className="card p-6 text-sm text-[#616161]">No upcoming sessions found.</div>
+          ) : sessions.map((s) => {
             const dt = new Date(s.scheduledAt);
-            const spotsLeft = s.maxParticipants - s.currentParticipants;
+            const currentParticipants = s._count?.participants ?? 0;
+            const spotsLeft = s.maxParticipants - currentParticipants;
+            const tutorName = s.host.profile?.displayName ?? 'Tutor';
             return (
               <div key={s.id} className="card p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:shadow-md transition-shadow">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="text-lg">{s.flag}</span>
+                    <span className="text-lg">🌍</span>
                     <span className="font-semibold text-sm text-[#212121] truncate">{s.title}</span>
-                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${LEVEL_COLOR[s.level]}`}>{s.level}</span>
+                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLevelColor(s.level)}`}>{s.level}</span>
                   </div>
-                  <p className="text-xs text-[#616161] mb-2">🗣 {s.topic} · hosted by {s.hostName}</p>
+                  <p className="text-xs text-[#616161] mb-2">🗣 {s.topic} · hosted by {tutorName}</p>
                   <div className="flex items-center gap-4 text-xs text-[#616161] flex-wrap">
                     <span className="flex items-center gap-1"><Clock size={11} /> {dt.toLocaleDateString()} {dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} UTC</span>
-                    <span className="flex items-center gap-1"><Users size={11} /> {s.currentParticipants}/{s.maxParticipants}</span>
+                    <span className="flex items-center gap-1"><Users size={11} /> {currentParticipants}/{s.maxParticipants}</span>
                     <span className="flex items-center gap-1"><Gem size={11} /> {s.creditCost} credits</span>
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate(`/practice/join/${s.id}`)}
+                  onClick={() => void handleJoin(s.id)}
                   disabled={spotsLeft === 0}
                   className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${spotsLeft > 0 ? 'bg-[#43A047] hover:bg-[#2E7D32] text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                 >

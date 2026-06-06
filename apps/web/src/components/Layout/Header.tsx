@@ -1,10 +1,10 @@
 ﻿import { useEffect, useState } from 'react';
 import { Bell, Gem } from 'lucide-react';
 import NotificationsPanel from '../Notifications/NotificationsPanel';
-import { NOTIFICATIONS, MOCK_CREDIT_BALANCE } from '../../data/mockData';
 import { LanguageSwitcher } from '../../core/i18n/I18nContext';
 import { useLocale } from '../../core/locale/LocaleContext';
 import { getWalletBalance } from '../../core/network/paymentsApi';
+import { getMyNotifications } from '../../core/network/notificationsApi';
 
 interface HeaderProps {
   title: string;
@@ -13,10 +13,10 @@ interface HeaderProps {
 
 export default function Header({ title, onMenuToggle }: HeaderProps) {
   const [showNotifs, setShowNotifs] = useState(false);
+  const [unread, setUnread] = useState(0);
   const [credits, setCredits] = useState<number>(() => {
-    return Number(localStorage.getItem('speakoo_credits') ?? MOCK_CREDIT_BALANCE);
+    return Number(localStorage.getItem('speakoo_credits') ?? 0);
   });
-  const unread = NOTIFICATIONS.filter((n) => !n.isRead).length;
   const { fmtCredits } = useLocale();
   const buildVersion = __APP_BUILD_VERSION__;
 
@@ -29,6 +29,14 @@ export default function Header({ title, onMenuToggle }: HeaderProps) {
       })
       .catch(() => {
         // Keep fallback credits if wallet endpoint is not available for this role.
+      });
+
+    getMyNotifications(1, 20)
+      .then((items) => {
+        setUnread(items.length);
+      })
+      .catch(() => {
+        setUnread(0);
       });
   }, []);
 

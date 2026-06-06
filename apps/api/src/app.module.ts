@@ -21,6 +21,7 @@ import { PracticeModule } from './modules/practice/practice.module';
 import { CommunityModule } from './modules/community/community.module';
 import { SafetyModule } from './modules/safety/safety.module';
 import { LearningModule } from './modules/learning/learning.module';
+import { ContentModule } from './modules/content/content.module';
 import { GlobalJwtAuthGuard } from './modules/auth/guards/global-jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -69,6 +70,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     CommunityModule,
     SafetyModule,
     LearningModule,
+    ContentModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: GlobalJwtAuthGuard },

@@ -1,11 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Volume2, CheckCircle, RotateCcw } from 'lucide-react';
+import { listPracticeExerciseContent } from '../../core/network/contentApi';
 
-const DICTATION_ITEMS = [
-  { text: 'She studies English every morning before breakfast.', level: 'A2' },
-  { text: 'The meeting was postponed due to an unexpected delay.', level: 'B1' },
-  { text: 'Despite the heavy rainfall, the outdoor event continued as planned.', level: 'B2' },
-];
+type DictationItem = { text: string; level: string };
 
 function speak(text: string, rate: number) {
   if ('speechSynthesis' in window) {
@@ -21,15 +18,48 @@ function normalize(s: string) {
 }
 
 export default function DictationExercise() {
+  const [items, setItems] = useState<DictationItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
   const [typed, setTyped] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   const [slow, setSlow] = useState(false);
 
-  const item = DICTATION_ITEMS[index];
+  useEffect(() => {
+    listPracticeExerciseContent('dictation')
+      .then((entries) => {
+        const payload = (entries[0]?.payload ?? null) as Array<{ text?: string; level?: string }> | null;
+        if (!Array.isArray(payload) || payload.length === 0) return;
+        const normalized = payload
+          .filter((item) => item.text && item.level)
+          .map((item) => ({ text: item.text as string, level: item.level as string }));
+        if (normalized.length > 0) {
+          setItems(normalized);
+          setIndex(0);
+          setTyped('');
+          setSubmitted(false);
+          setScore(0);
+          setSlow(false);
+        }
+      })
+      .catch(() => {
+        setItems([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return <div className="card p-4 text-sm text-[#616161]">Loading dictation exercise...</div>;
+  }
+
+  if (items.length === 0) {
+    return <div className="card p-4 text-sm text-[#616161]">No dictation content available.</div>;
+  }
+
+  const item = items[index];
   const isCorrect = normalize(typed) === normalize(item.text);
-  const done = submitted && index === DICTATION_ITEMS.length - 1;
+  const done = submitted && index === items.length - 1;
 
   const handleSubmit = () => {
     if (isCorrect) setScore((s) => s + 10);
@@ -49,7 +79,7 @@ export default function DictationExercise() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-[#616161]">
-          Item {index + 1} of {DICTATION_ITEMS.length}
+          Item {index + 1} of {items.length}
           <span className="ml-2 text-xs font-semibold text-[#43A047] bg-[#E8F5E9] px-1.5 py-0.5 rounded-full">{item.level}</span>
         </p>
         <span className="text-xs font-semibold text-[#43A047]">{score} XP</span>

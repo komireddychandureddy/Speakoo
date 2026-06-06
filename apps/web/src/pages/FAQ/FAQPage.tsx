@@ -1,9 +1,17 @@
-﻿import { useState } from 'react';
-import { FAQ_DATA } from '../../data/mockData';
+﻿import { useEffect, useState } from 'react';
+import { listFaqItems, type FaqItem } from '../../core/network/contentApi';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function FAQPage() {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [faqs, setFaqs] = useState<FaqItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    listFaqItems()
+      .then((items) => setFaqs(items))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="max-w-2xl space-y-3">
@@ -12,7 +20,11 @@ export default function FAQPage() {
         <p className="text-sm text-gray-500 mt-1">Find answers to the most common questions about Speakoo.</p>
       </div>
 
-      {FAQ_DATA.map((faq) => {
+      {loading ? (
+        <div className="card px-5 py-6 text-sm text-gray-500">Loading FAQs...</div>
+      ) : faqs.length === 0 ? (
+        <div className="card px-5 py-6 text-sm text-gray-500">No FAQs available yet.</div>
+      ) : faqs.map((faq) => {
         const isOpen = openId === faq.id;
         return (
           <div

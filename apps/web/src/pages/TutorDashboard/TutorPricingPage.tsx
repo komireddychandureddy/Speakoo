@@ -1,23 +1,71 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Save } from 'lucide-react';
 import { useI18n } from '../../core/i18n/I18nContext';
 import { useLocale } from '../../core/locale/LocaleContext';
-import { BASE_SESSION_PRICES, PLATFORM_FEE_PERCENT } from '../../data/mockData';
+import { getMyProfile, upsertMyProfile } from '../../core/network/tutorsApi';
 
 const DURATIONS = [30, 45, 60, 90] as const;
+const PLATFORM_FEE_PERCENT = 5;
+
+function getDurationBasePrice(hourlyRateCents: number, duration: number): number {
+  return Math.round((hourlyRateCents * duration) / 60);
+}
 
 export default function TutorPricingPage() {
   const { t } = useI18n();
   const { fmtPrice } = useLocale();
 
+  const [hourlyRateCents, setHourlyRateCents] = useState(0);
+  const [languagesTaught, setLanguagesTaught] = useState<string[]>([]);
+  const [cefrSpecialties, setCefrSpecialties] = useState<string[]>([]);
   const [addons, setAddons] = useState<Record<number, number>>(
     () => ({ 30: 50, 45: 80, 60: 100, 90: 150 }),
   );
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  useEffect(() => {
+    getMyProfile()
+      .then((profile) => {
+        setHourlyRateCents(profile.hourlyRateCents);
+        setLanguagesTaught(profile.languagesTaught);
+        setCefrSpecialties(profile.cefrSpecialties);
+      })
+      .catch(() => {
+        setError('Unable to load your current pricing profile.');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const computedBaseByDuration = useMemo(() => {
+    return DURATIONS.reduce<Record<number, number>>((acc, duration) => {
+      acc[duration] = getDurationBasePrice(hourlyRateCents, duration);
+      return acc;
+    }, {});
+  }, [hourlyRateCents]);
+
+  const handleSave = async () => {
+    if (hourlyRateCents <= 0 || languagesTaught.length === 0 || cefrSpecialties.length === 0) {
+      setError('Complete your tutor profile before saving pricing.');
+      return;
+    }
+
+    const suggestedHourly = Math.max(100, addons[60] + computedBaseByDuration[60]);
+
+    try {
+      await upsertMyProfile({
+        hourlyRateCents: suggestedHourly,
+        languagesTaught,
+        cefrSpecialties,
+      });
+      setHourlyRateCents(suggestedHourly);
+      setSaved(true);
+      setError(null);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setError('Unable to save pricing right now. Please try again.');
+    }
   };
 
   return (
@@ -30,6 +78,12 @@ export default function TutorPricingPage() {
         </p>
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <div className="grid grid-cols-5 bg-[#F5F5F5] text-xs font-semibold text-[#616161] px-5 py-3 uppercase tracking-wide">
           <span>Duration</span>
@@ -39,8 +93,10 @@ export default function TutorPricingPage() {
           <span>{t('fee_you_earn')}</span>
         </div>
 
-        {DURATIONS.map((dur) => {
-          const base = BASE_SESSION_PRICES[dur];
+        {loading ? (
+          <div className="px-5 py-6 text-sm text-[#616161]">Loading pricing...</div>
+        ) : DURATIONS.map((dur) => {
+          const base = computedBaseByDuration[dur] ?? 0;
           const addon = addons[dur] ?? 0;
           const total = base + addon;
           const platformFee = Math.round(total * PLATFORM_FEE_PERCENT / 100);
@@ -78,7 +134,7 @@ export default function TutorPricingPage() {
 
       <div className="flex justify-end">
         <button
-          onClick={handleSave}
+          onClick={() => void handleSave()}
           className="flex items-center gap-2 px-5 py-2.5 bg-[#43A047] hover:bg-[#2E7D32] text-white font-semibold rounded-xl transition-colors text-sm"
         >
           <Save size={15} />

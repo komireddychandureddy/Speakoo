@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageSquare, ThumbsUp, Plus, Search, Globe, X } from 'lucide-react';
-import { COMMUNITY_THREADS } from '../../data/mockData';
+import {
+  createCommunityThread,
+  listCommunityThreads,
+  type CommunityThread,
+} from '../../core/network/communityApi';
 
 const LANGUAGES = ['All', 'English', 'French', 'Spanish', 'German', 'Japanese', 'Arabic', 'Hindi', 'Mandarin'] as const;
 const CATEGORIES = ['All', 'question', 'discussion', 'tip', 'resource'] as const;
@@ -21,17 +25,57 @@ export default function CommunityPage() {
   const [lang, setLang] = useState<string>('All');
   const [cat, setCat] = useState<Category>('All');
   const [search, setSearch] = useState('');
+  const [threads, setThreads] = useState<CommunityThread[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newBody, setNewBody] = useState('');
   const [newLang, setNewLang] = useState('English');
 
-  const filtered = COMMUNITY_THREADS.filter(
+  useEffect(() => {
+    listCommunityThreads({
+      ...(lang !== 'All' ? { language: lang } : {}),
+      ...(cat !== 'All' ? { category: cat } : {}),
+    })
+      .then((data) => {
+        setThreads(data);
+        setError(null);
+      })
+      .catch(() => {
+        setError('Unable to load community threads right now.');
+      })
+      .finally(() => setLoading(false));
+  }, [lang, cat]);
+
+  const filtered = threads.filter(
     (t) =>
-      (lang === 'All' || t.language === lang) &&
-      (cat === 'All' || t.category === cat) &&
       (search === '' || t.title.toLowerCase().includes(search.toLowerCase())),
   );
+
+  const handleCreatePost = async () => {
+    if (!newTitle.trim() || !newBody.trim()) return;
+
+    try {
+      await createCommunityThread({
+        language: newLang,
+        title: newTitle.trim(),
+        body: newBody.trim(),
+        category: cat === 'All' ? 'discussion' : cat,
+      });
+      const refreshed = await listCommunityThreads({
+        ...(lang !== 'All' ? { language: lang } : {}),
+        ...(cat !== 'All' ? { category: cat } : {}),
+      });
+      setThreads(refreshed);
+      setShowNew(false);
+      setNewTitle('');
+      setNewBody('');
+      setError(null);
+    } catch {
+      setError('Unable to create post. Please try again.');
+    }
+  };
 
   return (
     <div className="max-w-4xl space-y-4">
@@ -68,10 +112,16 @@ export default function CommunityPage() {
             <div className="flex gap-3">
               <button onClick={() => { setShowNew(false); setNewTitle(''); setNewBody(''); }}
                 className="flex-1 border border-gray-200 text-sm py-2 rounded-lg hover:bg-gray-50 text-[#616161]">Cancel</button>
-              <button disabled={!newTitle.trim() || !newBody.trim()} onClick={() => { setShowNew(false); setNewTitle(''); setNewBody(''); }}
+              <button disabled={!newTitle.trim() || !newBody.trim()} onClick={() => void handleCreatePost()}
                 className="flex-1 btn-primary text-sm py-2 disabled:opacity-40">Post</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
         </div>
       )}
 
@@ -107,7 +157,9 @@ export default function CommunityPage() {
 
       {/* Thread List */}
       <div className="space-y-3">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="card p-8 text-center text-[#616161] text-sm">Loading community threads...</div>
+        ) : filtered.length === 0 ? (
           <div className="card p-8 text-center text-[#616161] text-sm">
             No posts found. Be the first to post in this language!
           </div>
@@ -117,20 +169,20 @@ export default function CommunityPage() {
               className="card p-4 text-left w-full hover:shadow-md hover:border-[#C8E6C9] transition-all">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-[#E8F5E9] flex items-center justify-center text-sm font-bold text-[#43A047] shrink-0">
-                  {t.authorAvatar}
+                  {(t.author.profile?.displayName ?? 'U').slice(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="text-base leading-none">{t.flag}</span>
+                    <span className="text-base leading-none">🌍</span>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CAT_COLOR[t.category]}`}>{CAT_LABEL[t.category]}</span>
                     <span className="text-xs text-[#616161]">{t.language}</span>
                   </div>
                   <p className="font-semibold text-sm text-[#212121] leading-snug">{t.title}</p>
                   <p className="text-xs text-[#616161] mt-0.5 line-clamp-2">{t.body}</p>
                   <div className="flex items-center gap-4 mt-2 text-xs text-[#616161]">
-                    <span className="flex items-center gap-1"><MessageSquare size={11} /> {t.replies} replies</span>
-                    <span className="flex items-center gap-1"><ThumbsUp size={11} /> {t.likes}</span>
-                    <span className="ml-auto">by {t.authorName}</span>
+                    <span className="flex items-center gap-1"><MessageSquare size={11} /> {t.replyCount} replies</span>
+                    <span className="flex items-center gap-1"><ThumbsUp size={11} /> {t.likesCount}</span>
+                    <span className="ml-auto">by {t.author.profile?.displayName ?? 'Community Member'}</span>
                   </div>
                   {t.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
